@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/billing";
+import { openAiJson } from "@/lib/ai/openai-json";
+import { acquireLease, releaseLease } from "@/lib/ops/lease";
+import { cronSecret, unauthorizedCron, verifyCronRequest } from "@/lib/security/cron-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
-
-function authorized(request: Request) {
-  return Boolean(process.env.CRON_SECRET) &&
-    request.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
-}
 
 function productionHost() {
   const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
@@ -18,47 +16,53 @@ function productionHost() {
 async function callOperatorLoop() {
   const response = await fetch(`https://${productionHost()}/api/cron/operator-loop`, {
     headers: {
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      Authorization: `Bearer ${cronSecret()}`,
       ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
         ? { "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET }
         : {}),
     },
     cache: "no-store",
+    redirect: "manual",
   });
+  if (response.status >= 300 && response.status < 400) {
+    throw new Error(`operator-loop was redirected (HTTP ${response.status}). Check Vercel Deployment Protection and VERCEL_AUTOMATION_BYPASS_SECRET.`);
+  }
   const payload = await response.json().catch(() => ({}));
   return { status: response.status, payload };
 }
 
 async function supervisorDecision(input: unknown) {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return null;
+  const text = await openAiJson({
+    system: "あなたはAI集客システムの巡回監督です。観測値だけを使い、異常・修復結果・未解決事項をJSONで要約してください。作業していないことを修復済みと書かないでください。severityはhealthy|attention|critical。",
+    user: JSON.stringify(input),
+  });
+  if (!text) return null;
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-5-mini",
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: "あなたはAI集客システムの巡回監督です。観測値だけを使い、異常・修復結果・未解決事項をJSONで要約してください。作業していないことを修復済みと書かないでください。severityはhealthy|attention|critical。" },
-          { role: "user", content: JSON.stringify(input) },
-        ],
-      }),
-    });
-    if (!response.ok) return null;
-    const payload = await response.json();
-    const text = payload.choices?.[0]?.message?.content;
-    return text ? JSON.parse(text) : null;
+    return JSON.parse(text);
   } catch {
     return null;
   }
 }
 
+const LEASE_NAME = "ai-patrol";
+
 export async function GET(request: Request) {
-  if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+  const auth = verifyCronRequest(request);
+  if (!auth.ok) return unauthorizedCron(auth);
 
   const db = getAdminSupabase();
+  const lease = await acquireLease(db, LEASE_NAME, (maxDuration + 10) * 1000);
+  if (!lease.acquired) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "ai-patrol is already running", leaseExpiresAt: lease.expiresAt });
+  }
+  try {
+    return await runPatrol(db);
+  } finally {
+    await releaseLease(db, LEASE_NAME, lease).catch((error) => console.error("ai-patrol lease release failed", error));
+  }
+}
+
+async function runPatrol(db: ReturnType<typeof getAdminSupabase>) {
   const checkedAt = new Date().toISOString();
   const repairs: Array<Record<string, unknown>> = [];
 

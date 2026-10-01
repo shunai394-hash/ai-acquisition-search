@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     const body = await request.json() as {
       socialPostId?: string;
-      verdict?: "continue" | "pivot" | "stop";
+      verdict?: "continue" | "pivot" | "stop" | "wait";
       nextAction?: string;
       changedAngle?: string;
       changedHook?: string;
@@ -45,11 +45,32 @@ export async function POST(request: Request) {
     };
     if (!body.socialPostId) return NextResponse.json({ error: "socialPostIdが必要です。" }, { status: 400 });
     sourcePostId = body.socialPostId;
-    if (body.verdict === "stop") {
-      return NextResponse.json({ error: "STOP判定では次Creativeを自動生成しません。" }, { status: 409 });
+    if (body.verdict === "stop" || body.verdict === "wait") {
+      return NextResponse.json({ error: body.verdict === "stop" ? "STOP判定では次Creativeを自動生成しません。" : "データ不足(WAIT)のため次Creativeを生成しません。", verdict: body.verdict }, { status: 409 });
     }
 
     const db = getAdminSupabase();
+
+    // The latest stored Teacher verdict wins over the request body, so a stale
+    // or wrong client verdict can never generate a creative after STOP / WAIT.
+    const { data: latestVerdict } = await db.from("operator_runs")
+      .select("id,output")
+      .eq("user_id", user.id)
+      .eq("run_type", "ai_performance_verdict")
+      .eq("input->>social_post_id", body.socialPostId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const storedVerdict = latestVerdict?.output && typeof latestVerdict.output === "object"
+      ? String((latestVerdict.output as Record<string, unknown>).verdict || "")
+      : "";
+    if (storedVerdict === "stop" || storedVerdict === "wait") {
+      return NextResponse.json({
+        error: storedVerdict === "stop" ? "最新のTeacher判定がSTOPのため次Creativeを生成しません。" : "最新のTeacher判定がWAIT(データ不足)のため次Creativeを生成しません。",
+        verdict: storedVerdict,
+        decisionRunId: latestVerdict?.id,
+      }, { status: 409 });
+    }
     const { data: post, error: postError } = await db.from("social_posts")
       .select("id,user_id,creative_id,network,caption,metadata").eq("id", body.socialPostId).eq("user_id", user.id).maybeSingle();
     if (postError) throw postError;
@@ -110,7 +131,7 @@ export async function POST(request: Request) {
     if (creativeError) throw creativeError;
     if (!creative) return NextResponse.json({ error: "元クリエイティブが見つかりません。" }, { status: 404 });
 
-    const verdict = body.verdict || "pivot";
+    const verdict = body.verdict || (storedVerdict === "continue" || storedVerdict === "pivot" ? storedVerdict : "pivot");
     const nextAction = body.nextAction || "前回と異なるHookと訴求で再テストする";
     const hook = body.changedHook || (
       verdict === "continue"
@@ -137,7 +158,7 @@ export async function POST(request: Request) {
         test_metric: body.testMetric || "CTR / CVR / ROAS",
         scenes: [
           { order: 1, role: "hook", text: hook },
-          { order: 2, role: "problem", text: "前回と異なる顧客課題を具体化する" },
+          { order: 2, role: "problem", text: verdict === "continue" ? "前回と同じ顧客課題を、別の切り口で具体化する" : "前回と異なる顧客課題を具体化する" },
           { order: 3, role: "solution", text: "商品による解決を実演する" },
           { order: 4, role: "proof", text: "確認可能な事実・使用感だけを示す" },
           { order: 5, role: "cta", text: "次の行動を1つだけ提示する" }
@@ -158,6 +179,7 @@ export async function POST(request: Request) {
         source_social_post_id: post.id,
         source_creative_id: creative.id,
         operator_verdict: verdict,
+        operator_decision_run_id: latestVerdict?.id ?? null,
         iteration_angle: angle,
         test_metric: body.testMetric || "CTR / CVR / ROAS",
         auto_publish: true,
@@ -204,7 +226,7 @@ export async function POST(request: Request) {
       user_id: user.id,
       run_type: "next_creative",
       status: "completed",
-      input: { source_social_post_id: post.id, source_creative_id: creative.id, verdict },
+      input: { source_social_post_id: post.id, source_creative_id: creative.id, verdict, decision_run_id: latestVerdict?.id ?? null },
       output: { next_creative_id: nextCreative.id, next_social_post_id: nextPost.id, video, angle, hook, nextAction },
       started_at: new Date().toISOString(),
       completed_at: new Date().toISOString()

@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run backtest:decision
+      - run: npm run build
+      # The repository has pre-existing lint errors outside the decision loop;
+      # report them without blocking until they are cleaned up.
+      - run: npm run lint
+        continue-on-error: true

@@ -118,6 +118,8 @@ final creative
 
 人間が設定するのは、商品、予算、ブランドルール、運用範囲などです。
 
+判定ロジック（Evidence → Teacher → CONTINUE / PIVOT / STOP / WAIT → 次アクション）、二重実行防止、本番設定と検証方法は [docs/decision-loop.md](docs/decision-loop.md) を参照してください。
+
 ## ローカル開発
 
 ```powershell

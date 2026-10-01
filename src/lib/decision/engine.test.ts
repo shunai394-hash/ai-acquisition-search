@@ -1,0 +1,84 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { buildDecision, refineNextAction } from "./engine";
+import { evidence, metric } from "./__fixtures__/evidence";
+
+const REQUIRED = ["action_type", "target_customer", "hypothesis", "reason", "expected_outcome", "primary_metric", "learning_objective", "priority", "evidence", "confidence", "logic_version", "prompt_version", "model_version", "generated_at"] as const;
+
+test("decision is fully structured", () => {
+  const d = buildDecision(evidence({ current: metric({ impressions: 4000, clicks: 120 }) }));
+  for (const key of REQUIRED) assert.ok(d[key] !== undefined && d[key] !== "", `missing ${key}`);
+  assert.equal(d.action_type, "reinforce_hypothesis");
+  assert.equal(d.next_action.generate_creative, true);
+  assert.equal(d.next_action.change_variable, "hook");
+});
+
+test("evidence includes product, customer, EC-Pulse and metrics", () => {
+  const d = buildDecision(evidence({ current: metric({ impressions: 4000, clicks: 120 }) }));
+  const sources = new Set(d.evidence.map((e) => e.source));
+  for (const s of ["product", "customer", "ec_pulse", "post_metrics", "hypothesis"]) assert.ok(sources.has(s as never), s);
+  assert.ok(d.evidence.some((e) => e.key === "gross_margin_rate" && e.value === 0.6));
+});
+
+test("STOP and WAIT never request a creative", () => {
+  const stop = buildDecision(evidence({ current: metric({ impressions: 6000, clicks: 10 }) }, { lineageVerdicts: ["pivot", "pivot"] }));
+  assert.equal(stop.verdict, "stop");
+  assert.equal(stop.next_action.generate_creative, false);
+  const wait = buildDecision(evidence({ current: metric({ impressions: 50 }) }));
+  assert.equal(wait.verdict, "wait");
+  assert.equal(wait.action_type, "wait_for_data");
+  assert.equal(wait.next_action.generate_creative, false);
+});
+
+test("PIVOT uses an EC-Pulse pain that differs from the current angle", () => {
+  const d = buildDecision(evidence({ current: metric({ impressions: 6000, clicks: 10 }) }));
+  assert.equal(d.verdict, "pivot");
+  assert.equal(d.next_action.angle, "結露でカバンが濡れる");
+  assert.notEqual(d.next_action.angle, "飲み物がすぐぬるくなる");
+});
+
+test("PIVOT without EC-Pulse data still produces a changed hypothesis", () => {
+  const e = evidence({ current: metric({ impressions: 6000, clicks: 10 }), market: { status: "unavailable", topPains: [], emergingPains: [] } });
+  const d = buildDecision(e);
+  assert.equal(d.verdict, "pivot");
+  assert.ok(d.evidence.some((x) => x.source === "ec_pulse" && x.value === "unavailable"));
+});
+
+test("input_hash is stable across asOf and generated_at for identical data", () => {
+  const a = buildDecision(evidence({ current: metric({ impressions: 4000, clicks: 120 }) }), new Date("2026-10-01T00:00:00Z"));
+  const b = buildDecision(evidence({ asOf: "2026-10-01T06:00:00.000Z", current: metric({ impressions: 4000, clicks: 120 }) }), new Date("2026-10-01T06:00:00Z"));
+  assert.equal(a.input_hash, b.input_hash);
+  const c = buildDecision(evidence({ current: metric({ impressions: 4000, clicks: 121 }) }));
+  assert.notEqual(a.input_hash, c.input_hash);
+});
+
+test("WAIT expiring into a verdict changes the hash (no stale cached WAIT)", () => {
+  const fresh = buildDecision(evidence({ current: metric({ impressions: 100 }) }));
+  const expired = buildDecision(evidence({ asOf: "2026-10-10T00:00:00.000Z", current: metric({ impressions: 100 }) }));
+  assert.equal(fresh.verdict, "wait");
+  assert.equal(expired.verdict, "pivot");
+  assert.notEqual(fresh.input_hash, expired.input_hash);
+});
+
+test("LLM refinement cannot change the verdict and ignores invalid output", async () => {
+  const e = evidence({ current: metric({ impressions: 4000, clicks: 120 }) });
+  const d = buildDecision(e);
+  const refined = await refineNextAction(d, e, async () => JSON.stringify({ verdict: "stop", hook: "新しいHook", angle: "別訴求" }), "test-model");
+  assert.equal(refined.verdict, "continue");
+  assert.equal(refined.next_action.hook, "新しいHook");
+  assert.equal(refined.next_action.angle, d.next_action.angle, "CONTINUE keeps the angle");
+  assert.equal(refined.model_version, "test-model");
+  const broken = await refineNextAction(d, e, async () => "not json", "test-model");
+  assert.deepEqual(broken, d);
+  const failed = await refineNextAction(d, e, async () => { throw new Error("AI API down"); }, "test-model");
+  assert.deepEqual(failed, d);
+});
+
+test("refinement is skipped for STOP", async () => {
+  const e = evidence({ current: metric({ impressions: 6000, clicks: 10 }) }, { lineageVerdicts: ["pivot", "pivot"] });
+  const d = buildDecision(e);
+  let called = false;
+  const r = await refineNextAction(d, e, async () => { called = true; return "{}"; }, "m");
+  assert.equal(called, false);
+  assert.equal(r.next_action.generate_creative, false);
+});

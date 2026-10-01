@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { secretMatches } from "@/lib/security/cron-auth";
 
 function requireEnv(name: string) {
   const value = process.env[name];
@@ -24,12 +25,7 @@ export async function getUserFromBearer(request: Request) {
   const internalSecret = request.headers.get("x-internal-secret");
   const internalUserId = request.headers.get("x-internal-user-id");
 
-  if (
-    internalSecret &&
-    internalUserId &&
-    process.env.CRON_SECRET &&
-    internalSecret === process.env.CRON_SECRET
-  ) {
+  if (internalSecret && internalUserId && secretMatches(internalSecret)) {
     const admin = getAdminSupabase();
     const { data, error } = await admin.auth.admin.getUserById(internalUserId);
     if (!error && data.user) return data.user;

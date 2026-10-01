@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/billing";
+import { ecPulseFetch } from "@/lib/ec-pulse/client";
 
 export const runtime = "nodejs";
-
-const EC_PULSE_API_URL = (process.env.EC_PULSE_API_URL || "https://ec-pulse-rk8mola3m-naitoshyuichirou-6935.vercel.app").replace(/\/$/, "");
+export const maxDuration = 120;
 
 type PainPoint = {
   pain: string;
@@ -36,13 +36,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const headers = { "Content-Type": "application/json", "X-API-Key": apiKey };
-
-    const ingestResponse = await fetch(EC_PULSE_API_URL + "/v1/research/ingest", {
+    const ingestResponse = await ecPulseFetch("/v1/research/ingest", {
       method: "POST",
-      headers,
       body: JSON.stringify({ urls: [url], max_comments_per_url: 500 }),
-      cache: "no-store"
+      timeoutMs: 60000
     });
 
     const ingest = await ingestResponse.json().catch(() => ({}));
@@ -68,17 +65,16 @@ export async function POST(request: NextRequest) {
     const products: Array<Record<string, unknown>> = [];
 
     for (const query of uniqueQueries) {
-      const response = await fetch(EC_PULSE_API_URL + "/v1/products/search", {
+      const response = await ecPulseFetch("/v1/products/search", {
         method: "POST",
-        headers,
         body: JSON.stringify({
           query,
           marketplaces: ["amazon", "rakuten", "yahoo"],
           limit: 5
         }),
-        cache: "no-store"
-      });
-      if (!response.ok) continue;
+        timeoutMs: 20000
+      }).catch(() => null);
+      if (!response?.ok) continue;
       const data = await response.json().catch(() => null);
       for (const item of data?.results ?? []) {
         products.push({
@@ -103,11 +99,11 @@ export async function POST(request: NextRequest) {
 
     let opportunity = null;
     if (runId) {
-      const opportunityResponse = await fetch(
-        EC_PULSE_API_URL + "/v1/research/runs/" + encodeURIComponent(runId) + "/opportunity",
-        { method: "GET", headers, cache: "no-store" }
-      );
-      if (opportunityResponse.ok) {
+      const opportunityResponse = await ecPulseFetch(
+        "/v1/research/runs/" + encodeURIComponent(runId) + "/opportunity",
+        { method: "GET", timeoutMs: 30000 }
+      ).catch(() => null);
+      if (opportunityResponse?.ok) {
         opportunity = await opportunityResponse.json().catch(() => null);
       }
     }

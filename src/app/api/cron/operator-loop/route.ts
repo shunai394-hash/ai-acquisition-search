@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/billing";
 import { generateHiggsfieldVideo } from "@/lib/video/higgsfield";
+import { acquireLease, releaseLease } from "@/lib/ops/lease";
+import { cronSecret, unauthorizedCron, verifyCronRequest } from "@/lib/security/cron-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -21,7 +23,7 @@ async function internalRequest(
 ) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "x-internal-secret": process.env.CRON_SECRET || "",
+    "x-internal-secret": cronSecret(),
     "x-internal-user-id": userId,
   };
 
@@ -90,7 +92,7 @@ async function publishCompletedVideo(
   }
 
   const published = Array.isArray(result.payload?.results)
-    ? result.payload.results.filter((item: any) => item?.ok)
+    ? result.payload.results.filter((item: { ok?: boolean } | null) => item?.ok)
     : [];
 
   if (published.length > 0) {
@@ -108,13 +110,27 @@ async function publishCompletedVideo(
   return { ok: published.length > 0, status: result.status, result: result.payload };
 }
 
+const LEASE_NAME = "operator-loop";
+
 export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const auth = verifyCronRequest(request);
+  if (!auth.ok) return unauthorizedCron(auth);
 
   const db = getAdminSupabase();
+  // Vercel Cron and the AI patrol can both invoke this loop. Only one run may
+  // execute at a time; the lease expires with the function's maxDuration.
+  const lease = await acquireLease(db, LEASE_NAME, (maxDuration + 10) * 1000);
+  if (!lease.acquired) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "operator-loop is already running", leaseExpiresAt: lease.expiresAt, ranAt: new Date().toISOString() });
+  }
+  try {
+    return await runOperatorLoop(db, lease.mode);
+  } finally {
+    await releaseLease(db, LEASE_NAME, lease).catch((error) => console.error("operator-loop lease release failed", error));
+  }
+}
+
+async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMode: string) {
   const evaluationDelayHours = Math.max(6, Number(process.env.OPERATOR_EVALUATION_DELAY_HOURS || 12));
   const cutoff = new Date(Date.now() - evaluationDelayHours * 60 * 60 * 1000).toISOString();
   const results: unknown[] = [];
@@ -163,8 +179,17 @@ export async function GET(request: Request) {
         continue;
       }
 
-      if (decision.payload?.verdict === "stop") {
-        results.push({ postId: post.id, network: post.network, verdict: "stop", nextCreative: false });
+      // STOP: never generate. WAIT (insufficient data): re-evaluate on a later run.
+      const verdict = decision.payload?.verdict;
+      if (verdict === "stop" || verdict === "wait" || decision.payload?.generateCreative === false) {
+        results.push({
+          postId: post.id,
+          network: post.network,
+          verdict,
+          decisionRunId: decision.payload?.runId,
+          reusedDecision: decision.payload?.reused === true,
+          nextCreative: false,
+        });
         continue;
       }
 
@@ -182,6 +207,7 @@ export async function GET(request: Request) {
         postId: post.id,
         network: post.network,
         verdict: decision.payload?.verdict,
+        decisionRunId: decision.payload?.runId,
         nextCreative: next.status >= 200 && next.status < 300,
         nextStatus: next.status,
         nextCreativeId: next.payload?.creative?.id,
@@ -379,6 +405,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     ok: true,
+    lease: leaseMode,
     checked: posts?.length || 0,
     processed: results.length,
     results,

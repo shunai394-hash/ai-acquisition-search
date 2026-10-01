@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/billing";
+import { ecPulseFetch } from "@/lib/ec-pulse/client";
 
 export const runtime = "nodejs";
-
-const EC_PULSE_API_URL = (process.env.EC_PULSE_API_URL || "https://ec-pulse-rk8mola3m-naitoshyuichirou-6935.vercel.app").replace(/\/$/, "");
 
 export async function GET(request: NextRequest) {
   const user = await getUserFromBearer(request);
@@ -20,10 +19,7 @@ export async function GET(request: NextRequest) {
   if (url) params.set("url", url);
 
   try {
-    const response = await fetch(
-      EC_PULSE_API_URL + "/v1/research/runs?" + params.toString(),
-      { headers: { "X-API-Key": apiKey }, cache: "no-store" }
-    );
+    const response = await ecPulseFetch("/v1/research/runs?" + params.toString(), { method: "GET" });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       return NextResponse.json(
