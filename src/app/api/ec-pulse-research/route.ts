@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/billing";
+import { ecPulseBaseUrl } from "@/lib/ec-pulse/client";
 
 export const runtime = "nodejs";
 
-const EC_PULSE_API_URL = (process.env.EC_PULSE_API_URL || "https://ec-pulse-rk8mola3m-naitoshyuichirou-6935.vercel.app").replace(/\/$/, "");
+const EC_PULSE_API_URL = ecPulseBaseUrl();
 
 type PainPoint = {
   pain: string;

@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/billing";
+import { cronAuthDiagnostics, cronSecret, isAuthorizedCron } from "@/lib/security/cron-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
-
-function authorized(request: Request) {
-  return Boolean(process.env.CRON_SECRET) &&
-    request.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
-}
 
 function productionHost() {
   const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
@@ -18,7 +14,7 @@ function productionHost() {
 async function callOperatorLoop() {
   const response = await fetch(`https://${productionHost()}/api/cron/operator-loop`, {
     headers: {
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      Authorization: `Bearer ${cronSecret()}`,
       ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
         ? { "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET }
         : {}),
@@ -56,7 +52,10 @@ async function supervisorDecision(input: unknown) {
 }
 
 export async function GET(request: Request) {
-  if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+  if (!isAuthorizedCron(request)) {
+    console.warn("patrol-ai unauthorized", cronAuthDiagnostics(request));
+    return new Response("Unauthorized", { status: 401 });
+  }
 
   const db = getAdminSupabase();
   const checkedAt = new Date().toISOString();

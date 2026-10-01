@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/billing";
 import { generateHiggsfieldVideo } from "@/lib/video/higgsfield";
+import { cronAuthDiagnostics, cronSecret, isAuthorizedCron } from "@/lib/security/cron-auth";
+import { acquireLease } from "@/lib/operator/lease";
+import { decideForPost } from "@/lib/operator/decide";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -21,7 +24,7 @@ async function internalRequest(
 ) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "x-internal-secret": process.env.CRON_SECRET || "",
+    "x-internal-secret": cronSecret() || "",
     "x-internal-user-id": userId,
   };
 
@@ -109,22 +112,44 @@ async function publishCompletedVideo(
 }
 
 export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCron(request)) {
+    // 認証は無効化しない。原因切り分け用に秘密値を含まない診断だけをログに残す。
+    console.warn("operator-loop unauthorized", cronAuthDiagnostics(request));
     return new Response("Unauthorized", { status: 401 });
   }
 
   const db = getAdminSupabase();
+
+  // 同時に2つの Cron / 巡回AI が走っても、片方だけが処理する。
+  const lease = await acquireLease(db, "operator-loop", maxDuration + 60);
+  if (!lease.acquired) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "operator-loop is already running", heldUntil: lease.expiresAt });
+  }
+  try {
+    return await runOperatorLoop(db, lease.enforced);
+  } finally {
+    await lease.release().catch((error) => console.error("operator-loop lease release failed", error));
+  }
+}
+
+async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseEnforced: boolean) {
   const evaluationDelayHours = Math.max(6, Number(process.env.OPERATOR_EVALUATION_DELAY_HOURS || 12));
+  const maxEvaluationDays = Math.max(1, Number(process.env.OPERATOR_MAX_EVALUATION_DAYS || 30));
   const cutoff = new Date(Date.now() - evaluationDelayHours * 60 * 60 * 1000).toISOString();
+  const oldest = new Date(Date.now() - maxEvaluationDays * 24 * 60 * 60 * 1000).toISOString();
   const results: unknown[] = [];
 
+  // STOP 済み・次の投稿へ引き継ぎ済み（superseded）の投稿は除外する。
+  // 以前は古い順に50件を毎回取得していたため、判定が終わった古い投稿が枠を占有し、
+  // 新しい投稿がいつまでも巡回されない問題があった。
   const { data: posts, error } = await db
     .from("social_posts")
-    .select("id,user_id,network,published_at,external_post_id")
+    .select("id,user_id,network,published_at,external_post_id,metadata")
     .eq("status", "published")
     .not("external_post_id", "is", null)
     .lt("published_at", cutoff)
+    .gte("published_at", oldest)
+    .or("metadata->>operator_patrol_status.is.null,metadata->>operator_patrol_status.eq.active")
     .order("published_at", { ascending: true })
     .limit(50);
 
@@ -155,33 +180,45 @@ export async function GET(request: Request) {
         continue;
       }
 
-      const decision = await internalRequest("POST", "/api/operator/ai-decision", post.user_id, {
-        socialPostId: post.id,
-      });
-      if (decision.status < 200 || decision.status >= 300) {
-        results.push({ postId: post.id, network: post.network, step: "decision", status: decision.status, error: decision.payload?.error });
+      // Decision は同一プロセス内で実行する（内部HTTPの認証・保護設定に依存しない）。
+      const decided = await decideForPost(db, { userId: post.user_id, socialPostId: post.id });
+      if (!decided.ok) {
+        results.push({ postId: post.id, network: post.network, step: "decision", status: decided.status, error: decided.error });
         continue;
       }
+      const decision = decided.decision;
 
-      if (decision.payload?.verdict === "stop") {
-        results.push({ postId: post.id, network: post.network, verdict: "stop", nextCreative: false });
+      // STOP: 次のクリエイティブ・動画は生成しない。WAIT: データが揃うまで次回巡回で再判定。
+      if (decision.verdict === "stop" || decision.verdict === "wait") {
+        results.push({
+          postId: post.id,
+          network: post.network,
+          verdict: decision.verdict,
+          actionType: decision.action_type,
+          decisionRunId: decided.runId,
+          reusedDecision: decided.reused,
+          nextCreative: false,
+        });
         continue;
       }
 
       const next = await internalRequest("POST", "/api/operator/next-creative", post.user_id, {
         socialPostId: post.id,
-        verdict: decision.payload?.verdict,
-        nextAction: decision.payload?.nextAction,
-        changedAngle: decision.payload?.changedAngle,
-        changedHook: decision.payload?.changedHook,
-        testMetric: decision.payload?.testMetric,
+        verdict: decision.verdict,
+        nextAction: decision.next_action.instructions,
+        changedAngle: decision.next_action.angle ?? undefined,
+        changedHook: decision.next_action.hook ?? undefined,
+        testMetric: decision.primary_metric,
         autoGenerate: true,
       });
 
       results.push({
         postId: post.id,
         network: post.network,
-        verdict: decision.payload?.verdict,
+        verdict: decision.verdict,
+        actionType: decision.action_type,
+        decisionRunId: decided.runId,
+        reusedDecision: decided.reused,
         nextCreative: next.status >= 200 && next.status < 300,
         nextStatus: next.status,
         nextCreativeId: next.payload?.creative?.id,
@@ -379,6 +416,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     ok: true,
+    leaseEnforced,
     checked: posts?.length || 0,
     processed: results.length,
     results,

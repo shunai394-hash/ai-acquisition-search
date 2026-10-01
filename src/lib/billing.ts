@@ -1,4 +1,6 @@
+import { timingSafeEqual } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { cronSecret } from "@/lib/security/cron-auth";
 
 function requireEnv(name: string) {
   const value = process.env[name];
@@ -24,11 +26,13 @@ export async function getUserFromBearer(request: Request) {
   const internalSecret = request.headers.get("x-internal-secret");
   const internalUserId = request.headers.get("x-internal-user-id");
 
+  const expectedInternalSecret = cronSecret();
   if (
     internalSecret &&
     internalUserId &&
-    process.env.CRON_SECRET &&
-    internalSecret === process.env.CRON_SECRET
+    expectedInternalSecret &&
+    Buffer.byteLength(internalSecret.trim()) === Buffer.byteLength(expectedInternalSecret) &&
+    timingSafeEqual(Buffer.from(internalSecret.trim()), Buffer.from(expectedInternalSecret))
   ) {
     const admin = getAdminSupabase();
     const { data, error } = await admin.auth.admin.getUserById(internalUserId);

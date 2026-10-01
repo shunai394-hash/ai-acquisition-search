@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/operator-loop",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/patrol-ai",
+      "schedule": "30 4 * * *"
     }
   ]
 }

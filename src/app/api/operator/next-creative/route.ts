@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
+import type { StructuredDecision } from "@/lib/operator/decision";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
 
     const body = await request.json() as {
       socialPostId?: string;
-      verdict?: "continue" | "pivot" | "stop";
+      verdict?: "continue" | "pivot" | "stop" | "wait";
       nextAction?: string;
       changedAngle?: string;
       changedHook?: string;
@@ -45,8 +46,8 @@ export async function POST(request: Request) {
     };
     if (!body.socialPostId) return NextResponse.json({ error: "socialPostIdが必要です。" }, { status: 400 });
     sourcePostId = body.socialPostId;
-    if (body.verdict === "stop") {
-      return NextResponse.json({ error: "STOP判定では次Creativeを自動生成しません。" }, { status: 409 });
+    if (body.verdict === "stop" || body.verdict === "wait") {
+      return NextResponse.json({ error: body.verdict === "stop" ? "STOP判定では次Creativeを自動生成しません。" : "データ不足（WAIT）のため次Creativeは生成しません。" }, { status: 409 });
     }
 
     const db = getAdminSupabase();
@@ -54,6 +55,22 @@ export async function POST(request: Request) {
       .select("id,user_id,creative_id,network,caption,metadata").eq("id", body.socialPostId).eq("user_id", user.id).maybeSingle();
     if (postError) throw postError;
     if (!post) return NextResponse.json({ error: "対象投稿が見つかりません。" }, { status: 404 });
+
+    // 呼び出し側の verdict だけを信用せず、保存済みの最新 Decision でも STOP / WAIT を拒否する。
+    const lastDecisionRef = (post.metadata as Record<string, unknown> | null)?.operator_last_decision as Record<string, unknown> | undefined;
+    let structured: StructuredDecision | null = null;
+    if (lastDecisionRef?.run_id) {
+      const { data: decisionRun } = await db.from("operator_runs")
+        .select("id,output").eq("id", String(lastDecisionRef.run_id)).eq("user_id", user.id).maybeSingle();
+      structured = ((decisionRun?.output as Record<string, unknown> | null)?.decision as StructuredDecision | undefined) ?? null;
+    }
+    const latestVerdict = structured?.verdict ?? (typeof lastDecisionRef?.verdict === "string" ? lastDecisionRef.verdict : null);
+    if (latestVerdict === "stop" || latestVerdict === "wait") {
+      return NextResponse.json({
+        error: latestVerdict === "stop" ? "最新のAI判定がSTOPのため次Creativeを生成しません。" : "最新のAI判定がWAIT（データ不足）のため次Creativeを生成しません。",
+        verdict: latestVerdict,
+      }, { status: 409 });
+    }
 
     const { data: existingPosts } = await db.from("social_posts")
       .select("id,creative_id,network,status,metadata")
@@ -110,14 +127,14 @@ export async function POST(request: Request) {
     if (creativeError) throw creativeError;
     if (!creative) return NextResponse.json({ error: "元クリエイティブが見つかりません。" }, { status: 404 });
 
-    const verdict = body.verdict || "pivot";
-    const nextAction = body.nextAction || "前回と異なるHookと訴求で再テストする";
-    const hook = body.changedHook || (
+    const verdict = body.verdict || (latestVerdict === "continue" ? "continue" : "pivot");
+    const nextAction = body.nextAction || structured?.next_action.instructions || "前回と異なるHookと訴求で再テストする";
+    const hook = body.changedHook || structured?.next_action.hook || (
       verdict === "continue"
         ? (creative.hook || "この商品の別の使い方、知っていますか？")
         : "前の広告とは違う視点で、この商品を見てください。"
     );
-    const angle = body.changedAngle || (
+    const angle = body.changedAngle || structured?.next_action.angle || (
       verdict === "continue" ? "同一訴求の別Hook" : "前回と異なる顧客課題・訴求"
     );
 
@@ -134,10 +151,22 @@ export async function POST(request: Request) {
         verdict,
         angle,
         next_action: nextAction,
-        test_metric: body.testMetric || "CTR / CVR / ROAS",
+        test_metric: body.testMetric || structured?.primary_metric || "CTR / CVR / ROAS",
+        decision_run_id: lastDecisionRef?.run_id ?? null,
+        decision: structured ? {
+          action_type: structured.action_type,
+          target_customer: structured.target_customer,
+          hypothesis: structured.hypothesis,
+          expected_outcome: structured.expected_outcome,
+          primary_metric: structured.primary_metric,
+          learning_objective: structured.learning_objective,
+          change_axis: structured.next_action.change_axis,
+          logic_version: structured.logic_version,
+          input_hash: structured.input_hash,
+        } : null,
         scenes: [
           { order: 1, role: "hook", text: hook },
-          { order: 2, role: "problem", text: "前回と異なる顧客課題を具体化する" },
+          { order: 2, role: "problem", text: structured?.next_action.change_axis === "angle" || structured?.next_action.change_axis === "target" ? angle : "前回と異なる顧客課題を具体化する" },
           { order: 3, role: "solution", text: "商品による解決を実演する" },
           { order: 4, role: "proof", text: "確認可能な事実・使用感だけを示す" },
           { order: 5, role: "cta", text: "次の行動を1つだけ提示する" }
@@ -159,7 +188,10 @@ export async function POST(request: Request) {
         source_creative_id: creative.id,
         operator_verdict: verdict,
         iteration_angle: angle,
-        test_metric: body.testMetric || "CTR / CVR / ROAS",
+        test_metric: body.testMetric || structured?.primary_metric || "CTR / CVR / ROAS",
+        hypothesis: structured?.hypothesis ?? null,
+        decision_run_id: lastDecisionRef?.run_id ?? null,
+        operator_patrol_status: "active",
         auto_publish: true,
       }
     }).select("id,network,status,caption,metadata").single();
@@ -211,6 +243,17 @@ export async function POST(request: Request) {
     }).select("id").single();
     if (runError) throw runError;
     operatorRunId = run.id;
+
+    // 元投稿は次の投稿へ引き継いだので、以後の巡回・判定対象から外す。
+    const { data: latestSource } = await db.from("social_posts").select("metadata").eq("id", post.id).eq("user_id", user.id).maybeSingle();
+    await db.from("social_posts").update({
+      metadata: {
+        ...((latestSource?.metadata as Record<string, unknown> | null) || {}),
+        operator_patrol_status: "superseded",
+        operator_superseded_by: nextPost.id,
+      },
+      updated_at: new Date().toISOString(),
+    }).eq("id", post.id).eq("user_id", user.id);
 
     return NextResponse.json({ ok: true, runId: run.id, creative: nextCreative, socialPost: nextPost, video }, { status: 201 });
   } catch (error) {

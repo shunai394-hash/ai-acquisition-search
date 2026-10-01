@@ -118,12 +118,38 @@ final creative
 
 人間が設定するのは、商品、予算、ブランドルール、運用範囲などです。
 
+### AI Decision / Teacher
+
+`/api/operator/ai-decision`（`src/lib/operator/`）は次の順で「次に何をするか」を決めます。
+
+1. Evidence 収集: 商品（products）、顧客仮説（acquisition_plans）、EC-Pulse の Research / 痛点トレンド / 価格監視、
+   投稿実績（post_metrics を指標ごとに統合）、同じ媒体の過去投稿の中央値、仮説系列の PIVOT 履歴。
+   判定時点より後に観測されたデータは使いません。
+2. Teacher（決定論的ルール `teacher-v2`）: `continue` / `pivot` / `stop` / `wait`。
+   - データ不足（公開24時間未満・露出不足・差が出ていない）は `wait`（insufficient_data）。
+   - 単発の負けは `pivot`。`stop` は売上・CTR が基準を大きく下回り、かつ同じ系列で2回以上 PIVOT 済みの時だけ。
+   - エンゲージメントだけの指標では `stop` しません。
+3. 構造化 Decision（action_type, target_customer, hypothesis, reason, expected_outcome, primary_metric,
+   learning_objective, priority, evidence, confidence, logic_version, prompt_version, model_version, generated_at）を
+   `operator_runs` に保存。同じ入力は `input_hash` で同じ Decision を再利用します。LLM は文章の具体化だけを行い、判定は変えません。
+4. `stop` / `wait` では次クリエイティブ・動画を生成しません（`next-creative` も最新 Decision を確認して拒否します）。
+
+精度評価: `npm run backtest`（読み取り専用。Supabase の service role が必要）。
+
 ## ローカル開発
 
 ```powershell
 npm install
 npm run build
 npm run dev
+```
+
+テスト・型検査:
+
+```powershell
+npm test
+npm run typecheck
+npm run lint
 ```
 
 MCPサーバー:
@@ -138,6 +164,16 @@ npm run mcp
 
 ```text
 OPENAI_API_KEY=...
+```
+
+### Cron / EC-Pulse
+
+```text
+CRON_SECRET=...              # Vercel Cron が Authorization: Bearer で送る値
+EC_PULSE_API_URL=...         # shunai394-hash/ec-pulse の Production ドメイン
+EC_PULSE_API_KEY=...
+OPERATOR_EVALUATION_DELAY_HOURS=12
+OPERATOR_MAX_EVALUATION_DAYS=30
 ```
 
 ### TikTok / TikTok Shopシグナル（任意）
