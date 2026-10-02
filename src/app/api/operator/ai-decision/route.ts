@@ -7,7 +7,9 @@ import { runIdempotentDecision } from "@/lib/decision/idempotency";
 import type { StructuredDecision } from "@/lib/decision/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+const PROCESSING_STALE_MS = 90_000;
 
 // Fields kept for existing clients (UI, operator-loop, MCP).
 function compatFields(decision: StructuredDecision) {
@@ -73,7 +75,7 @@ export async function POST(request: Request) {
         if (error?.code !== "23505") throw error ?? new Error("AI判定の予約に失敗しました。");
 
         const { data: existing, error: existingError } = await db.from("operator_runs")
-          .select("id")
+          .select("id, output, started_at")
           .eq("user_id", user.id)
           .eq("run_type", "ai_performance_verdict")
           .eq("input->>decision_key", decisionKey)
@@ -82,6 +84,17 @@ export async function POST(request: Request) {
           .maybeSingle();
         if (existingError) throw existingError;
         if (!existing?.id) throw new Error("AI判定の予約競合を解決できませんでした。");
+
+        const output = existing.output;
+        const startedAt = Date.parse(String(existing.started_at ?? ""));
+        const processing = output && typeof output === "object" && (output as Record<string, unknown>).state === "processing";
+        const stale = processing && Number.isFinite(startedAt) && Date.now() - startedAt >= PROCESSING_STALE_MS;
+        if (stale) {
+          const { error: reclaimError } = await db.from("operator_runs").delete().eq("id", existing.id);
+          if (reclaimError) throw reclaimError;
+          return this.reserve(decisionKey);
+        }
+
         return { status: "existing" as const, id: existing.id as string };
       },
       async getCompleted(id: string) {
@@ -112,7 +125,13 @@ export async function POST(request: Request) {
     const result = await runIdempotentDecision(store, decisionKey, async () => {
       const decision = await refineNextAction(deterministic, evidence, openAiJson, openAiModel());
       const aiConnected = decision.model_version !== "deterministic";
-      return { ...compatFields(decision), aiConnected, decision };
+      return {
+        output: { ...compatFields(decision), aiConnected, decision },
+        // A deterministic fallback is still returned to the caller, but it must
+        // not become the cached "completed" result. A later request should be
+        // allowed to retry the LLM once it is available.
+        persist: aiConnected,
+      };
     });
 
     if (result.status === "completed") {
@@ -128,7 +147,15 @@ export async function POST(request: Request) {
 
     const runId = result.id;
     const output = result.output;
-    return NextResponse.json({ ok: true, runId, aiConnected: output.aiConnected, ...compatFields(output.decision), decision: output.decision });
+    return NextResponse.json({
+      ok: true,
+      runId,
+      reused: result.status === "completed",
+      persisted: result.status !== "transient",
+      aiConnected: output.aiConnected,
+      ...compatFields(output.decision),
+      decision: output.decision,
+    }, { status: result.status === "transient" ? 200 : 200 });
   } catch (error) {
     console.error("ai decision error", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "AI判定に失敗しました。" }, { status: 500 });
