@@ -82,3 +82,59 @@ test("refinement is skipped for STOP", async () => {
   assert.equal(called, false);
   assert.equal(r.next_action.generate_creative, false);
 });
+
+
+test("invalid evidence always waits instead of making a business decision", () => {
+  const cases = [
+    metric({ impressions: -1 }),
+    metric({ impressions: 1000, clicks: 1001 }),
+    metric({ impressions: 1000, views: 1001 }),
+    metric({ impressions: 1000, clicks: 100, conversions: 101 }),
+    metric({ impressions: 1000, price: undefined as never }),
+  ];
+  for (const current of cases.slice(0, 4)) {
+    const d = buildDecision(evidence({ current }));
+    assert.equal(d.verdict, "wait");
+    assert.equal(d.teacher.ruleId, "evidence_quality");
+    assert.equal(d.next_action.generate_creative, false);
+  }
+});
+
+test("metric measured after decision time is rejected", () => {
+  const d = buildDecision(evidence({
+    asOf: "2026-10-01T00:00:00.000Z",
+    current: metric({ impressions: 4000, clicks: 120, measuredAt: "2026-10-01T00:00:01.000Z" }),
+  }));
+  assert.equal(d.verdict, "wait");
+  assert.ok(d.teacher.missingData.includes("metric_after_decision_time"));
+});
+
+test("EC-Pulse evidence captured after decision time is rejected", () => {
+  const d = buildDecision(evidence({
+    asOf: "2026-10-01T00:00:00.000Z",
+    market: {
+      status: "ok",
+      capturedAt: "2026-10-01T00:00:01.000Z",
+      topPains: [],
+      emergingPains: [],
+    },
+    current: metric({ impressions: 4000, clicks: 120 }),
+  }));
+  assert.equal(d.verdict, "wait");
+  assert.ok(d.teacher.missingData.includes("market_evidence_after_decision_time"));
+});
+
+test("invalid product economics are rejected", () => {
+  const d = buildDecision(evidence({
+    product: { price: 1000, cost: 1200 },
+    current: metric({ impressions: 4000, clicks: 120 }),
+  }));
+  assert.equal(d.verdict, "wait");
+  assert.ok(d.teacher.missingData.includes("product_cost_exceeds_price"));
+});
+
+test("valid evidence keeps the normal deterministic verdict", () => {
+  const d = buildDecision(evidence({ current: metric({ impressions: 4000, clicks: 120 }) }));
+  assert.equal(d.verdict, "continue");
+  assert.notEqual(d.teacher.ruleId, "evidence_quality");
+});
