@@ -401,33 +401,78 @@ export async function analyzePage(
   const appealCandidates = normalizeAppealCandidates(parsed.appealCandidates);
   const normalizeScenarios = (value: unknown): PostScenario[] => {
     const items = Array.isArray(value) ? value : [];
-    const archetypes = new Set<PostScenario["archetype"]>(["empathy", "comparison_discovery", "purchase_motivation"]);
-    return items
-      .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
-      .filter((x) => typeof x.hypothesis === "string" && archetypes.has(x.archetype as PostScenario["archetype"]))
-      .slice(0, 3)
-      .map((x, index) => ({
-        id: typeof x.id === "string" ? x.id : `scenario-${index + 1}`,
-        archetype: x.archetype as PostScenario["archetype"],
-        hypothesis: x.hypothesis as string,
-        targetCustomer: typeof x.targetCustomer === "string" ? x.targetCustomer : "未特定",
-        painOrDesire: typeof x.painOrDesire === "string" ? x.painOrDesire : "未検証",
-        hook: typeof x.hook === "string" ? x.hook : "未検証",
-        beats: Array.isArray(x.beats) ? x.beats.filter((v): v is string => typeof v === "string").slice(0, 6) : [],
-        proof: Array.isArray(x.proof) ? x.proof.filter((v): v is string => typeof v === "string").slice(0, 6) : [],
-        cta: typeof x.cta === "string" ? x.cta : "未検証",
-        channel: typeof x.channel === "string" ? x.channel : "未確定",
-        format: typeof x.format === "string" ? x.format : "未確定",
-        primaryMetric: typeof x.primaryMetric === "string" ? x.primaryMetric : "未確定",
-        secondaryMetric: typeof x.secondaryMetric === "string" ? x.secondaryMetric : "未確定",
-        variableToChange: typeof x.variableToChange === "string" ? x.variableToChange : "未確定",
-        variablesToHold: Array.isArray(x.variablesToHold) ? x.variablesToHold.filter((v): v is string => typeof v === "string").slice(0, 8) : [],
-        risk: typeof x.risk === "string" ? x.risk : "未評価",
-        evidence: Array.isArray(x.evidence) ? x.evidence.filter((v): v is string => typeof v === "string").slice(0, 6) : [],
-      }));
+    const archetypes = new Set<PostScenario["archetype"]>([
+      "empathy",
+      "comparison_discovery",
+      "purchase_motivation",
+    ]);
+    const seen = new Set<PostScenario["archetype"]>();
+    const normalized: PostScenario[] = [];
+
+    for (const raw of items) {
+      if (!raw || typeof raw !== "object") continue;
+      const x = raw as Record<string, unknown>;
+      const archetype = x.archetype as PostScenario["archetype"];
+      if (!archetypes.has(archetype) || seen.has(archetype)) continue;
+
+      const beats = Array.isArray(x.beats)
+        ? x.beats.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 6)
+        : [];
+      const proof = Array.isArray(x.proof)
+        ? x.proof.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 6)
+        : [];
+      const evidence = Array.isArray(x.evidence)
+        ? x.evidence.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 6)
+        : [];
+      const hypothesis = typeof x.hypothesis === "string" ? x.hypothesis.trim() : "";
+      const hook = typeof x.hook === "string" ? x.hook.trim() : "";
+      const variableToChange = typeof x.variableToChange === "string" ? x.variableToChange.trim() : "";
+      const primaryMetric = typeof x.primaryMetric === "string" ? x.primaryMetric.trim() : "";
+
+      // A scenario is executable only when it has a real hypothesis, a
+      // 3-6 step execution plan, one test variable, one primary metric,
+      // and explicit evidence. Otherwise the deterministic fallback wins.
+      if (!hypothesis || !hook || beats.length < 3 || !variableToChange || !primaryMetric || !evidence.length) {
+        continue;
+      }
+
+      normalized.push({
+        id: typeof x.id === "string" && x.id.trim() ? x.id : `scenario-${normalized.length + 1}`,
+        archetype,
+        hypothesis,
+        targetCustomer: typeof x.targetCustomer === "string" && x.targetCustomer.trim() ? x.targetCustomer.trim() : "未特定",
+        painOrDesire: typeof x.painOrDesire === "string" && x.painOrDesire.trim() ? x.painOrDesire.trim() : "未検証",
+        hook,
+        beats,
+        proof,
+        cta: typeof x.cta === "string" && x.cta.trim() ? x.cta.trim() : "未検証",
+        channel: typeof x.channel === "string" && x.channel.trim() ? x.channel.trim() : "未確定",
+        format: typeof x.format === "string" && x.format.trim() ? x.format.trim() : "未確定",
+        primaryMetric,
+        secondaryMetric: typeof x.secondaryMetric === "string" && x.secondaryMetric.trim() ? x.secondaryMetric.trim() : "未確定",
+        variableToChange,
+        variablesToHold: Array.isArray(x.variablesToHold)
+          ? x.variablesToHold.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 8)
+          : [],
+        risk: typeof x.risk === "string" && x.risk.trim() ? x.risk.trim() : "未評価",
+        evidence,
+      });
+      seen.add(archetype);
+      if (normalized.length === 3) break;
+    }
+
+    return normalized;
   };
   const channelRecommendation = normalizeChannelRecommendation(parsed.channelRecommendation, base.channelRecommendation);
-  const scenarios = normalizeScenarios(parsed.scenarios);
+  const scenarios = normalizeScenarios(parsed.scenarios).map((scenario) => ({
+    ...scenario,
+    channel:
+      channelRecommendation.recommended && channelRecommendation.recommended !== "未確定"
+        ? scenario.channel === "未確定" || scenario.channel === "unknown"
+          ? channelRecommendation.recommended
+          : scenario.channel
+        : "未確定",
+  }));
 
   return {
     ...base,
