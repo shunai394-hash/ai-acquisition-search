@@ -263,6 +263,93 @@ export async function analyzePage(
   const arr = <T,>(value: unknown, fallbackValue: T[]): T[] =>
     Array.isArray(value) ? (value as T[]) : fallbackValue;
 
+  const clampScore = (value: unknown, fallbackValue = 0.5) => {
+    const n = typeof value === "number" && Number.isFinite(value) ? value : fallbackValue;
+    return Math.max(0, Math.min(1, n));
+  };
+
+  const normalizeSellingPoints = (value: unknown): SellingPoint[] => {
+    const items = Array.isArray(value) ? value : [];
+    const allowed = new Set<SellingPoint["type"]>([
+      "functional_value", "emotional_value", "comparative_advantage",
+      "customer_context", "reason_to_buy_now",
+    ]);
+    return items
+      .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+      .filter((x) => typeof x.statement === "string" && allowed.has(x.type as SellingPoint["type"]))
+      .slice(0, 5)
+      .map((x) => ({
+        type: x.type as SellingPoint["type"],
+        statement: x.statement as string,
+        evidence: Array.isArray(x.evidence) ? x.evidence.filter((v): v is string => typeof v === "string").slice(0, 5) : [],
+        confidence: clampScore(x.confidence, 0.2),
+      }));
+  };
+
+  const normalizeCustomerCandidates = (value: unknown): CustomerCandidate[] => {
+    const items = Array.isArray(value) ? value : [];
+    return items
+      .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+      .filter((x) => typeof x.label === "string" && typeof x.pain === "string" && typeof x.desire === "string")
+      .slice(0, 3)
+      .map((x) => ({
+        label: x.label as string,
+        context: typeof x.context === "string" ? x.context : "未検証",
+        pain: x.pain as string,
+        desire: x.desire as string,
+        buyingTrigger: typeof x.buyingTrigger === "string" ? x.buyingTrigger : "未検証",
+        preferredChannel: typeof x.preferredChannel === "string" ? x.preferredChannel : "未検証",
+        resonantWords: Array.isArray(x.resonantWords) ? x.resonantWords.filter((v): v is string => typeof v === "string").slice(0, 10) : [],
+        avoidWords: Array.isArray(x.avoidWords) ? x.avoidWords.filter((v): v is string => typeof v === "string").slice(0, 10) : [],
+        reason: typeof x.reason === "string" ? x.reason : "根拠未提示",
+      }));
+  };
+
+  const normalizeAppealCandidates = (value: unknown): AppealCandidate[] => {
+    const items = Array.isArray(value) ? value : [];
+    const stages = new Set<AppealCandidate["funnelStage"]>(["awareness", "consideration", "purchase"]);
+    return items
+      .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+      .filter((x) => typeof x.name === "string" && typeof x.copy === "string" && stages.has(x.funnelStage as AppealCandidate["funnelStage"]))
+      .slice(0, 5)
+      .map((x, index) => ({
+        name: x.name as string,
+        copy: x.copy as string,
+        customerLabel: typeof x.customerLabel === "string" ? x.customerLabel : "未特定",
+        emotion: typeof x.emotion === "string" ? x.emotion : "未特定",
+        funnelStage: x.funnelStage as AppealCandidate["funnelStage"],
+        channelFit: typeof x.channelFit === "string" ? x.channelFit : "未検証",
+        strengthScore: clampScore(x.strengthScore, 0.5),
+        riskScore: clampScore(x.riskScore, 0.5),
+        validationPriority: Math.max(1, Math.min(5, Number.isFinite(Number(x.validationPriority)) ? Number(x.validationPriority) : index + 1)),
+        reason: typeof x.reason === "string" ? x.reason : "根拠未提示",
+      }));
+  };
+
+  const normalizeChannelRecommendation = (value: unknown, fallbackValue: ChannelRecommendation): ChannelRecommendation => {
+    if (!value || typeof value !== "object") return fallbackValue;
+    const x = value as Record<string, unknown>;
+    const comparison = Array.isArray(x.comparison) ? x.comparison : [];
+    return {
+      recommended: typeof x.recommended === "string" ? x.recommended : fallbackValue.recommended,
+      reason: typeof x.reason === "string" ? x.reason : fallbackValue.reason,
+      comparison: comparison
+        .filter((v): v is Record<string, unknown> => !!v && typeof v === "object" && typeof v.channel === "string")
+        .slice(0, 6)
+        .map((v) => ({
+          channel: v.channel as string,
+          visualFit: Math.max(0, Math.min(5, Number(v.visualFit) || 0)),
+          explanationLoad: Math.max(0, Math.min(5, Number(v.explanationLoad) || 0)),
+          purchaseIntent: Math.max(0, Math.min(5, Number(v.purchaseIntent) || 0)),
+          dataFit: Math.max(0, Math.min(5, Number(v.dataFit) || 0)),
+          productionCost: Math.max(0, Math.min(5, Number(v.productionCost) || 0)),
+          continuity: Math.max(0, Math.min(5, Number(v.continuity) || 0)),
+          note: typeof v.note === "string" ? v.note : "根拠未提示",
+        })),
+      confidence: clampScore(x.confidence, fallbackValue.confidence),
+    };
+  };
+
   const obj = <T extends object>(
     value: unknown,
     fallbackValue: T
@@ -277,18 +364,18 @@ export async function analyzePage(
   const competitors = obj(parsed.competitors, base.competitors);
   const performance = obj(parsed.performance, base.performance);
   const decision = obj(parsed.decision, base.decision);
-  const sellingPoints = arr(parsed.sellingPoints, base.sellingPoints);
-  const customerCandidates = arr(parsed.customerCandidates, base.customerCandidates);
-  const appealCandidates = arr(parsed.appealCandidates, base.appealCandidates);
-  const channelRecommendation = obj(parsed.channelRecommendation, base.channelRecommendation);
+  const sellingPoints = normalizeSellingPoints(parsed.sellingPoints);
+  const customerCandidates = normalizeCustomerCandidates(parsed.customerCandidates);
+  const appealCandidates = normalizeAppealCandidates(parsed.appealCandidates);
+  const channelRecommendation = normalizeChannelRecommendation(parsed.channelRecommendation, base.channelRecommendation);
 
   return {
     ...base,
     ...parsed,
 
-    sellingPoints,
-    customerCandidates,
-    appealCandidates,
+    sellingPoints: sellingPoints.length ? sellingPoints : base.sellingPoints,
+    customerCandidates: customerCandidates.length ? customerCandidates : base.customerCandidates,
+    appealCandidates: appealCandidates.length ? appealCandidates : base.appealCandidates,
     channelRecommendation,
 
     product: {
