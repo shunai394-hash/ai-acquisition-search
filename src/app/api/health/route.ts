@@ -38,8 +38,10 @@ export async function GET(request: Request) {
     return { database: body?.database ?? null };
   });
 
-  const ok = database.ok && ecPulse.ok;
-  const summary = { ok, commit, logicVersion: DECISION_LOGIC_VERSION, database: database.ok, ecPulse: ecPulse.ok, checkedAt: new Date().toISOString() };
+  // The lease table is required for safe cron/operator execution, so its
+  // availability is part of overall health rather than a diagnostic-only check.
+  const ok = database.ok && leaseTable.ok && ecPulse.ok;
+  const summary = { ok, commit, logicVersion: DECISION_LOGIC_VERSION, database: database.ok, operatorLeases: leaseTable.ok, ecPulse: ecPulse.ok, checkedAt: new Date().toISOString() };
   if (!verifyCronRequest(request).ok) return NextResponse.json(summary, { status: ok ? 200 : 503 });
 
   const ec = ecPulseConfig();
