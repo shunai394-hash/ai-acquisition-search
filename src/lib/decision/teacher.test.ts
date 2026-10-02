@@ -100,3 +100,44 @@ test("same evidence always yields the same verdict (consistency)", () => {
   const first = JSON.stringify(evaluateTeacher(e));
   for (let i = 0; i < 20; i++) assert.equal(JSON.stringify(evaluateTeacher(e)), first);
 });
+
+test("exposure exactly at the minimum enters decision logic instead of remaining insufficient", () => {
+  const r = evaluateTeacher(evidence({ current: metric({ impressions: 300, clicks: null }) }));
+  assert.notEqual(r.ruleId, "insufficient_exposure");
+});
+
+test("paid traffic with enough clicks but zero conversions pivots on the offer path", () => {
+  const r = evaluateTeacher(evidence({
+    current: metric({ impressions: 5000, clicks: 40, conversions: 0, revenue: 0, adSpend: 1000 }),
+  }));
+  assert.equal(r.verdict, "pivot");
+  assert.equal(r.ruleId, "no_conversion_paid");
+});
+
+test("repeated paid zero-conversion failures stop after the lineage threshold", () => {
+  const r = evaluateTeacher(evidence({
+    current: metric({ impressions: 5000, clicks: 40, conversions: 0, revenue: 0, adSpend: 1000 }),
+  }, { lineageVerdicts: ["pivot", "pivot"] }));
+  assert.equal(r.verdict, "stop");
+  assert.equal(r.ruleId, "no_conversion_repeated");
+});
+
+test("eligibleHistory excludes the current post, other networks, and future measurements", () => {
+  const e = evidence({
+    history: [
+      past("post-1", { impressions: 1000, clicks: 20 }, "linkedin"),
+      past("other-network", { impressions: 1000, clicks: 20 }, "instagram"),
+      past("future", { impressions: 1000, clicks: 20, measuredAt: "2026-10-02T00:00:00.000Z" }, "linkedin"),
+      past("valid", { impressions: 1000, clicks: 20 }, "linkedin"),
+    ],
+  });
+  const result = eligibleHistory(e);
+  assert.deepEqual(result.map((x) => x.socialPostId), ["valid"]);
+});
+
+test("teacher output includes criteria for the actual rule used", () => {
+  const r = evaluateTeacher(evidence({ current: metric({ impressions: 5000, clicks: 0 }) }));
+  assert.equal(r.ruleId, "ctr_below_benchmark");
+  assert.ok(r.criteria.some((x) => x.name === "ctr"));
+  assert.ok(r.criteria.some((x) => x.name === "ctr_ci95"));
+});
