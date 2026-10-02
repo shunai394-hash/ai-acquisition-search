@@ -10,6 +10,7 @@ import { generateHiggsfieldVideo, waitForHiggsfieldVideo } from "../lib/video/hi
 import { createCampaignId, loadCampaign, saveCampaign } from "../lib/campaign/store";
 import { discoverAcquisitionSignals } from "../lib/acquisition/search-web";
 import { decideNextCampaign } from "../lib/campaign/decision";
+import type { CampaignPerformance } from "../lib/campaign/decision";
 import { buildDecision } from "../lib/decision/engine";
 import { getTikTokPublishStatus, getTikTokVideoMetrics, publishTikTokVideo, queryTikTokCreator, resolveTikTokVideoId } from "../lib/social/tiktok";
 import { getYouTubeVideoStatus, uploadYouTubeVideo } from "../lib/social/youtube";
@@ -135,7 +136,7 @@ function createServer(): McpServer {
         });
         const analysis = await analyzePage(source, { query: search.queries.join(" / "), results: search.results }, socialSignals, shopSignals);
         const previousCampaign = campaignId ? await loadCampaign(campaignId) : null;
-        const previousPerformance: unknown[] = [];
+        const previousPerformance: CampaignPerformance[] = [];
         if (previousCampaign?.posts?.length) {
           const { normalizeXPerformance, normalizeYouTubePerformance, normalizeTikTokPerformance, normalizeInstagramPerformance, normalizeFacebookPerformance } = await import("../lib/analytics/performance");
           const { getXPostMetrics } = await import("../lib/social/x");
