@@ -131,7 +131,18 @@ function buildEvidenceItems(evidence: DecisionEvidence, teacher: TeacherResult):
 /** Deterministic structured decision. Same evidence -> same decision. */
 export function buildDecision(evidence: DecisionEvidence, now = new Date()): StructuredDecision {
   const quality = evidenceQuality(evidence);
-  const teacher = evaluateTeacher(evidence);
+  const baseTeacher = evaluateTeacher(evidence);
+  const teacher: TeacherResult = quality.ok
+    ? baseTeacher
+    : {
+        ...baseTeacher,
+        verdict: "wait",
+        status: "insufficient_data",
+        ruleId: "evidence_quality",
+        reason: `証拠の整合性を確認できないため判定を保留: ${quality.issues.join(", ")}`,
+        confidence: 0.1,
+        missingData: [...baseTeacher.missingData, ...quality.issues],
+      };
   const h = evidence.hypothesis;
   const target = evidence.customer.target || "分析で特定した主要顧客";
   const metric = primaryMetric(evidence, teacher);
@@ -207,13 +218,13 @@ export function buildDecision(evidence: DecisionEvidence, now = new Date()): Str
     reason: teacher.reason,
     primary_metric: metric,
     evidence: buildEvidenceItems(evidence, teacher),
-    confidence: quality.ok ? teacher.confidence : Math.min(teacher.confidence, 0.25),
-    teacher: quality.ok ? teacher : { ...teacher, verdict: "wait", status: "insufficient_data", ruleId: "evidence_quality", reason: `証拠の整合性を確認できないため判定を保留: ${quality.issues.join(", ")}`, confidence: 0.1, missingData: [...teacher.missingData, ...quality.issues] },
+    confidence: teacher.confidence,
+    teacher,
     logic_version: DECISION_LOGIC_VERSION,
     prompt_version: DECISION_PROMPT_VERSION,
     model_version: "deterministic",
     generated_at: now.toISOString(),
-    input_hash: evidenceHash(evidence, quality.ok ? teacher : { ...teacher, verdict: "wait", ruleId: "evidence_quality" }),
+    input_hash: evidenceHash(evidence, teacher),
   };
 }
 
