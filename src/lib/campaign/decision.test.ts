@@ -36,3 +36,25 @@ test("campaign ranking does not invent sales evidence when performance is missin
   assert.equal(result.nextTests[0].expectedProfit, null);
   assert.match(result.nextTests[0].rankReason, /未知/);
 });
+
+
+test("campaign priority does not treat unknown sales evidence as a neutral sales score", () => {
+  const result = decideNextCampaign({
+    analysis: {
+      nextPosts: [
+        { concept: "known", hook: "known", format: "short", channel: "TikTok", reason: "known evidence", testMetric: "CTR" },
+        { concept: "unknown", hook: "unknown", format: "short", channel: "YouTube", reason: "unknown evidence", testMetric: "CTR" },
+      ],
+    },
+    performance: [
+      { platform: "TikTok", postId: "t1", metrics: { impressions: 10000, clicks: 500, conversions: 25, grossProfit: 20000, adSpend: 5000 } },
+    ],
+  });
+  const known = result.nextTests.find((x) => x.channel === "TikTok");
+  const unknown = result.nextTests.find((x) => x.channel === "YouTube");
+  assert.ok(known && unknown);
+  assert.equal(known.expectedProfit, 15000);
+  assert.equal(unknown.expectedProfit, null);
+  assert.ok(known.priorityScore > unknown.priorityScore);
+  assert.match(unknown.rankReason, /未知/);
+});
