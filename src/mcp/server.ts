@@ -394,7 +394,7 @@ function createServer(): McpServer {
       inputSchema: z.object({
         videoUrl: z.string().url().describe("TikTokから取得可能なHTTPS公開動画URL"),
         title: z.string().min(1).max(2200).describe("TikTokキャプション"),
-        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認")
+        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認"),
         privacyLevel: z.enum([
           "PUBLIC_TO_EVERYONE",
           "MUTUAL_FOLLOW_FRIENDS",
@@ -451,7 +451,7 @@ function createServer(): McpServer {
         "YouTube Data API v3のvideos.insertを使い、ローカルMP4を認可済みYouTubeチャンネルへアップロードします。",
       inputSchema: z.object({
         filePath: z.string().min(1).describe("アップロードするMP4ファイルのローカルパス"),
-        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認")
+        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認"),
         title: z.string().min(1).max(100),
         description: z.string().optional(),
         tags: z.array(z.string()).optional(),
