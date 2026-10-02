@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evaluateTeacher } from "./teacher";
+import { evaluateTeacher, eligibleHistory } from "./teacher";
 import { evidence, metric, past } from "./__fixtures__/evidence";
 
 test("no metrics -> WAIT (insufficient_data)", () => {
