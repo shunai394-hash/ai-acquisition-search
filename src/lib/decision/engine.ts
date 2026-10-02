@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { TEACHER_LOGIC_VERSION, TEACHER_THRESHOLDS, eligibleHistory, evaluateTeacher } from "./teacher";
 import type { DecisionEvidence, EvidenceItem, StructuredDecision, TeacherResult } from "./types";
 
-export const DECISION_LOGIC_VERSION = `decision-2026.10.1+${TEACHER_LOGIC_VERSION}`;
+export const DECISION_LOGIC_VERSION = `decision-2026.10.2+${TEACHER_LOGIC_VERSION}`;
 export const DECISION_PROMPT_VERSION = "next-action-refine-v1";
 
 function evidenceQuality(evidence: DecisionEvidence): { ok: boolean; issues: string[] } {
@@ -20,11 +20,16 @@ function evidenceQuality(evidence: DecisionEvidence): { ok: boolean; issues: str
     if (m.clicks != null && m.impressions != null && m.clicks > m.impressions) issues.push("clicks_exceed_impressions");
     if (m.views != null && m.impressions != null && m.views > m.impressions) issues.push("views_exceed_impressions");
     if (m.conversions != null && m.clicks != null && m.conversions > m.clicks) issues.push("conversions_exceed_clicks");
+    const exposure = Math.max(m.impressions ?? 0, m.views ?? 0);
+    for (const key of ["likes", "comments", "shares", "saves"] as const) {
+      if (m[key] != null && exposure > 0 && m[key] > exposure) issues.push(`${key}_exceed_exposure`);
+    }
   }
   const p = evidence.product;
   if (p.price != null && (!Number.isFinite(p.price) || p.price < 0)) issues.push("product_price_invalid");
   if (p.cost != null && (!Number.isFinite(p.cost) || p.cost < 0)) issues.push("product_cost_invalid");
   if (p.price != null && p.cost != null && p.cost > p.price) issues.push("product_cost_exceeds_price");
+  if (p.price === 0 && p.cost != null && p.cost > 0) issues.push("product_zero_price_with_cost");
   return { ok: issues.length === 0, issues };
 }
 
