@@ -4,7 +4,23 @@ import { stripeRequest, verifyStripeSignature } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
-type StripeObject = Record<string, any>;
+type StripeMetadata = Record<string, string | undefined>;
+
+type StripeObject = {
+  id?: string;
+  type?: string;
+  customer?: string | null;
+  subscription?: string | null;
+  client_reference_id?: string | null;
+  metadata?: StripeMetadata;
+  status?: string;
+  current_period_end?: number | string | null;
+  cancel_at_period_end?: boolean;
+  data?: {
+    object?: StripeObject;
+  };
+  [key: string]: unknown;
+};
 
 async function userIdForCustomer(customerId?: string | null) {
   if (!customerId) return null;

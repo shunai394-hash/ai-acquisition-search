@@ -15,67 +15,105 @@ export type NormalizedPerformance = {
   raw: unknown;
 };
 
-export async function normalizeXPerformance(input: any): Promise<NormalizedPerformance> {
-  const m = input?.publicMetrics ?? {};
+type JsonObject = Record<string, unknown>;
+
+function objectOf(value: unknown): JsonObject {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as JsonObject
+    : {};
+}
+
+function numberOf(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function stringOf(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+export async function normalizeXPerformance(input: JsonObject): Promise<NormalizedPerformance> {
+  const m = objectOf(input.publicMetrics);
+  const postId = String(input.postId);
+
   return {
     platform: "x",
-    postId: String(input.postId),
-    url: `https://x.com/i/web/status/${input.postId}`,
+    postId,
+    url: `https://x.com/i/web/status/${postId}`,
     collectedAt: new Date().toISOString(),
     metrics: {
-      impressions: m.impression_count ?? null,
-      likes: m.like_count ?? null,
-      comments: m.reply_count ?? null,
-      shares: m.retweet_count ?? null,
-      clicks: m.url_link_clicks ?? null,
+      impressions: numberOf(m.impression_count),
+      likes: numberOf(m.like_count),
+      comments: numberOf(m.reply_count),
+      shares: numberOf(m.retweet_count),
+      clicks: numberOf(m.url_link_clicks),
     },
     raw: input,
   };
 }
 
-export async function normalizeYouTubePerformance(input: any): Promise<NormalizedPerformance> {
-  const s = input?.statistics ?? {};
+export async function normalizeYouTubePerformance(input: JsonObject): Promise<NormalizedPerformance> {
+  const s = objectOf(input.statistics);
+  const videoId = String(input.videoId);
+
   return {
     platform: "youtube",
-    postId: String(input.videoId),
-    url: `https://www.youtube.com/watch?v=${input.videoId}`,
+    postId: videoId,
+    url: `https://www.youtube.com/watch?v=${videoId}`,
     collectedAt: new Date().toISOString(),
     metrics: {
-      views: s.viewCount != null ? Number(s.viewCount) : null,
-      likes: s.likeCount != null ? Number(s.likeCount) : null,
-      comments: s.commentCount != null ? Number(s.commentCount) : null,
+      views: numberOf(s.viewCount),
+      likes: numberOf(s.likeCount),
+      comments: numberOf(s.commentCount),
     },
     raw: input,
   };
 }
 
-
-export async function normalizeTikTokPerformance(input: any): Promise<NormalizedPerformance> {
+export async function normalizeTikTokPerformance(input: JsonObject): Promise<NormalizedPerformance> {
   return {
     platform: "tiktok",
     postId: String(input.id),
-    url: input.share_url,
+    url: stringOf(input.share_url),
     collectedAt: new Date().toISOString(),
     metrics: {
-      views: input.view_count ?? null,
-      likes: input.like_count ?? null,
-      comments: input.comment_count ?? null,
-      shares: input.share_count ?? null,
+      views: numberOf(input.view_count),
+      likes: numberOf(input.like_count),
+      comments: numberOf(input.comment_count),
+      shares: numberOf(input.share_count),
     },
     raw: input,
   };
 }
 
-export async function normalizeInstagramPerformance(input: any): Promise<NormalizedPerformance> {
-  const m = input?.metrics ?? input ?? {};
-  const get = (name: string) => {
-    const item = Array.isArray(input?.data) ? input.data.find((x: any) => x.name === name) : undefined;
-    return item?.values?.at?.(-1)?.value ?? m[name] ?? null;
+export async function normalizeInstagramPerformance(input: JsonObject): Promise<NormalizedPerformance> {
+  const m = objectOf(input.metrics ?? input);
+  const data = Array.isArray(input.data) ? input.data : [];
+
+  const get = (name: string): number | null => {
+    const item = data.find((value): value is JsonObject => {
+      const record = objectOf(value);
+      return record.name === name;
+    });
+
+    const values = item ? item.values : undefined;
+    if (Array.isArray(values) && values.length > 0) {
+      const last = objectOf(values[values.length - 1]);
+      const value = numberOf(last.value);
+      if (value !== null) return value;
+    }
+
+    return numberOf(m[name]);
   };
+
   return {
     platform: "instagram",
     postId: String(input.id ?? input.mediaId),
-    url: input.permalink,
+    url: stringOf(input.permalink),
     collectedAt: new Date().toISOString(),
     metrics: {
       views: get("views") ?? get("plays"),
@@ -87,18 +125,21 @@ export async function normalizeInstagramPerformance(input: any): Promise<Normali
   };
 }
 
-export async function normalizeFacebookPerformance(input: any): Promise<NormalizedPerformance> {
-  const s = input?.statistics ?? input ?? {};
+export async function normalizeFacebookPerformance(input: JsonObject): Promise<NormalizedPerformance> {
+  const s = objectOf(input.statistics ?? input);
+  const reactions = objectOf(s.reactions);
+  const reactionSummary = objectOf(reactions.summary);
+
   return {
     platform: "facebook",
     postId: String(input.id ?? input.videoId),
-    url: input.permalink_url,
+    url: stringOf(input.permalink_url),
     collectedAt: new Date().toISOString(),
     metrics: {
-      views: s.views ?? s.total_video_views ?? null,
-      likes: s.likes ?? s.reactions?.summary?.total_count ?? null,
-      comments: s.comments ?? s.comments_count ?? null,
-      shares: s.shares ?? s.share_count ?? null,
+      views: numberOf(s.views ?? s.total_video_views),
+      likes: numberOf(s.likes ?? reactionSummary.total_count),
+      comments: numberOf(s.comments ?? s.comments_count),
+      shares: numberOf(s.shares ?? s.share_count),
     },
     raw: input,
   };

@@ -29,6 +29,7 @@ export default function LinkedInConnect({ socialPostId }: { socialPostId?: strin
     setLoading(false);
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(() => { void refresh(); }, []);
 
   async function connect() {
