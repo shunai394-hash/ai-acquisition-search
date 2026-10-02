@@ -6,6 +6,12 @@ export type CampaignTest = {
   format: string;
   hypothesis: string;
   successMetric: string;
+  expectedCtr?: number | null;
+  expectedCvr?: number | null;
+  expectedProfit?: number | null;
+  learningValueScore: number;
+  priorityScore: number;
+  rankReason: string;
 };
 
 export type CampaignPerformance = {
@@ -73,11 +79,21 @@ export function decideNextCampaign(input: {
   if (input.analysis.opportunities?.length) basedOn.push("商品・市場分析で抽出した機会");
   if (!performance.length) unknown.push("まだ投稿実績が接続されていないため、成果比較はできない");
 
-  const selected = posts.slice(0, 3);
+  const scored = posts.map((p, i) => {
+    const channelFit = p.channel ? 0.6 : 0.2;
+    const metricClarity = p.testMetric ? 0.7 : 0.2;
+    const learningValue = Math.min(1, 0.45 + (2 - i) * 0.2);
+    const salesExpectation = Math.min(1, 0.4 + channelFit * 0.3 + metricClarity * 0.3);
+    const productionEase = p.format ? 0.7 : 0.3;
+    const priorityScore = salesExpectation * 0.35 + learningValue * 0.35 + productionEase * 0.15 + metricClarity * 0.15;
+    return { p, i, learningValue, priorityScore };
+  }).sort((a, b) => b.priorityScore - a.priorityScore);
+
+  const selected = scored.slice(0, 3);
   const target = input.analysis.decision?.target || input.analysis.customer?.likelySegments?.[0] || "分析で特定した主要顧客";
   const angle = input.analysis.decision?.valueProposition || input.analysis.decision?.desire || "商品価値を具体的な顧客課題に接続する";
 
-  const nextTests: CampaignTest[] = selected.map((p, i) => ({
+  const nextTests: CampaignTest[] = selected.map(({ p, learningValue, priorityScore }, i) => ({
     id: `test-${Date.now()}-${i + 1}`,
     concept: p.concept,
     hook: p.hook,
@@ -85,6 +101,9 @@ export function decideNextCampaign(input: {
     format: p.format,
     hypothesis: p.reason,
     successMetric: p.testMetric,
+    learningValueScore: Number(learningValue.toFixed(3)),
+    priorityScore: Number(priorityScore.toFixed(3)),
+    rankReason: "売上期待・学習価値・制作容易性・成功指標の明確さを合成して優先順位を算出",
   }));
 
   return {
