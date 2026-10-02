@@ -56,7 +56,6 @@ export async function POST(request: Request) {
           product_id: body.productId || creative?.product_id || null,
           user_id: user.id,
           run_type: "ai_performance_verdict",
-          status: "processing",
           input: {
             social_post_id: post.id,
             creative_id: post.creative_id,
