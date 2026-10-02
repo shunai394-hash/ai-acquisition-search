@@ -13,6 +13,10 @@ export const DECISION_LEASE_TTL_MS = DECISION_ROUTE_MAX_DURATION_MS + 10_000;
 /** How long a concurrent request waits for the holder: LLM worst case plus DB writes. */
 export const DECISION_WAIT_MAX_MS = DECISION_LLM_MAX_MS + 5_000;
 export const DECISION_POLL_INTERVAL_MS = 500;
+/** Safe waiter budget after request overhead, never negative. */
+export function decisionWaitBudgetMs(requestStartedAt: number, now = Date.now()) {
+  return Math.max(0, Math.min(DECISION_WAIT_MAX_MS, requestStartedAt + DECISION_ROUTE_MAX_DURATION_MS - 5_000 - now));
+}
 
 /**
  * Same input -> same key. The input hash covers everything the decision reads
