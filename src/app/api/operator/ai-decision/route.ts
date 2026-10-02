@@ -5,7 +5,7 @@ import { buildDecision, refineNextAction } from "@/lib/decision/engine";
 import { collectDecisionEvidence } from "@/lib/decision/evidence";
 import {
   DECISION_ROUTE_MAX_DURATION_MS,
-  DECISION_WAIT_MAX_MS,
+  decisionWaitBudgetMs,
   DecisionInProgressError,
   decisionKeyFor,
   runIdempotentDecision,
@@ -18,8 +18,6 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 // Time this request keeps for itself after waiting on another request's decision.
-const RESPONSE_MARGIN_MS = 5_000;
-
 // Fields kept for existing clients (UI, operator-loop, MCP).
 function compatFields(decision: StructuredDecision) {
   return {
@@ -93,7 +91,7 @@ export async function POST(request: Request) {
       };
       return { output, retryable: Boolean(llm.failure) };
     }, {
-      maxWaitMs: Math.min(DECISION_WAIT_MAX_MS, startedAt + DECISION_ROUTE_MAX_DURATION_MS - RESPONSE_MARGIN_MS - Date.now()),
+      maxWaitMs: decisionWaitBudgetMs(startedAt),
     });
 
     const output = result.output;
