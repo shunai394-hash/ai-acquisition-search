@@ -46,11 +46,10 @@ export async function POST(request: Request) {
     const deterministic = buildDecision(evidence);
     // Same evidence -> same decision key -> the stored decision is reused, so
     // concurrent or repeated calls neither re-run the LLM nor insert duplicates.
-    // Idempotency is scoped to the same observed metric + the same EC-Pulse research run.
-    // This avoids duplicate decisions under concurrency while still allowing a new
-    // market-evidence run to trigger a fresh decision for the same post.
-    const evidenceVersion = evidence.market.runId ?? evidence.market.status;
-    const decisionKey = `${post.id}:${metricId ?? "no-metric"}:${evidenceVersion}:${deterministic.logic_version}`;
+    // The hash covers all evidence that can change the deterministic decision,
+    // including history and market evidence. Use it in the reservation key so
+    // changed evidence cannot reuse an older completed decision.
+    const decisionKey = `${post.id}:${deterministic.input_hash}:${deterministic.logic_version}`;
 
     const store = {
       async reserve(decisionKey: string) {
