@@ -7,12 +7,29 @@ function blockedIp(address: string) {
   const normalized = address.toLowerCase().split("%")[0];
   if (normalized === "::1" || normalized === "0:0:0:0:0:0:0:1") return true;
   if (isIP(normalized) === 4) {
-    const [a, b] = normalized.split(".").map(Number);
-    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
-      (a >= 224) || (a === 100 && b >= 64 && b <= 127);
+    const [a, b, c, d] = normalized.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && (b === 0 || b === 168)) ||
+      (a === 198 && b >= 18 && b <= 19) ||
+      (a >= 224) ||
+      [a, b, c, d].some((part) => !Number.isInteger(part) || part < 0 || part > 255);
   }
   if (isIP(normalized) === 6) {
+    if (normalized === "::" || normalized.startsWith("::ffff:")) {
+      const mapped = normalized.slice("::ffff:".length);
+      if (isIP(mapped) === 4) return blockedIp(mapped);
+      const parts = mapped.split(":");
+      if (parts.length === 2) {
+        const hi = Number.parseInt(parts[0], 16);
+        const lo = Number.parseInt(parts[1], 16);
+        if (Number.isInteger(hi) && Number.isInteger(lo) && hi >= 0 && hi <= 0xffff && lo >= 0 && lo <= 0xffff) {
+          return blockedIp([hi >> 8, hi & 0xff, lo >> 8, lo & 0xff].join("."));
+        }
+      }
+    }
     return normalized.startsWith("fc") || normalized.startsWith("fd") ||
       normalized.startsWith("fe8") || normalized.startsWith("fe9") ||
       normalized.startsWith("fea") || normalized.startsWith("feb") ||
