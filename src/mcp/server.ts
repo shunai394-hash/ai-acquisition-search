@@ -6,7 +6,7 @@ import { fetchPageSnapshot } from "../lib/acquisition/fetch-url";
 import { discoverSocialSignals } from "../lib/acquisition/social-search";
 import { discoverShopSignals } from "../lib/acquisition/shop-search";
 import { saveNarrationFile } from "../lib/video/gemini-tts";
-import { generateHiggsfieldVideo, getHiggsfieldStatus, waitForHiggsfieldVideo } from "../lib/video/higgsfield";
+import { generateHiggsfieldVideo, waitForHiggsfieldVideo } from "../lib/video/higgsfield";
 import { createCampaignId, loadCampaign, saveCampaign } from "../lib/campaign/store";
 import { discoverAcquisitionSignals } from "../lib/acquisition/search-web";
 import { decideNextCampaign } from "../lib/campaign/decision";
@@ -134,7 +134,7 @@ function createServer(): McpServer {
         });
         const analysis = await analyzePage(source, { query: search.queries.join(" / "), results: search.results }, socialSignals, shopSignals);
         const previousCampaign = campaignId ? await loadCampaign(campaignId) : null;
-        const previousPerformance: any[] = [];
+        const previousPerformance: unknown[] = [];
         if (previousCampaign?.posts?.length) {
           const { normalizeXPerformance, normalizeYouTubePerformance, normalizeTikTokPerformance, normalizeInstagramPerformance, normalizeFacebookPerformance } = await import("../lib/analytics/performance");
           const { getXPostMetrics } = await import("../lib/social/x");
@@ -153,7 +153,7 @@ function createServer(): McpServer {
         const decision = decideNextCampaign({ analysis, performance: previousPerformance });
         const selected = decision.nextTests[0];
         const brief = decision.productionBrief;
-         const prompt = videoPrompt ?? [selected?.concept, selected?.hook, brief?.angle, brief?.format, brief?.cta].filter(Boolean).join(". ");
+        const prompt = videoPrompt ?? [selected?.concept, selected?.hook, brief?.angle, brief?.format, brief?.cta].filter(Boolean).join(". ");
         let video: unknown = null;
         let narration: unknown = null;
         let videoUrl: string | undefined;
