@@ -10,6 +10,7 @@ import { generateHiggsfieldVideo, getHiggsfieldStatus, waitForHiggsfieldVideo } 
 import { createCampaignId, loadCampaign, saveCampaign } from "../lib/campaign/store";
 import { discoverAcquisitionSignals } from "../lib/acquisition/search-web";
 import { decideNextCampaign } from "../lib/campaign/decision";
+import { buildDecision } from "../lib/decision/engine";
 import { getTikTokPublishStatus, getTikTokVideoMetrics, publishTikTokVideo, queryTikTokCreator, resolveTikTokVideoId } from "../lib/social/tiktok";
 import { getYouTubeVideoStatus, uploadYouTubeVideo } from "../lib/social/youtube";
 import { getFacebookReelMetrics, getInstagramReelMetrics, publishFacebookReel, publishInstagramReel } from "../lib/social/meta";
@@ -592,6 +593,67 @@ function createServer(): McpServer {
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
         const message = error instanceof Error ? error.message : "実績取得に失敗しました。";
+        return { content: [{ type: "text", text: message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "evaluate-next-action",
+    {
+      description: "本番のEvidence → Teacher → DecisionエンジンでCONTINUE/PIVOT/STOP/WAITと次アクションを決定します。LLMではなくバージョン管理された決定ロジックが判定を行い、欠損値はunknownとして扱います。",
+      inputSchema: z.object({
+        asOf: z.string().datetime(),
+        product: z.object({
+          name: z.string().nullable(), url: z.string().url().nullable(),
+          price: z.number().nullable(), cost: z.number().nullable(),
+          features: z.array(z.string()).default([]), strengths: z.array(z.string()).default([]),
+          useCases: z.array(z.string()).default([]), salesChannels: z.array(z.string()).default([])
+        }),
+        customer: z.object({
+          target: z.string().nullable(), pain: z.string().nullable(), desire: z.string().nullable(),
+          valueProposition: z.string().nullable(), buyingTriggers: z.array(z.string()).default([]),
+          stage: z.string().nullable()
+        }),
+        market: z.object({
+          status: z.enum(["ok", "unavailable", "not_configured", "no_data"]),
+          error: z.string().optional(), runId: z.string().nullable().optional(),
+          capturedAt: z.string().datetime().nullable().optional(), commentsCount: z.number().nullable().optional(),
+          topPains: z.array(z.object({ pain: z.string(), count: z.number(), sharePercent: z.number() })).default([]),
+          emergingPains: z.array(z.object({ pain: z.string(), status: z.string(), shareDeltaPercent: z.number() })).default([]),
+          trendSignal: z.string().nullable().optional()
+        }),
+        hypothesis: z.object({
+          socialPostId: z.string(), network: z.string(), caption: z.string().nullable(),
+          hook: z.string().nullable(), angle: z.string().nullable(), hypothesis: z.string().nullable(),
+          primaryMetric: z.string().nullable(), publishedAt: z.string().datetime().nullable(),
+          lineageVerdicts: z.array(z.enum(["continue", "pivot", "stop", "wait"])).default([])
+        }),
+        current: z.object({
+          id: z.string().nullable().optional(), measuredAt: z.string().datetime(),
+          impressions: z.number().nullable(), views: z.number().nullable(), likes: z.number().nullable(),
+          comments: z.number().nullable(), shares: z.number().nullable(), saves: z.number().nullable(),
+          clicks: z.number().nullable(), conversions: z.number().nullable(), revenue: z.number().nullable(),
+          grossProfit: z.number().nullable(), adSpend: z.number().nullable(), source: z.string()
+        }).nullable(),
+        history: z.array(z.object({
+          socialPostId: z.string(), network: z.string(), publishedAt: z.string().datetime().nullable(),
+          metric: z.object({
+            id: z.string().nullable().optional(), measuredAt: z.string().datetime(),
+            impressions: z.number().nullable(), views: z.number().nullable(), likes: z.number().nullable(),
+            comments: z.number().nullable(), shares: z.number().nullable(), saves: z.number().nullable(),
+            clicks: z.number().nullable(), conversions: z.number().nullable(), revenue: z.number().nullable(),
+            grossProfit: z.number().nullable(), adSpend: z.number().nullable(), source: z.string()
+          })
+        })).default([])
+      })
+    },
+    async (evidence) => {
+      try {
+        const decision = buildDecision(evidence);
+        return { content: [{ type: "text", text: JSON.stringify(decision, null, 2) }] };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "次アクションの決定に失敗しました。";
         return { content: [{ type: "text", text: message }], isError: true };
       }
     }
