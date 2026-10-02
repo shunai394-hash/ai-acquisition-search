@@ -154,6 +154,30 @@ test("two concurrent cron runs: one is skipped, nothing is duplicated", async ()
   assert.equal(db.table("operator_leases").length, 0, "lease released");
 });
 
+test("configured OpenAI failure does not cache deterministic fallback", async () => {
+  seedPost("p1");
+  db.seed("post_metrics", [{
+    social_post_id: "p1",
+    impressions: 5000,
+    likes: 10,
+    comments: 1,
+    shares: 0,
+    raw: { source: "x" },
+    measured_at: iso(-HOUR),
+  }]);
+  process.env.OPENAI_API_KEY = "test-key";
+
+  const response = await aiDecision(internal("/api/operator/ai-decision", { socialPostId: "p1" }));
+  const body = await response.json();
+
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.aiConnected, false);
+  assert.equal(body.persisted, false);
+  assert.equal(db.table("operator_runs").filter((x) => x.run_type === "ai_performance_verdict").length, 0);
+
+  delete process.env.OPENAI_API_KEY;
+});
+
 test("duplicate ai-decision requests reuse one stored decision; duplicate next-creative reuses one creative", async () => {
   seedPost("p1");
   db.seed("post_metrics", [{ social_post_id: "p1", impressions: 5000, likes: 10, comments: 1, shares: 0, raw: { source: "x" }, measured_at: iso(-HOUR) }]);

@@ -1,6 +1,9 @@
+export type DecisionExecution<T> = { output: T; persist?: boolean };
+
 export type DecisionReservationResult<T> =
   | { status: "acquired"; id: string; output: T }
-  | { status: "completed"; id: string; output: T };
+  | { status: "completed"; id: string; output: T }
+  | { status: "transient"; id: string; output: T };
 
 export type DecisionReservationStore<T> = {
   reserve: (decisionKey: string) => Promise<{ status: "acquired"; id: string } | { status: "existing"; id: string }>;
@@ -9,12 +12,14 @@ export type DecisionReservationStore<T> = {
   release: (id: string) => Promise<void>;
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export async function runIdempotentDecision<T>(
   store: DecisionReservationStore<T>,
   decisionKey: string,
-  execute: () => Promise<T>,
-  waitMs = 50,
-  maxWaits = 40,
+  execute: () => Promise<DecisionExecution<T>>,
+  waitMs = 250,
+  maxWaits = 240,
 ): Promise<DecisionReservationResult<T>> {
   const reservation = await store.reserve(decisionKey);
 
@@ -22,15 +27,19 @@ export async function runIdempotentDecision<T>(
     for (let attempt = 0; attempt < maxWaits; attempt += 1) {
       const output = await store.getCompleted(reservation.id);
       if (output) return { status: "completed", id: reservation.id, output };
-      if (attempt < maxWaits - 1) await new Promise((resolve) => setTimeout(resolve, waitMs));
+      if (attempt < maxWaits - 1) await sleep(waitMs);
     }
     throw new Error("既存のAI判定が完了するまで待機できませんでした。");
   }
 
   try {
-    const output = await execute();
-    await store.complete(reservation.id, output);
-    return { status: "acquired", id: reservation.id, output };
+    const result = await execute();
+    if (result.persist !== false) {
+      await store.complete(reservation.id, result.output);
+      return { status: "acquired", id: reservation.id, output: result.output };
+    }
+    await store.release(reservation.id);
+    return { status: "transient", id: reservation.id, output: result.output };
   } catch (error) {
     await store.release(reservation.id);
     throw error;

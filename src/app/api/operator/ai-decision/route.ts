@@ -7,7 +7,9 @@ import { runIdempotentDecision } from "@/lib/decision/idempotency";
 import type { StructuredDecision } from "@/lib/decision/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+const PROCESSING_STALE_MS = 90_000;
 
 // Fields kept for existing clients (UI, operator-loop, MCP).
 function compatFields(decision: StructuredDecision) {
@@ -44,14 +46,13 @@ export async function POST(request: Request) {
     const deterministic = buildDecision(evidence);
     // Same evidence -> same decision key -> the stored decision is reused, so
     // concurrent or repeated calls neither re-run the LLM nor insert duplicates.
-    // Idempotency is scoped to the same observed metric + the same EC-Pulse research run.
-    // This avoids duplicate decisions under concurrency while still allowing a new
-    // market-evidence run to trigger a fresh decision for the same post.
-    const evidenceVersion = evidence.market.runId ?? evidence.market.status;
-    const decisionKey = `${post.id}:${metricId ?? "no-metric"}:${evidenceVersion}:${deterministic.logic_version}`;
+    // The hash covers all evidence that can change the deterministic decision,
+    // including history and market evidence. Use it in the reservation key so
+    // changed evidence cannot reuse an older completed decision.
+    const decisionKey = `${post.id}:${deterministic.input_hash}:${deterministic.logic_version}`;
 
     const store = {
-      async reserve(decisionKey: string) {
+      async reserve(decisionKey: string): Promise<{ status: "acquired"; id: string } | { status: "existing"; id: string }> {
         const { data, error } = await db.from("operator_runs").insert({
           product_id: body.productId || creative?.product_id || null,
           user_id: user.id,
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
         if (error?.code !== "23505") throw error ?? new Error("AI判定の予約に失敗しました。");
 
         const { data: existing, error: existingError } = await db.from("operator_runs")
-          .select("id")
+          .select("id, output, started_at")
           .eq("user_id", user.id)
           .eq("run_type", "ai_performance_verdict")
           .eq("input->>decision_key", decisionKey)
@@ -82,6 +83,17 @@ export async function POST(request: Request) {
           .maybeSingle();
         if (existingError) throw existingError;
         if (!existing?.id) throw new Error("AI判定の予約競合を解決できませんでした。");
+
+        const output = existing.output;
+        const startedAt = Date.parse(String(existing.started_at ?? ""));
+        const processing = output && typeof output === "object" && (output as Record<string, unknown>).state === "processing";
+        const stale = processing && Number.isFinite(startedAt) && Date.now() - startedAt >= PROCESSING_STALE_MS;
+        if (stale) {
+          const { error: reclaimError } = await db.from("operator_runs").delete().eq("id", existing.id);
+          if (reclaimError) throw reclaimError;
+          return this.reserve(decisionKey);
+        }
+
         return { status: "existing" as const, id: existing.id as string };
       },
       async getCompleted(id: string) {
@@ -112,7 +124,14 @@ export async function POST(request: Request) {
     const result = await runIdempotentDecision(store, decisionKey, async () => {
       const decision = await refineNextAction(deterministic, evidence, openAiJson, openAiModel());
       const aiConnected = decision.model_version !== "deterministic";
-      return { ...compatFields(decision), aiConnected, decision };
+      const aiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
+      return {
+        output: { ...compatFields(decision), aiConnected, decision },
+        // If AI is configured but the call failed, do not cache the deterministic
+        // fallback. If AI is intentionally unconfigured, keep the existing
+        // deterministic-only behavior used by local/CI environments.
+        persist: aiConnected || !aiConfigured,
+      };
     });
 
     if (result.status === "completed") {
@@ -128,7 +147,15 @@ export async function POST(request: Request) {
 
     const runId = result.id;
     const output = result.output;
-    return NextResponse.json({ ok: true, runId, aiConnected: output.aiConnected, ...compatFields(output.decision), decision: output.decision });
+    return NextResponse.json({
+      ok: true,
+      runId,
+      reused: false,
+      persisted: result.status !== "transient",
+      aiConnected: output.aiConnected,
+      ...compatFields(output.decision),
+      decision: output.decision,
+    });
   } catch (error) {
     console.error("ai decision error", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "AI判定に失敗しました。" }, { status: 500 });
