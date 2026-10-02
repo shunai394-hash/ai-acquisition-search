@@ -5,6 +5,7 @@ import {
   DECISION_LLM_MAX_MS,
   DECISION_ROUTE_MAX_DURATION_MS,
   DECISION_WAIT_MAX_MS,
+  decisionWaitBudgetMs,
   DecisionInProgressError,
   runIdempotentDecision,
   type DecisionReservationStore,
@@ -63,7 +64,7 @@ function memoryStore(clock: () => number = Date.now) {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-test("wait budget is derived from the LLM timeout and retry count and fits in the route", () => {
+test("wait budget is clamped to the remaining route window after request overhead", () => {\n  const startedAt = 1_000_000;\n  assert.equal(decisionWaitBudgetMs(startedAt, startedAt), DECISION_WAIT_MAX_MS);\n  assert.equal(decisionWaitBudgetMs(startedAt, startedAt + DECISION_ROUTE_MAX_DURATION_MS - 5_000), 0);\n  assert.equal(decisionWaitBudgetMs(startedAt, startedAt + DECISION_ROUTE_MAX_DURATION_MS + 1), 0);\n});\n\ntest("wait budget is derived from the LLM timeout and retry count and fits in the route", () => {
   assert.equal(DECISION_LLM_MAX_MS, OPENAI_JSON_TIMEOUT_MS * OPENAI_JSON_MAX_ATTEMPTS);
   assert.ok(DECISION_WAIT_MAX_MS > DECISION_LLM_MAX_MS, "waiter outlasts the slowest LLM call");
   assert.ok(DECISION_WAIT_MAX_MS < DECISION_ROUTE_MAX_DURATION_MS, "waiter still answers before the platform kills it");
