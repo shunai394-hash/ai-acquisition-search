@@ -1,4 +1,4 @@
-import type { AcquisitionAnalysis, PageSnapshot, SellingPoint, CustomerCandidate, AppealCandidate, ChannelRecommendation } from "./types";
+import type { AcquisitionAnalysis, PageSnapshot, SellingPoint, CustomerCandidate, AppealCandidate, ChannelRecommendation, PostScenario } from "./types";
 import { buildAcquisitionPrompt } from "./prompts";
 import { openAiJson } from "@/lib/ai/openai-json";
 import type { WebSearchResult } from "./search-web";
@@ -63,6 +63,65 @@ function fallback(
     { name: "比較・発見型", copy: "選択時に比較すべき違いを示す", customerLabel: customerCandidates[0].label, emotion: "納得", funnelStage: "consideration", channelFit: "未確定（媒体適合性は追加検証が必要）", strengthScore: 0.5, riskScore: 0.3, validationPriority: 2, reason: "差別化がクリックにつながるか検証する" },
     { name: "購入動機型", copy: "今買う理由と利用シーンを示す", customerLabel: customerCandidates[0].label, emotion: "安心", funnelStage: "purchase", channelFit: "未確定（媒体適合性は追加検証が必要）", strengthScore: 0.4, riskScore: 0.4, validationPriority: 3, reason: "購入導線への近さを検証する" },
   ];
+  const scenarios: PostScenario[] = [
+    {
+      id: "scenario-empathy",
+      archetype: "empathy",
+      hypothesis: "顧客が実際に困っている場面への共感が、最初の反応を生むか検証する",
+      targetCustomer: customerCandidates[0].label,
+      painOrDesire: customerCandidates[0].pain,
+      hook: "その悩み、まずここを確認してください。",
+      beats: ["悩みを一言で提示", "困る具体的な場面を示す", "確認できる商品価値を1つ提示", "過度な断定を避けて利用場面を示す", "次の行動を1つCTA"],
+      proof: source.description ? [source.description] : [],
+      cta: "詳しい条件を確認する",
+      channel: "未確定",
+      format: "短尺・共感型",
+      primaryMetric: "視聴維持率",
+      secondaryMetric: "クリック率",
+      variableToChange: "悩み起点のフック",
+      variablesToHold: ["商品", "尺", "構成", "CTA"],
+      risk: "顧客の悩みが仮説段階のため、共感表現が実際の需要と一致しない可能性がある",
+      evidence: evidence.slice(0, 3),
+    },
+    {
+      id: "scenario-comparison",
+      archetype: "comparison_discovery",
+      hypothesis: "比較時に重視される違いを示すことで、検討意図を引き出せるか検証する",
+      targetCustomer: customerCandidates[0].label,
+      painOrDesire: "比較・選択時の不安",
+      hook: "似た商品を選ぶ前に、確認したいポイントがあります。",
+      beats: ["比較対象を明示", "確認項目を1つ提示", "確認できる商品情報を提示", "差がある場合の利用文脈を示す", "比較詳細へのCTA"],
+      proof: source.headings.slice(0, 2),
+      cta: "比較ポイントを確認する",
+      channel: "未確定",
+      format: "比較・発見型短尺",
+      primaryMetric: "クリック率",
+      secondaryMetric: "保存率",
+      variableToChange: "比較軸",
+      variablesToHold: ["商品", "尺", "CTA", "配信条件"],
+      risk: "比較対象や優位性が十分に確認できていないため、断定比較は避ける必要がある",
+      evidence: evidence.slice(0, 3),
+    },
+    {
+      id: "scenario-purchase",
+      archetype: "purchase_motivation",
+      hypothesis: "購入直前の不安を減らす情報が、購入行動につながるか検証する",
+      targetCustomer: customerCandidates[0].label,
+      painOrDesire: customerCandidates[0].desire,
+      hook: "買う前に、ここだけ確認してください。",
+      beats: ["購入前の不安を提示", "商品ページで確認できる条件を提示", "利用シーンを提示", "不明点は不明と明示", "商品詳細へのCTA"],
+      proof: [source.description, ...source.headings].filter(Boolean).slice(0, 3) as string[],
+      cta: "商品条件を確認する",
+      channel: "未確定",
+      format: "購入検討型短尺",
+      primaryMetric: "クリック率",
+      secondaryMetric: "購入率",
+      variableToChange: "購入不安の訴求",
+      variablesToHold: ["商品", "尺", "CTA", "配信条件"],
+      risk: "購入率を直接観測できない場合、クリック以降の効果は未確定になる",
+      evidence: evidence.slice(0, 3),
+    },
+  ];
   const channelRecommendation: ChannelRecommendation = {
     recommended: "未確定",
     reason: "商品ページだけでは媒体適合性を十分に確認できないため、媒体を断定しません。実績・商品特性・顧客接点を追加取得してから決定します。",
@@ -72,6 +131,7 @@ function fallback(
 
   return {
     sellingPoints,
+    scenarios,
     customerCandidates,
     appealCandidates,
     channelRecommendation,
@@ -153,7 +213,7 @@ function fallback(
       valueProposition:
         source.headings.slice(0, 3).join(" / ") ||
         "商品ページの主要便益を検証する",
-      channel: "TikTok / Instagram Reels",
+      channel: "未確定",
       format: "悩み起点の短尺投稿",
       testPlan:
         "異なる訴求を3本出し、視聴維持率・クリック率・購入率を比較する",
@@ -165,7 +225,7 @@ function fallback(
         concept: productName + "の悩み解決型",
         hook: "この商品が必要になる人は、まずここを見てください。",
         format: "15〜30秒短尺",
-        channel: "TikTok / Instagram Reels",
+        channel: "未確定",
         reason: "悩み起点の反応を検証するため",
         testMetric: "視聴維持率・クリック率",
       },
@@ -339,7 +399,35 @@ export async function analyzePage(
   const sellingPoints = normalizeSellingPoints(parsed.sellingPoints);
   const customerCandidates = normalizeCustomerCandidates(parsed.customerCandidates);
   const appealCandidates = normalizeAppealCandidates(parsed.appealCandidates);
+  const normalizeScenarios = (value: unknown): PostScenario[] => {
+    const items = Array.isArray(value) ? value : [];
+    const archetypes = new Set<PostScenario["archetype"]>(["empathy", "comparison_discovery", "purchase_motivation"]);
+    return items
+      .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+      .filter((x) => typeof x.hypothesis === "string" && archetypes.has(x.archetype as PostScenario["archetype"]))
+      .slice(0, 3)
+      .map((x, index) => ({
+        id: typeof x.id === "string" ? x.id : `scenario-${index + 1}`,
+        archetype: x.archetype as PostScenario["archetype"],
+        hypothesis: x.hypothesis as string,
+        targetCustomer: typeof x.targetCustomer === "string" ? x.targetCustomer : "未特定",
+        painOrDesire: typeof x.painOrDesire === "string" ? x.painOrDesire : "未検証",
+        hook: typeof x.hook === "string" ? x.hook : "未検証",
+        beats: Array.isArray(x.beats) ? x.beats.filter((v): v is string => typeof v === "string").slice(0, 6) : [],
+        proof: Array.isArray(x.proof) ? x.proof.filter((v): v is string => typeof v === "string").slice(0, 6) : [],
+        cta: typeof x.cta === "string" ? x.cta : "未検証",
+        channel: typeof x.channel === "string" ? x.channel : "未確定",
+        format: typeof x.format === "string" ? x.format : "未確定",
+        primaryMetric: typeof x.primaryMetric === "string" ? x.primaryMetric : "未確定",
+        secondaryMetric: typeof x.secondaryMetric === "string" ? x.secondaryMetric : "未確定",
+        variableToChange: typeof x.variableToChange === "string" ? x.variableToChange : "未確定",
+        variablesToHold: Array.isArray(x.variablesToHold) ? x.variablesToHold.filter((v): v is string => typeof v === "string").slice(0, 8) : [],
+        risk: typeof x.risk === "string" ? x.risk : "未評価",
+        evidence: Array.isArray(x.evidence) ? x.evidence.filter((v): v is string => typeof v === "string").slice(0, 6) : [],
+      }));
+  };
   const channelRecommendation = normalizeChannelRecommendation(parsed.channelRecommendation, base.channelRecommendation);
+  const scenarios = normalizeScenarios(parsed.scenarios);
 
   return {
     ...base,
@@ -348,6 +436,7 @@ export async function analyzePage(
     sellingPoints: sellingPoints.length ? sellingPoints : base.sellingPoints,
     customerCandidates: customerCandidates.length ? customerCandidates : base.customerCandidates,
     appealCandidates: appealCandidates.length ? appealCandidates : base.appealCandidates,
+    scenarios: scenarios.length ? scenarios : base.scenarios,
     channelRecommendation,
 
     product: {

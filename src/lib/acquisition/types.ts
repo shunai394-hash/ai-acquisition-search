@@ -38,6 +38,26 @@ export type AppealCandidate = {
   reason: string;
 };
 
+export type PostScenario = {
+  id: string;
+  archetype: "empathy" | "comparison_discovery" | "purchase_motivation";
+  hypothesis: string;
+  targetCustomer: string;
+  painOrDesire: string;
+  hook: string;
+  beats: string[];
+  proof: string[];
+  cta: string;
+  channel: string;
+  format: string;
+  primaryMetric: string;
+  secondaryMetric: string;
+  variableToChange: string;
+  variablesToHold: string[];
+  risk: string;
+  evidence: string[];
+};
+
 export type ChannelRecommendation = {
   recommended: string;
   reason: string;
@@ -59,6 +79,7 @@ export type AcquisitionAnalysis = {
   sellingPoints: SellingPoint[];
   customerCandidates: CustomerCandidate[];
   appealCandidates: AppealCandidate[];
+  scenarios: PostScenario[];
   channelRecommendation: ChannelRecommendation;
   market: { summary: string; signals: string[] };
   customer: { summary: string; likelySegments: string[]; needs: string[] };
