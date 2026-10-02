@@ -112,7 +112,7 @@ export async function POST(request: Request) {
     const result = await runIdempotentDecision(store, decisionKey, async () => {
       const decision = await refineNextAction(deterministic, evidence, openAiJson, openAiModel());
       const aiConnected = decision.model_version !== "deterministic";
-      return { aiConnected, decision };
+      return { ...compatFields(decision), aiConnected, decision };
     });
 
     if (result.status === "completed") {
