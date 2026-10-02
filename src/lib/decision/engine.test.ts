@@ -243,3 +243,23 @@ test("next action has exactly one mutable creative variable when generating", ()
     assert.equal(decision.next_action.angle, null);
   }
 });
+
+
+test("same evidence produces the same complete deterministic decision", () => {
+  const input = evidence({ current: metric({ impressions: 4000, clicks: 120 }) });
+  const now = new Date("2026-10-01T12:00:00.000Z");
+  const a = buildDecision(input, now);
+  const b = buildDecision(input, now);
+  assert.deepEqual(b, a);
+});
+
+test("unknown metrics remain unknown and do not become zero", () => {
+  const input = evidence({
+    current: metric({ impressions: 4000, clicks: null, conversions: null, revenue: null, grossProfit: null, adSpend: null }),
+  });
+  const d = buildDecision(input, new Date("2026-10-01T12:00:00.000Z"));
+  assert.equal(d.teacher.sample.clicks, null);
+  assert.equal(d.teacher.sample.conversions, null);
+  assert.ok(!d.evidence.some((x) => x.source === "post_metrics" && x.key === "clicks" && x.value === 0));
+  assert.ok(!d.evidence.some((x) => x.source === "post_metrics" && x.key === "conversions" && x.value === 0));
+});

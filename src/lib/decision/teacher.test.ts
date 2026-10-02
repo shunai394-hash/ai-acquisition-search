@@ -141,3 +141,22 @@ test("teacher output includes criteria for the actual rule used", () => {
   assert.ok(r.criteria.some((x) => x.name === "ctr"));
   assert.ok(r.criteria.some((x) => x.name === "ctr_ci95"));
 });
+
+
+test("unknown conversion data never behaves like zero conversions", () => {
+  const r = evaluateTeacher(evidence({
+    current: metric({ impressions: 5000, clicks: 40, conversions: null, revenue: null, adSpend: 1000 }),
+  }));
+  assert.equal(r.sample.conversions, null);
+  assert.ok(r.missingData.includes("conversions"));
+  assert.notEqual(r.ruleId, "no_conversion_paid");
+  assert.notEqual(r.ruleId, "no_conversion_repeated");
+});
+
+test("unknown click data remains null instead of becoming zero", () => {
+  const r = evaluateTeacher(evidence({
+    current: metric({ impressions: 5000, clicks: null, conversions: null }),
+  }));
+  assert.equal(r.sample.clicks, null);
+  assert.ok(r.missingData.includes("clicks"));
+});
