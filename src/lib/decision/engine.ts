@@ -258,8 +258,12 @@ export async function refineNextAction(decision: StructuredDecision, evidence: D
     if (!text) return decision;
     const parsed = JSON.parse(text) as { hook?: unknown; angle?: unknown; description?: unknown };
     const clean = (v: unknown, max: number) => (typeof v === "string" && v.trim() && v.length <= max ? v.trim() : null);
-    const hook = clean(parsed.hook, 60);
-    const angle = decision.next_action.change_variable === "hook" ? decision.next_action.angle : clean(parsed.angle, 80) ?? decision.next_action.angle;
+    const hook = decision.next_action.change_variable === "hook"
+      ? clean(parsed.hook, 60) ?? decision.next_action.hook
+      : decision.next_action.hook;
+    const angle = decision.next_action.change_variable === "angle"
+      ? clean(parsed.angle, 80) ?? decision.next_action.angle
+      : decision.next_action.angle;
     return {
       ...decision,
       next_action: {
