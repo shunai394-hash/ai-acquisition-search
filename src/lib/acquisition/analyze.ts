@@ -191,7 +191,12 @@ export async function analyzePage(
     return fallback(source, webResults, socialSignals, shopSignals);
   }
 
-  const parsed = JSON.parse(content) as Partial<AcquisitionAnalysis>;
+  let parsed: Partial<AcquisitionAnalysis>;
+  try {
+    parsed = JSON.parse(content) as Partial<AcquisitionAnalysis>;
+  } catch {
+    return fallback(source, webResults, socialSignals, shopSignals);
+  }
   const base = fallback(source, webResults, socialSignals, shopSignals);
 
   const arr = <T,>(value: unknown, fallbackValue: T[]): T[] =>
