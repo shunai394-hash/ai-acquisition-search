@@ -128,17 +128,18 @@ export function decideNextCampaign(input: {
     const salesExpectation =
       normalizeEvidence(expectedProfit, knownProfit) ??
       normalizeEvidence(expectedCvr, knownCvr) ??
-      normalizeEvidence(expectedCtr, knownCtr) ??
-      0.5;
-    const channelFit = p.channel ? 0.6 : 0.2;
+      normalizeEvidence(expectedCtr, knownCtr);
     const metricClarity = p.testMetric ? 0.7 : 0.2;
     const learningValue = Math.min(1, 0.45 + (2 - i) * 0.2);
     const productionEase = p.format ? 0.7 : 0.3;
-    const priorityScore =
-      salesExpectation * 0.35 +
-      learningValue * 0.35 +
-      productionEase * 0.15 +
-      metricClarity * 0.15;
+    const weightedComponents = [
+      salesExpectation != null ? { value: salesExpectation, weight: 0.35 } : null,
+      { value: learningValue, weight: 0.35 },
+      { value: productionEase, weight: 0.15 },
+      { value: metricClarity, weight: 0.15 },
+    ].filter((x): x is { value: number; weight: number } => x != null);
+    const totalWeight = weightedComponents.reduce((sum, x) => sum + x.weight, 0);
+    const priorityScore = weightedComponents.reduce((sum, x) => sum + x.value * x.weight, 0) / totalWeight;
     const rankReason = expectedProfit != null
       ? "同媒体の実績粗利（広告費控除後）を最優先の売上根拠として、学習価値・制作容易性・成功指標の明確さを合成"
       : expectedCvr != null
