@@ -149,6 +149,7 @@ export function decideNextCampaign(input: {
     return { p, i, learningValue, priorityScore, expectedCtr, expectedCvr, expectedProfit, rankReason };
   }).sort((a, b) => b.priorityScore - a.priorityScore);
 
+  const selected = scored.slice(0, 3);
   const target = input.analysis.decision?.target || input.analysis.customer?.likelySegments?.[0] || "分析で特定した主要顧客";
   const angle = input.analysis.decision?.valueProposition || input.analysis.decision?.desire || "商品価値を具体的な顧客課題に接続する";
 
