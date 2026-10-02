@@ -6,6 +6,8 @@ on:
     paths:
       - ".claude-plugin/**"
       - "skills/**"
+      - "commands/**"
+      - "commands/**"
       - ".mcp.json"
       - "src/mcp/**"
       - "src/lib/video/**"
@@ -38,7 +40,7 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Typecheck
         run: npx tsc --noEmit
       - name: Lint
