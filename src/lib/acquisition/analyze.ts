@@ -256,7 +256,7 @@ function fallback(
   };
 }
 
-export function normalizeAcquisitionScenarios = (value: unknown): PostScenario[] => {
+export function normalizeAcquisitionScenarios(value: unknown): PostScenario[] {
     const items = Array.isArray(value) ? value : [];
     const archetypes = new Set<PostScenario["archetype"]>([
       "empathy",
@@ -465,7 +465,7 @@ export async function analyzePage(
   const customerCandidates = normalizeCustomerCandidates(parsed.customerCandidates);
   const appealCandidates = normalizeAppealCandidates(parsed.appealCandidates);
   const channelRecommendation = normalizeChannelRecommendation(parsed.channelRecommendation, base.channelRecommendation);
-  const scenarios = normalizeScenarios(parsed.scenarios).map((scenario) => ({
+  const scenarios = normalizeAcquisitionScenarios(parsed.scenarios).map((scenario) => ({
     ...scenario,
     channel:
       channelRecommendation.recommended && channelRecommendation.recommended !== "未確定"
