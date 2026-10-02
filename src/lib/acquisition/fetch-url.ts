@@ -1,4 +1,5 @@
 ﻿import type { PageSnapshot } from "./types";
+import { fetchPublicUrl } from "@/lib/security/public-url";
 
 const TIMEOUT_MS = 12_000;
 const MAX_BYTES = 1_500_000;
@@ -134,20 +135,6 @@ function cleanText(html: string) {
 export async function fetchPageSnapshot(
   inputUrl: string
 ): Promise<PageSnapshot> {
-  let url: URL;
-
-  try {
-    url = new URL(inputUrl);
-  } catch {
-    throw new Error("URLの形式が正しくありません。");
-  }
-
-  if (!["http:", "https:"].includes(url.protocol)) {
-    throw new Error(
-      "http または https のURLを入力してください。"
-    );
-  }
-
   const controller = new AbortController();
   const timer = setTimeout(
     () => controller.abort(),
@@ -157,9 +144,8 @@ export async function fetchPageSnapshot(
   let response: Response;
 
   try {
-    response = await fetch(url.toString(), {
+    response = await fetchPublicUrl(inputUrl, {
       signal: controller.signal,
-      redirect: "follow",
       cache: "no-store",
       headers: {
         "User-Agent": "AI-Acquisition-Search/1.0",
