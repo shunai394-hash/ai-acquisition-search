@@ -175,3 +175,36 @@ test("LLM refinement cannot change hook when the decision variable is offer", as
   assert.equal(refined.next_action.angle, d.next_action.angle);
   assert.equal(refined.next_action.description, "説明だけ変更");
 });
+
+
+test("LLM refinement for hook cannot change angle", async () => {
+  const e = evidence({ current: metric({ impressions: 4000, clicks: 120 }) });
+  const d = buildDecision(e);
+  assert.equal(d.verdict, "continue");
+  assert.equal(d.next_action.change_variable, "hook");
+  const refined = await refineNextAction(
+    d,
+    e,
+    async () => JSON.stringify({ hook: "新しいHook", angle: "不正な訴求変更", description: "説明変更" }),
+    "test-model",
+  );
+  assert.equal(refined.next_action.hook, "新しいHook");
+  assert.equal(refined.next_action.angle, d.next_action.angle);
+  assert.equal(refined.next_action.description, "説明変更");
+});
+
+test("LLM refinement for angle cannot change hook", async () => {
+  const e = evidence({ current: metric({ impressions: 6000, clicks: 10 }) });
+  const d = buildDecision(e);
+  assert.equal(d.verdict, "pivot");
+  assert.equal(d.next_action.change_variable, "angle");
+  const refined = await refineNextAction(
+    d,
+    e,
+    async () => JSON.stringify({ hook: "不正なHook変更", angle: "新しい訴求変更", description: "説明変更" }),
+    "test-model",
+  );
+  assert.equal(refined.next_action.hook, d.next_action.hook);
+  assert.equal(refined.next_action.angle, "新しい訴求変更");
+  assert.equal(refined.next_action.description, "説明変更");
+});
