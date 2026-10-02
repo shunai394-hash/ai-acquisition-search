@@ -208,3 +208,38 @@ test("LLM refinement for angle cannot change hook", async () => {
   assert.equal(refined.next_action.angle, "新しい訴求変更");
   assert.equal(refined.next_action.description, "説明変更");
 });
+
+test("next action has exactly one mutable creative variable when generating", () => {
+  const cases = [
+    {
+      name: "continue",
+      decision: buildDecision(evidence({ current: metric({ impressions: 4000, clicks: 120 }) })),
+    },
+    {
+      name: "pivot-angle",
+      decision: buildDecision(evidence({ current: metric({ impressions: 6000, clicks: 10 }) })),
+    },
+    {
+      name: "pivot-offer",
+      decision: buildDecision(
+        evidence({ current: metric({ impressions: 5000, clicks: 40, conversions: 0, revenue: 0, adSpend: 1000 }) }),
+      ),
+    },
+  ];
+
+  for (const { name, decision } of cases) {
+    assert.equal(decision.next_action.generate_creative, true, name);
+    assert.ok(["hook", "angle", "offer"].includes(decision.next_action.change_variable ?? ""), name);
+  }
+
+  const stop = buildDecision(
+    evidence({ current: metric({ impressions: 6000, clicks: 10 }) }, { lineageVerdicts: ["pivot", "pivot"] }),
+  );
+  const wait = buildDecision(evidence({ current: metric({ impressions: 50 }) }));
+  for (const decision of [stop, wait]) {
+    assert.equal(decision.next_action.generate_creative, false);
+    assert.equal(decision.next_action.change_variable, null);
+    assert.equal(decision.next_action.hook, null);
+    assert.equal(decision.next_action.angle, null);
+  }
+});
