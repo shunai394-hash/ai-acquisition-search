@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     const decisionKey = `${post.id}:${deterministic.input_hash}:${deterministic.logic_version}`;
 
     const store = {
-      async reserve(decisionKey: string) {
+      async reserve(decisionKey: string): Promise<{ status: "acquired"; id: string } | { status: "existing"; id: string }> {
         const { data, error } = await db.from("operator_runs").insert({
           product_id: body.productId || creative?.product_id || null,
           user_id: user.id,
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       runId,
-      reused: result.status === "completed",
+      reused: false,
       persisted: result.status !== "transient",
       aiConnected: output.aiConnected,
       ...compatFields(output.decision),
