@@ -34,12 +34,12 @@ test("concurrent decision execution reserves once and reuses the completed resul
 
   const first = runIdempotentDecision(store, "same-key", async () => {
     executions += 1;
-    return "decision-1";
+    return { output: "decision-1" };
   }, 1, 100);
 
   const second = runIdempotentDecision(store, "same-key", async () => {
     executions += 1;
-    return "decision-2";
+    return { output: "decision-2" };
   }, 1, 100);
 
   await new Promise((resolve) => setImmediate(resolve));
@@ -51,6 +51,28 @@ test("concurrent decision execution reserves once and reuses the completed resul
   assert.deepEqual(results.map((r) => r.status), ["acquired", "completed"]);
   assert.equal(results[0].id, results[1].id);
   assert.equal(results[1].output, "decision-1");
+});
+
+test("wait window can exceed the old 2-second polling window", async () => {
+  let completed: string | null = null;
+  let reads = 0;
+  const store = {
+    async reserve() {
+      return { status: "existing" as const, id: "run-1" };
+    },
+    async getCompleted() {
+      reads += 1;
+      if (reads >= 4) completed = "late-decision";
+      return completed;
+    },
+    async complete() {},
+    async release() {},
+  };
+
+  const result = await runIdempotentDecision(store, "slow-key", async () => ({ output: "unused" }), 800, 4);
+  assert.equal(result.status, "completed");
+  assert.equal(result.output, "late-decision");
+  assert.equal(reads, 4);
 });
 
 test("failed execution releases the reservation so the next attempt can run", async () => {
@@ -87,11 +109,36 @@ test("failed execution releases the reservation so the next attempt can run", as
   assert.equal(attempts, 1);
   assert.equal(released, true);
 
-  const retry = await runIdempotentDecision(store, "retry-key", async () => {
-    attempts += 1;
-    return "retry-success";
-  });
-
+  const retry = await runIdempotentDecision(store, "retry-key", async () => ({ output: "retry-success" }));
   assert.equal(attempts, 2);
   assert.equal(retry.status, "acquired");
+});
+
+test("non-persistable output is released and returned as transient", async () => {
+  let released = false;
+  let completed = false;
+  const store = {
+    async reserve() {
+      return { status: "acquired" as const, id: "run-1" };
+    },
+    async getCompleted() {
+      return null;
+    },
+    async complete() {
+      completed = true;
+    },
+    async release() {
+      released = true;
+    },
+  };
+
+  const result = await runIdempotentDecision(store, "transient-key", async () => ({
+    output: "deterministic-fallback",
+    persist: false,
+  }));
+
+  assert.equal(result.status, "transient");
+  assert.equal(result.output, "deterministic-fallback");
+  assert.equal(released, true);
+  assert.equal(completed, false);
 });
