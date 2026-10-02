@@ -159,3 +159,19 @@ test("LLM refinement enforces documented field length limits", async () => {
   assert.equal(refined.next_action.angle, d.next_action.angle);
   assert.equal(refined.next_action.description, d.next_action.description);
 });
+
+test("LLM refinement cannot change hook when the decision variable is offer", async () => {
+  const e = evidence({ current: metric({ impressions: 5000, clicks: 40, conversions: 0, revenue: 0, adSpend: 1000 }) });
+  const d = buildDecision(e);
+  assert.equal(d.verdict, "pivot");
+  assert.equal(d.next_action.change_variable, "offer");
+  const refined = await refineNextAction(
+    d,
+    e,
+    async () => JSON.stringify({ hook: "不正なHook変更", angle: "不正な訴求変更", description: "説明だけ変更" }),
+    "test-model",
+  );
+  assert.equal(refined.next_action.hook, d.next_action.hook);
+  assert.equal(refined.next_action.angle, d.next_action.angle);
+  assert.equal(refined.next_action.description, "説明だけ変更");
+});
