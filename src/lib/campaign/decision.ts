@@ -24,6 +24,10 @@ export type CampaignPerformance = {
     comments?: number | null;
     shares?: number | null;
     clicks?: number | null;
+    conversions?: number | null;
+    revenue?: number | null;
+    grossProfit?: number | null;
+    adSpend?: number | null;
   };
 };
 
@@ -79,21 +83,77 @@ export function decideNextCampaign(input: {
   if (input.analysis.opportunities?.length) basedOn.push("商品・市場分析で抽出した機会");
   if (!performance.length) unknown.push("まだ投稿実績が接続されていないため、成果比較はできない");
 
+  const channelStats = new Map<string, {
+    impressions: number;
+    clicks: number;
+    conversions: number;
+    grossProfit: number;
+    adSpend: number;
+  }>();
+  for (const p of performance) {
+    const key = p.platform.trim().toLowerCase();
+    const s = channelStats.get(key) ?? { impressions: 0, clicks: 0, conversions: 0, grossProfit: 0, adSpend: 0 };
+    if (num(p.metrics.impressions) != null) s.impressions += p.metrics.impressions!;
+    if (num(p.metrics.clicks) != null) s.clicks += p.metrics.clicks!;
+    if (num(p.metrics.conversions) != null) s.conversions += p.metrics.conversions!;
+    if (num(p.metrics.grossProfit) != null) s.grossProfit += p.metrics.grossProfit!;
+    if (num(p.metrics.adSpend) != null) s.adSpend += p.metrics.adSpend!;
+    channelStats.set(key, s);
+  }
+
+  const channelEvidence = [...channelStats.entries()].map(([channel, s]) => ({
+    channel,
+    ctr: s.impressions > 0 ? s.clicks / s.impressions : null,
+    cvr: s.clicks > 0 ? s.conversions / s.clicks : null,
+    profit: (s.grossProfit !== 0 || s.adSpend !== 0) ? s.grossProfit - s.adSpend : null,
+  }));
+  const knownProfit = channelEvidence.map((x) => x.profit).filter((x): x is number => x != null);
+  const knownCvr = channelEvidence.map((x) => x.cvr).filter((x): x is number => x != null);
+  const knownCtr = channelEvidence.map((x) => x.ctr).filter((x): x is number => x != null);
+  const normalizeEvidence = (value: number | null, values: number[]) => {
+    if (value == null || !values.length) return null;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    if (max === min) return 0.5;
+    return Math.max(0, Math.min(1, (value - min) / (max - min)));
+  };
+
   const scored = posts.map((p, i) => {
+    const stats = channelStats.get(p.channel.trim().toLowerCase());
+    const expectedCtr = stats && stats.impressions > 0 ? stats.clicks / stats.impressions : null;
+    const expectedCvr = stats && stats.clicks > 0 ? stats.conversions / stats.clicks : null;
+    const expectedProfit = stats && (stats.grossProfit !== 0 || stats.adSpend !== 0)
+      ? stats.grossProfit - stats.adSpend
+      : null;
+    const salesExpectation =
+      normalizeEvidence(expectedProfit, knownProfit) ??
+      normalizeEvidence(expectedCvr, knownCvr) ??
+      normalizeEvidence(expectedCtr, knownCtr) ??
+      0.5;
     const channelFit = p.channel ? 0.6 : 0.2;
     const metricClarity = p.testMetric ? 0.7 : 0.2;
     const learningValue = Math.min(1, 0.45 + (2 - i) * 0.2);
-    const salesExpectation = Math.min(1, 0.4 + channelFit * 0.3 + metricClarity * 0.3);
     const productionEase = p.format ? 0.7 : 0.3;
-    const priorityScore = salesExpectation * 0.35 + learningValue * 0.35 + productionEase * 0.15 + metricClarity * 0.15;
-    return { p, i, learningValue, priorityScore };
+    const priorityScore =
+      salesExpectation * 0.35 +
+      learningValue * 0.35 +
+      productionEase * 0.15 +
+      metricClarity * 0.15;
+    const rankReason = expectedProfit != null
+      ? "同媒体の実績粗利（広告費控除後）を最優先の売上根拠として、学習価値・制作容易性・成功指標の明確さを合成"
+      : expectedCvr != null
+        ? "同媒体の実績CVRを売上期待の根拠として、学習価値・制作容易性・成功指標の明確さを合成"
+        : expectedCtr != null
+          ? "同媒体の実績CTRを売上期待の代替根拠として、学習価値・制作容易性・成功指標の明確さを合成"
+          : "売上実績が未接続のため売上期待は未知。学習価値・制作容易性・成功指標の明確さを中心に優先順位を算出";
+    return { p, i, learningValue, priorityScore, expectedCtr, expectedCvr, expectedProfit, rankReason };
   }).sort((a, b) => b.priorityScore - a.priorityScore);
 
   const selected = scored.slice(0, 3);
   const target = input.analysis.decision?.target || input.analysis.customer?.likelySegments?.[0] || "分析で特定した主要顧客";
   const angle = input.analysis.decision?.valueProposition || input.analysis.decision?.desire || "商品価値を具体的な顧客課題に接続する";
 
-  const nextTests: CampaignTest[] = selected.map(({ p, learningValue, priorityScore }, i) => ({
+  const nextTests: CampaignTest[] = selected.map(({ p, learningValue, priorityScore, expectedCtr, expectedCvr, expectedProfit, rankReason }, i) => ({
     id: `test-${Date.now()}-${i + 1}`,
     concept: p.concept,
     hook: p.hook,
@@ -101,9 +161,12 @@ export function decideNextCampaign(input: {
     format: p.format,
     hypothesis: p.reason,
     successMetric: p.testMetric,
+    expectedCtr,
+    expectedCvr,
+    expectedProfit,
     learningValueScore: Number(learningValue.toFixed(3)),
     priorityScore: Number(priorityScore.toFixed(3)),
-    rankReason: "売上期待・学習価値・制作容易性・成功指標の明確さを合成して優先順位を算出",
+    rankReason,
   }));
 
   return {

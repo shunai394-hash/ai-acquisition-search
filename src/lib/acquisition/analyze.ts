@@ -53,26 +53,21 @@ function fallback(
     pain: "具体的な悩みは追加検証が必要",
     desire: "商品ページで示された便益を得たい",
     buyingTrigger: "悩みが顕在化したタイミング",
-    preferredChannel: "TikTok / Instagram Reels",
+    preferredChannel: "未確定（媒体適合性は追加検証が必要）",
     resonantWords: source.headings.slice(0, 2),
     avoidWords: [],
     reason: "現時点で確認できる商品文脈を起点にした仮説",
   }];
   const appealCandidates: AppealCandidate[] = [
-    { name: "共感型", copy: "悩み起点で商品が必要になる場面を示す", customerLabel: customerCandidates[0].label, emotion: "共感", funnelStage: "awareness", channelFit: "TikTok / Instagram Reels", strengthScore: 0.5, riskScore: 0.3, validationPriority: 1, reason: "顧客課題の反応を最初に検証する" },
-    { name: "比較・発見型", copy: "選択時に比較すべき違いを示す", customerLabel: customerCandidates[0].label, emotion: "納得", funnelStage: "consideration", channelFit: "TikTok / Instagram Reels", strengthScore: 0.5, riskScore: 0.3, validationPriority: 2, reason: "差別化がクリックにつながるか検証する" },
-    { name: "購入動機型", copy: "今買う理由と利用シーンを示す", customerLabel: customerCandidates[0].label, emotion: "安心", funnelStage: "purchase", channelFit: "TikTok / Instagram Reels", strengthScore: 0.4, riskScore: 0.4, validationPriority: 3, reason: "購入導線への近さを検証する" },
+    { name: "共感型", copy: "悩み起点で商品が必要になる場面を示す", customerLabel: customerCandidates[0].label, emotion: "共感", funnelStage: "awareness", channelFit: "未確定（媒体適合性は追加検証が必要）", strengthScore: 0.5, riskScore: 0.3, validationPriority: 1, reason: "顧客課題の反応を最初に検証する" },
+    { name: "比較・発見型", copy: "選択時に比較すべき違いを示す", customerLabel: customerCandidates[0].label, emotion: "納得", funnelStage: "consideration", channelFit: "未確定（媒体適合性は追加検証が必要）", strengthScore: 0.5, riskScore: 0.3, validationPriority: 2, reason: "差別化がクリックにつながるか検証する" },
+    { name: "購入動機型", copy: "今買う理由と利用シーンを示す", customerLabel: customerCandidates[0].label, emotion: "安心", funnelStage: "purchase", channelFit: "未確定（媒体適合性は追加検証が必要）", strengthScore: 0.4, riskScore: 0.4, validationPriority: 3, reason: "購入導線への近さを検証する" },
   ];
   const channelRecommendation: ChannelRecommendation = {
-    recommended: "Instagram Reels",
-    reason: "視覚訴求と短尺検証を優先する暫定仮説。実績データ未接続のため確定ではありません。",
-    comparison: [
-      { channel: "Instagram Reels", visualFit: 4, explanationLoad: 3, purchaseIntent: 3, dataFit: 2, productionCost: 2, continuity: 4, note: "短尺・視覚訴求を検証しやすい仮説" },
-      { channel: "TikTok", visualFit: 5, explanationLoad: 2, purchaseIntent: 2, dataFit: 2, productionCost: 2, continuity: 4, note: "拡散型の反応検証候補" },
-      { channel: "X", visualFit: 2, explanationLoad: 4, purchaseIntent: 2, dataFit: 2, productionCost: 1, continuity: 3, note: "言語訴求の検証候補" },
-      { channel: "YouTube Shorts", visualFit: 4, explanationLoad: 4, purchaseIntent: 3, dataFit: 2, productionCost: 4, continuity: 3, note: "説明量を確保しやすいが制作負荷が高い仮説" },
-    ],
-    confidence: 0.25,
+    recommended: "未確定",
+    reason: "商品ページだけでは媒体適合性を十分に確認できないため、媒体を断定しません。実績・商品特性・顧客接点を追加取得してから決定します。",
+    comparison: [],
+    confidence: 0.05,
   };
 
   return {
@@ -146,7 +141,7 @@ function fallback(
     ],
     nextActions: [
       "顧客・競合・訴求候補を検索する",
-      "異なる訴求の投稿を3本テストする",
+      "媒体適合性を確認したうえで、異なる訴求を3本テストする",
       "アクセス・CV・売上を記録する",
     ],
     decision: {
