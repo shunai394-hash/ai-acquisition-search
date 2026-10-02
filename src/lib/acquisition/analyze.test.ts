@@ -71,3 +71,73 @@ test("scenario normalizer rejects unknown archetypes and preserves explicit unkn
   assert.equal(result.length, 1);
   assert.equal(result[0].channel, "未確定");
 });
+
+test("scenario normalizer is total for malformed top-level input", () => {
+  assert.deepEqual(normalizeAcquisitionScenarios(null), []);
+  assert.deepEqual(normalizeAcquisitionScenarios(undefined), []);
+  assert.deepEqual(normalizeAcquisitionScenarios({}), []);
+  assert.deepEqual(normalizeAcquisitionScenarios("not-an-array"), []);
+});
+
+test("scenario normalizer strips non-string execution entries and whitespace", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      hypothesis: "  仮説  ",
+      hook: "  フック  ",
+      beats: ["  one  ", 123, "", null, "two", "three", "four"],
+      evidence: ["  source  ", false, "", "second"],
+      variablesToHold: ["  商品  ", 99, "", "CTA"],
+    }),
+  ]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].hypothesis, "仮説");
+  assert.equal(result[0].hook, "フック");
+  assert.deepEqual(result[0].beats, ["  one  ", "two", "three", "four"]);
+  assert.deepEqual(result[0].evidence, ["  source  ", "second"]);
+  assert.deepEqual(result[0].variablesToHold, ["  商品  ", "CTA"]);
+});
+
+test("scenario normalizer applies safe defaults to optional fields", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      targetCustomer: "",
+      painOrDesire: " ",
+      cta: "",
+      channel: "",
+      format: "",
+      secondaryMetric: "",
+      variablesToHold: "not-an-array",
+      risk: "",
+    }),
+  ]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].targetCustomer, "未特定");
+  assert.equal(result[0].painOrDesire, "未検証");
+  assert.equal(result[0].cta, "未検証");
+  assert.equal(result[0].channel, "未確定");
+  assert.equal(result[0].format, "未確定");
+  assert.equal(result[0].secondaryMetric, "未確定");
+  assert.deepEqual(result[0].variablesToHold, []);
+  assert.equal(result[0].risk, "未評価");
+});
+
+test("scenario normalizer keeps at most three executable scenarios", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy"),
+    valid("comparison_discovery"),
+    valid("purchase_motivation"),
+    valid("empathy", { id: "extra-1" }),
+    valid("comparison_discovery", { id: "extra-2" }),
+  ]);
+  assert.equal(result.length, 3);
+  assert.deepEqual(result.map((x) => x.id), ["empathy", "comparison_discovery", "purchase_motivation"]);
+});
+
+test("scenario normalizer requires evidence even when all execution fields exist", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", { evidence: [] }),
+    valid("comparison_discovery"),
+  ]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].archetype, "comparison_discovery");
+});
