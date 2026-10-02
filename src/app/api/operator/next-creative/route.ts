@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
+import { DECISION_RUN_TYPE, isProcessingRun, reservationLeaseExpiry } from "@/lib/decision/reservation-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -53,14 +54,27 @@ export async function POST(request: Request) {
 
     // The latest stored Teacher verdict wins over the request body, so a stale
     // or wrong client verdict can never generate a creative after STOP / WAIT.
-    const { data: latestVerdict } = await db.from("operator_runs")
-      .select("id,output")
+    // Reservations (processing rows) carry no verdict yet: skip them, and while
+    // one is live the decision may still turn into STOP / WAIT, so do not proceed.
+    const { data: verdictRuns, error: verdictError } = await db.from("operator_runs")
+      .select("id,output,completed_at,lease_expires_at,started_at,created_at")
       .eq("user_id", user.id)
-      .eq("run_type", "ai_performance_verdict")
+      .eq("run_type", DECISION_RUN_TYPE)
       .eq("input->>social_post_id", body.socialPostId)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(20);
+    if (verdictError) throw verdictError;
+    const runs = (verdictRuns || []) as Array<Record<string, unknown>>;
+    const pending = runs.find((run) => isProcessingRun(run) && reservationLeaseExpiry(run) > Date.now());
+    const latestVerdict = runs.find((run) => !isProcessingRun(run));
+    if (pending && (!latestVerdict || String(pending.created_at) >= String(latestVerdict.created_at))) {
+      return NextResponse.json({
+        error: "AI判定を処理中です。判定の完了後に再実行してください。",
+        code: "decision_in_progress",
+        retryable: true,
+        decisionRunId: pending.id,
+      }, { status: 409, headers: { "Retry-After": "5" } });
+    }
     const storedVerdict = latestVerdict?.output && typeof latestVerdict.output === "object"
       ? String((latestVerdict.output as Record<string, unknown>).verdict || "")
       : "";
