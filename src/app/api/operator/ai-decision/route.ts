@@ -3,6 +3,7 @@ import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
 import { openAiJson, openAiModel } from "@/lib/ai/openai-json";
 import { buildDecision, refineNextAction } from "@/lib/decision/engine";
 import { collectDecisionEvidence } from "@/lib/decision/evidence";
+import { runIdempotentDecision } from "@/lib/decision/idempotency";
 import type { StructuredDecision } from "@/lib/decision/types";
 
 export const runtime = "nodejs";
@@ -49,54 +50,85 @@ export async function POST(request: Request) {
     const evidenceVersion = evidence.market.runId ?? evidence.market.status;
     const decisionKey = `${post.id}:${metricId ?? "no-metric"}:${evidenceVersion}:${deterministic.logic_version}`;
 
-    const findExisting = async () => {
-      const { data } = await db.from("operator_runs")
-        .select("id,output")
-        .eq("user_id", user.id)
-        .eq("run_type", "ai_performance_verdict")
-        .eq("input->>decision_key", decisionKey)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      const stored = storedDecision(data?.output);
-      return data && stored ? { id: data.id as string, ...stored } : null;
-    };
-    const reusedResponse = (found: NonNullable<Awaited<ReturnType<typeof findExisting>>>) =>
-      NextResponse.json({ ok: true, reused: true, runId: found.id, aiConnected: found.aiConnected === true, ...compatFields(found.decision), decision: found.decision });
+    const store = {
+      async reserve(decisionKey: string) {
+        const { data, error } = await db.from("operator_runs").insert({
+          product_id: body.productId || creative?.product_id || null,
+          user_id: user.id,
+          run_type: "ai_performance_verdict",
+          input: {
+            social_post_id: post.id,
+            creative_id: post.creative_id,
+            metric_id: metricId ?? null,
+            decision_key: decisionKey,
+            input_hash: deterministic.input_hash,
+            as_of: evidence.asOf,
+            evidence,
+          },
+          output: { state: "processing" },
+          started_at: new Date().toISOString(),
+        }).select("id").single();
 
-    const existing = await findExisting();
-    if (existing) return reusedResponse(existing);
+        if (!error && data?.id) return { status: "acquired" as const, id: data.id as string };
+        if (error?.code !== "23505") throw error ?? new Error("AI判定の予約に失敗しました。");
 
-    const decision = await refineNextAction(deterministic, evidence, openAiJson, openAiModel());
-    const aiConnected = decision.model_version !== "deterministic";
-    const startedAt = new Date().toISOString();
-
-    const { data: run, error: runError } = await db.from("operator_runs").insert({
-      product_id: body.productId || creative?.product_id || null,
-      user_id: user.id,
-      run_type: "ai_performance_verdict",
-      status: "completed",
-      input: {
-        social_post_id: post.id,
-        creative_id: post.creative_id,
-        metric_id: metricId ?? null,
-        decision_key: decisionKey,
-        input_hash: decision.input_hash,
-        as_of: evidence.asOf,
-        evidence,
+        const { data: existing, error: existingError } = await db.from("operator_runs")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("run_type", "ai_performance_verdict")
+          .eq("input->>decision_key", decisionKey)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (existingError) throw existingError;
+        if (!existing?.id) throw new Error("AI判定の予約競合を解決できませんでした。");
+        return { status: "existing" as const, id: existing.id as string };
       },
-      output: { ...compatFields(decision), aiConnected, decision },
-      started_at: startedAt,
-      completed_at: new Date().toISOString(),
-    }).select("id").single();
+      async getCompleted(id: string) {
+        const { data, error } = await db.from("operator_runs")
+          .select("id,output")
+          .eq("id", id)
+          .maybeSingle();
+        if (error) throw error;
+        const stored = storedDecision(data?.output);
+        return stored ? { id: data?.id as string, ...stored } : null;
+      },
+      async complete(id: string, output: StoredOutput) {
+        const { error } = await db.from("operator_runs")
+          .update({
+            status: "completed",
+            output,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", id);
+        if (error) throw error;
+      },
+      async release(id: string) {
+        const { error } = await db.from("operator_runs").delete().eq("id", id);
+        if (error) throw error;
+      },
+    };
 
-    if (runError?.code === "23505") {
-      const winner = await findExisting();
-      if (winner) return reusedResponse(winner);
+    const result = await runIdempotentDecision(store, decisionKey, async () => {
+      const decision = await refineNextAction(deterministic, evidence, openAiJson, openAiModel());
+      const aiConnected = decision.model_version !== "deterministic";
+      return { ...compatFields(decision), aiConnected, decision };
+    });
+
+    if (result.status === "completed") {
+      return NextResponse.json({
+        ok: true,
+        reused: true,
+        runId: result.id,
+        aiConnected: result.output.aiConnected === true,
+        ...compatFields(result.output.decision),
+        decision: result.output.decision,
+      });
     }
-    if (runError) throw runError;
 
-    return NextResponse.json({ ok: true, runId: run.id, aiConnected, ...compatFields(decision), decision });
+    const runId = result.id;
+    const output = result.output;
+    return NextResponse.json({ ok: true, runId, aiConnected: output.aiConnected, ...compatFields(output.decision), decision: output.decision });
   } catch (error) {
     console.error("ai decision error", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "AI判定に失敗しました。" }, { status: 500 });
