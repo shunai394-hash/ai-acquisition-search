@@ -117,10 +117,11 @@ function createServer(): McpServer {
         publishMode: z.enum(["draft", "approval", "autonomous"]).default("draft"),
         narrationText: z.string().optional(),
         platforms: z.array(z.enum(["tiktok", "youtube", "instagram", "facebook", "x"])).default([]),
-        videoPrompt: z.string().optional()
+        videoPrompt: z.string().optional(),
+        confirmPublish: z.boolean().default(false).describe("SNSへ実投稿する場合は明示的にtrueを指定")
       })
     },
-    async ({ url, campaignId, publishMode, narrationText, platforms, videoPrompt }) => {
+    async ({ url, campaignId, publishMode, narrationText, platforms, videoPrompt, confirmPublish }) => {
       try {
         const source = await fetchPageSnapshot(url);
         const productName = source.productName || source.title;
@@ -175,7 +176,7 @@ function createServer(): McpServer {
         const posts: Array<{ platform: string; postId: string; url?: string; publishedAt?: string }> = [];
         const caption = selected?.hook || decision.productionBrief?.objective || productName;
 
-        if (publishMode === "autonomous" && videoUrl) {
+        if (publishMode === "autonomous" && videoUrl && confirmPublish) {
           if (platforms.includes("tiktok") && process.env.TIKTOK_ACCESS_TOKEN) {
             const result = await publishTikTokVideo({ videoUrl, title: caption, isAigc: true });
             publishResults.push({ platform: "tiktok", ...result });
@@ -214,7 +215,7 @@ function createServer(): McpServer {
           hypothesis: decision, posts, performance: []
         };
         const filePath = await saveCampaign(record);
-        return { content: [{ type: "text", text: JSON.stringify({ campaignId: newCampaignId, publishMode, platforms, analysis, decision, previousPerformance, video, videoUrl, narration, publishResults, filePath, publishing: publishMode === "autonomous" ? "autonomous publish attempted for configured platforms" : "not published" }, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify({ campaignId: newCampaignId, publishMode, platforms, analysis, decision, previousPerformance, video, videoUrl, narration, publishResults, filePath, publishing: publishMode === "autonomous" && confirmPublish ? "autonomous publish attempted for configured platforms" : "not published" }, null, 2) }] };
       } catch (error) {
         const message = error instanceof Error ? error.message : "広告サイクルの実行に失敗しました。";
         return { content: [{ type: "text", text: message }], isError: true };
@@ -393,6 +394,7 @@ function createServer(): McpServer {
       inputSchema: z.object({
         videoUrl: z.string().url().describe("TikTokから取得可能なHTTPS公開動画URL"),
         title: z.string().min(1).max(2200).describe("TikTokキャプション"),
+        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認")
         privacyLevel: z.enum([
           "PUBLIC_TO_EVERYONE",
           "MUTUAL_FOLLOW_FRIENDS",
@@ -409,6 +411,7 @@ function createServer(): McpServer {
     },
     async (input) => {
       try {
+        if (!input.confirm) return { content: [{ type: "text", text: "投稿は実行していません。confirm=true を明示して再実行してください。" }], isError: true };
         const result = await publishTikTokVideo(input);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
@@ -448,6 +451,7 @@ function createServer(): McpServer {
         "YouTube Data API v3のvideos.insertを使い、ローカルMP4を認可済みYouTubeチャンネルへアップロードします。",
       inputSchema: z.object({
         filePath: z.string().min(1).describe("アップロードするMP4ファイルのローカルパス"),
+        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認")
         title: z.string().min(1).max(100),
         description: z.string().optional(),
         tags: z.array(z.string()).optional(),
@@ -459,6 +463,7 @@ function createServer(): McpServer {
     },
     async (input) => {
       try {
+        if (!input.confirm) return { content: [{ type: "text", text: "投稿は実行していません。confirm=true を明示して再実行してください。" }], isError: true };
         const result = await uploadYouTubeVideo(input);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
@@ -494,11 +499,13 @@ function createServer(): McpServer {
       description: "Meta Graph APIでInstagramプロフェッショナルアカウントへReelsを公開します。",
       inputSchema: z.object({
         videoUrl: z.string().url(),
-        caption: z.string().optional()
+        caption: z.string().optional(),
+        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認")
       })
     },
     async (input) => {
       try {
+        if (!input.confirm) return { content: [{ type: "text", text: "投稿は実行していません。confirm=true を明示して再実行してください。" }], isError: true };
         const result = await publishInstagramReel(input);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
@@ -514,11 +521,13 @@ function createServer(): McpServer {
       description: "Meta Graph APIでFacebook PageへReelsを公開します。",
       inputSchema: z.object({
         videoUrl: z.string().url(),
-        caption: z.string().optional()
+        caption: z.string().optional(),
+        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認")
       })
     },
     async (input) => {
       try {
+        if (!input.confirm) return { content: [{ type: "text", text: "投稿は実行していません。confirm=true を明示して再実行してください。" }], isError: true };
         const result = await publishFacebookReel(input);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
@@ -532,10 +541,11 @@ function createServer(): McpServer {
     "x-publish",
     {
       description: "X API v2で認可済みアカウントへテキスト投稿します。",
-      inputSchema: z.object({ text: z.string().min(1).max(280) })
+      inputSchema: z.object({ text: z.string().min(1).max(280), confirm: z.boolean().default(false).describe("実投稿を許可する明示確認") })
     },
-    async ({ text }) => {
+    async ({ text, confirm }) => {
       try {
+        if (!confirm) return { content: [{ type: "text", text: "投稿は実行していません。confirm=true を明示して再実行してください。" }], isError: true };
         const result = await publishXPost({ text });
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
