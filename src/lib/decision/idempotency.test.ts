@@ -7,7 +7,7 @@ test("concurrent decision execution reserves once and reuses the completed resul
   let reservedId: string | null = null;
   let completed: string | null = null;
   let executions = 0;
-  let releaseBarrier: (() => void) | null = null;
+  let releaseBarrier = () => {};
   const barrier = new Promise<void>((resolve) => {
     releaseBarrier = resolve;
   });
@@ -43,7 +43,7 @@ test("concurrent decision execution reserves once and reuses the completed resul
   }, 1, 100);
 
   await new Promise((resolve) => setImmediate(resolve));
-  releaseBarrier?.();
+  releaseBarrier();
 
   const results = await Promise.all([first, second]);
 
