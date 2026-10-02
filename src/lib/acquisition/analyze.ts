@@ -1,5 +1,6 @@
 import type { AcquisitionAnalysis, PageSnapshot } from "./types";
 import { buildAcquisitionPrompt } from "./prompts";
+import { openAiJson } from "@/lib/ai/openai-json";
 import type { WebSearchResult } from "./search-web";
 import type { SocialSignal } from "./social-search";
 import type { ShopSignal } from "./shop-search";
@@ -171,52 +172,23 @@ export async function analyzePage(
   socialSignals: SocialSignal[] = [],
   shopSignals: ShopSignal[] = []
 ): Promise<AcquisitionAnalysis> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const prompt = buildAcquisitionPrompt(
+    source,
+    webResults,
+    socialSignals,
+    shopSignals
+  );
 
-  if (!apiKey) {
-    return fallback(source, webResults, socialSignals, shopSignals);
-  }
-
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + apiKey,
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-5-mini",
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "あなたはB2C/B2Bの顧客獲得戦略を分析する慎重なマーケティングアナリストです。",
-        },
-        {
-          role: "user",
-          content: buildAcquisitionPrompt(
-            source,
-            webResults,
-            socialSignals,
-            shopSignals
-          ),
-        },
-      ],
-    }),
+  const content = await openAiJson({
+    system:
+      "あなたはB2C/B2Bの顧客獲得戦略を分析する慎重なマーケティングアナリストです。",
+    user: prompt,
   });
 
-  if (!response.ok) {
-    throw new Error(
-      "AI分析に失敗しました（HTTP " + response.status + "）。"
-    );
-  }
-
-  const payload = await response.json();
-  const content = payload.choices?.[0]?.message?.content;
-
+  // AI provider failures should degrade to a deterministic, evidence-backed
+  // result instead of turning the whole analysis request into HTTP 502.
   if (!content) {
-    throw new Error("AIから分析結果が返りませんでした。");
+    return fallback(source, webResults, socialSignals, shopSignals);
   }
 
   const parsed = JSON.parse(content) as Partial<AcquisitionAnalysis>;
