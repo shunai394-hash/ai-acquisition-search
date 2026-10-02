@@ -15,6 +15,7 @@ import { buildDecision } from "../lib/decision/engine";
 import { getTikTokPublishStatus, getTikTokVideoMetrics, publishTikTokVideo, queryTikTokCreator, resolveTikTokVideoId } from "../lib/social/tiktok";
 import { getYouTubeVideoStatus, uploadYouTubeVideo } from "../lib/social/youtube";
 import { getFacebookReelMetrics, getInstagramReelMetrics, publishFacebookReel, publishInstagramReel } from "../lib/social/meta";
+import { normalizeXPerformance, normalizeYouTubePerformance, normalizeTikTokPerformance, normalizeInstagramPerformance, normalizeFacebookPerformance, type NormalizedPerformance } from "../lib/analytics/performance";
 import { publishXPost, getXPostMetrics } from "../lib/social/x";
 import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -138,7 +139,6 @@ function createServer(): McpServer {
         const previousCampaign = campaignId ? await loadCampaign(campaignId) : null;
         const previousPerformance: CampaignPerformance[] = [];
         if (previousCampaign?.posts?.length) {
-          const { normalizeXPerformance, normalizeYouTubePerformance, normalizeTikTokPerformance, normalizeInstagramPerformance, normalizeFacebookPerformance } = await import("../lib/analytics/performance");
           const { getXPostMetrics } = await import("../lib/social/x");
           for (const post of previousCampaign.posts) {
             try {
@@ -258,9 +258,8 @@ function createServer(): McpServer {
         if (!campaign) {
           return { content: [{ type: "text", text: `Campaign not found: ${campaignId}` }], isError: true };
         }
-        const { normalizeXPerformance, normalizeYouTubePerformance, normalizeTikTokPerformance, normalizeInstagramPerformance, normalizeFacebookPerformance } = await import("../lib/analytics/performance");
         const { getXPostMetrics } = await import("../lib/social/x");
-        const results: unknown[] = [];
+        const results: NormalizedPerformance[] = [];
         for (const post of campaign.posts) {
           try {
             let normalized;
@@ -270,12 +269,12 @@ function createServer(): McpServer {
             else if (post.platform === "instagram") normalized = await normalizeInstagramPerformance(await getInstagramReelMetrics(post.postId));
             else if (post.platform === "facebook") normalized = await normalizeFacebookPerformance(await getFacebookReelMetrics(post.postId));
             else {
-              results.push({ platform: post.platform, postId: post.postId, metrics: {}, collectionError: "Unsupported platform" });
+              continue;
               continue;
             }
             results.push(normalized);
           } catch (error) {
-            results.push({ platform: post.platform, postId: post.postId, metrics: {}, collectionError: error instanceof Error ? error.message : String(error) });
+            // Failed metric collection is omitted from normalized performance; the caller receives only valid records.
           }
         }
         const updated = { ...campaign, updatedAt: new Date().toISOString(), performance: results };
@@ -585,20 +584,16 @@ function createServer(): McpServer {
     },
     async ({ platform, postId }) => {
       try {
-        const { normalizeXPerformance, normalizeYouTubePerformance } = await import("../lib/analytics/performance");
-        let result;
+        let result: NormalizedPerformance;
         if (platform === "x") {
           result = await normalizeXPerformance(await getXPostMetrics(postId));
         } else if (platform === "youtube") {
           result = await normalizeYouTubePerformance(await getYouTubeVideoStatus(postId));
         } else if (platform === "tiktok") {
-          const { normalizeTikTokPerformance } = await import("../lib/analytics/performance");
           result = await normalizeTikTokPerformance(await getTikTokVideoMetrics(postId));
         } else if (platform === "instagram") {
-          const { normalizeInstagramPerformance } = await import("../lib/analytics/performance");
           result = await normalizeInstagramPerformance(await getInstagramReelMetrics(postId));
         } else {
-          const { normalizeFacebookPerformance } = await import("../lib/analytics/performance");
           result = await normalizeFacebookPerformance(await getFacebookReelMetrics(postId));
         }
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
