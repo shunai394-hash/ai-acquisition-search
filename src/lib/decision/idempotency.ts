@@ -1,5 +1,5 @@
 export type DecisionReservationResult<T> =
-  | { status: "acquired"; id: string }
+  | { status: "acquired"; id: string; output: T }
   | { status: "completed"; id: string; output: T };
 
 export type DecisionReservationStore<T> = {
