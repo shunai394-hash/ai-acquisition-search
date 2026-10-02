@@ -7,7 +7,6 @@ on:
       - ".claude-plugin/**"
       - "skills/**"
       - "commands/**"
-      - "commands/**"
       - ".mcp.json"
       - "src/mcp/**"
       - "src/lib/video/**"
@@ -21,6 +20,7 @@ on:
     paths:
       - ".claude-plugin/**"
       - "skills/**"
+      - "commands/**"
       - ".mcp.json"
       - "src/mcp/**"
       - "src/lib/video/**"
@@ -43,9 +43,11 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Typecheck
         run: npx tsc --noEmit
-      - name: Lint
-        run: npm run lint
+      - name: Lint plugin code
+        run: npx eslint src/mcp src/lib/video src/lib/acquisition
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
       - name: Validate plugin
         run: claude plugin validate .
+      - name: Run tests
+        run: npm test
