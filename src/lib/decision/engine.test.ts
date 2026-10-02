@@ -126,7 +126,10 @@ test("EC-Pulse evidence captured after decision time is rejected", () => {
 
 test("invalid product economics are rejected", () => {
   const d = buildDecision(evidence({
-    product: { price: 1000, cost: 1200 },
+    product: {
+      name: "テスト商品", url: "https://example.com/product", price: 1000, cost: 1200,
+      features: [], strengths: [], useCases: [], salesChannels: [],
+    },
     current: metric({ impressions: 4000, clicks: 120 }),
   }));
   assert.equal(d.verdict, "wait");
