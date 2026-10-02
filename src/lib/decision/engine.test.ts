@@ -140,3 +140,22 @@ test("valid evidence keeps the normal deterministic verdict", () => {
   assert.equal(d.verdict, "continue");
   assert.notEqual(d.teacher.ruleId, "evidence_quality");
 });
+
+
+test("LLM refinement enforces documented field length limits", async () => {
+  const e = evidence({ current: metric({ impressions: 4000, clicks: 120 }) });
+  const d = buildDecision(e);
+  const refined = await refineNextAction(
+    d,
+    e,
+    async () => JSON.stringify({
+      hook: "あ".repeat(61),
+      angle: "い".repeat(81),
+      description: "う".repeat(121),
+    }),
+    "test-model",
+  );
+  assert.equal(refined.next_action.hook, d.next_action.hook);
+  assert.equal(refined.next_action.angle, d.next_action.angle);
+  assert.equal(refined.next_action.description, d.next_action.description);
+});
