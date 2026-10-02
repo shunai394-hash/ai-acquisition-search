@@ -125,12 +125,13 @@ export async function POST(request: Request) {
     const result = await runIdempotentDecision(store, decisionKey, async () => {
       const decision = await refineNextAction(deterministic, evidence, openAiJson, openAiModel());
       const aiConnected = decision.model_version !== "deterministic";
+      const aiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
       return {
         output: { ...compatFields(decision), aiConnected, decision },
-        // A deterministic fallback is still returned to the caller, but it must
-        // not become the cached "completed" result. A later request should be
-        // allowed to retry the LLM once it is available.
-        persist: aiConnected,
+        // If AI is configured but the call failed, do not cache the deterministic
+        // fallback. If AI is intentionally unconfigured, keep the existing
+        // deterministic-only behavior used by local/CI environments.
+        persist: aiConnected || !aiConfigured,
       };
     });
 
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
       aiConnected: output.aiConnected,
       ...compatFields(output.decision),
       decision: output.decision,
-    }, { status: result.status === "transient" ? 200 : 200 });
+    });
   } catch (error) {
     console.error("ai decision error", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "AI判定に失敗しました。" }, { status: 500 });
