@@ -6,10 +6,12 @@ import { fetchPageSnapshot } from "../lib/acquisition/fetch-url";
 import { discoverSocialSignals } from "../lib/acquisition/social-search";
 import { discoverShopSignals } from "../lib/acquisition/shop-search";
 import { saveNarrationFile } from "../lib/video/gemini-tts";
-import { generateHiggsfieldVideo, getHiggsfieldStatus, waitForHiggsfieldVideo } from "../lib/video/higgsfield";
+import { generateHiggsfieldVideo, waitForHiggsfieldVideo } from "../lib/video/higgsfield";
 import { createCampaignId, loadCampaign, saveCampaign } from "../lib/campaign/store";
 import { discoverAcquisitionSignals } from "../lib/acquisition/search-web";
 import { decideNextCampaign } from "../lib/campaign/decision";
+import type { CampaignPerformance } from "../lib/campaign/decision";
+import { buildDecision } from "../lib/decision/engine";
 import { getTikTokPublishStatus, getTikTokVideoMetrics, publishTikTokVideo, queryTikTokCreator, resolveTikTokVideoId } from "../lib/social/tiktok";
 import { getYouTubeVideoStatus, uploadYouTubeVideo } from "../lib/social/youtube";
 import { getFacebookReelMetrics, getInstagramReelMetrics, publishFacebookReel, publishInstagramReel } from "../lib/social/meta";
@@ -20,7 +22,7 @@ import path from "node:path";
 function createServer(): McpServer {
   const server = new McpServer({
     name: "ai-acquisition-search",
-    version: "0.4.1"
+    version: "0.5.0"
   });
 
   server.registerTool(
@@ -116,10 +118,11 @@ function createServer(): McpServer {
         publishMode: z.enum(["draft", "approval", "autonomous"]).default("draft"),
         narrationText: z.string().optional(),
         platforms: z.array(z.enum(["tiktok", "youtube", "instagram", "facebook", "x"])).default([]),
-        videoPrompt: z.string().optional()
+        videoPrompt: z.string().optional(),
+        confirmPublish: z.boolean().default(false).describe("SNSへ実投稿する場合は明示的にtrueを指定")
       })
     },
-    async ({ url, campaignId, publishMode, narrationText, platforms, videoPrompt }) => {
+    async ({ url, campaignId, publishMode, narrationText, platforms, videoPrompt, confirmPublish }) => {
       try {
         const source = await fetchPageSnapshot(url);
         const productName = source.productName || source.title;
@@ -133,7 +136,7 @@ function createServer(): McpServer {
         });
         const analysis = await analyzePage(source, { query: search.queries.join(" / "), results: search.results }, socialSignals, shopSignals);
         const previousCampaign = campaignId ? await loadCampaign(campaignId) : null;
-        const previousPerformance: any[] = [];
+        const previousPerformance: CampaignPerformance[] = [];
         if (previousCampaign?.posts?.length) {
           const { normalizeXPerformance, normalizeYouTubePerformance, normalizeTikTokPerformance, normalizeInstagramPerformance, normalizeFacebookPerformance } = await import("../lib/analytics/performance");
           const { getXPostMetrics } = await import("../lib/social/x");
@@ -145,14 +148,14 @@ function createServer(): McpServer {
               else if (post.platform === "instagram") previousPerformance.push(await normalizeInstagramPerformance(await getInstagramReelMetrics(post.postId)));
               else if (post.platform === "facebook") previousPerformance.push(await normalizeFacebookPerformance(await getFacebookReelMetrics(post.postId)));
             } catch (error) {
-              previousPerformance.push({ platform: post.platform, postId: post.postId, metrics: {}, collectionError: error instanceof Error ? error.message : String(error) });
+              previousPerformance.push({ platform: post.platform, postId: post.postId, metrics: {} });
             }
           }
         }
         const decision = decideNextCampaign({ analysis, performance: previousPerformance });
         const selected = decision.nextTests[0];
         const brief = decision.productionBrief;
-         const prompt = videoPrompt ?? [selected?.concept, selected?.hook, brief?.angle, brief?.format, brief?.cta].filter(Boolean).join(". ");
+        const prompt = videoPrompt ?? [selected?.concept, selected?.hook, brief?.angle, brief?.format, brief?.cta].filter(Boolean).join(". ");
         let video: unknown = null;
         let narration: unknown = null;
         let videoUrl: string | undefined;
@@ -174,7 +177,7 @@ function createServer(): McpServer {
         const posts: Array<{ platform: string; postId: string; url?: string; publishedAt?: string }> = [];
         const caption = selected?.hook || decision.productionBrief?.objective || productName;
 
-        if (publishMode === "autonomous" && videoUrl) {
+        if (publishMode === "autonomous" && videoUrl && confirmPublish) {
           if (platforms.includes("tiktok") && process.env.TIKTOK_ACCESS_TOKEN) {
             const result = await publishTikTokVideo({ videoUrl, title: caption, isAigc: true });
             publishResults.push({ platform: "tiktok", ...result });
@@ -213,7 +216,7 @@ function createServer(): McpServer {
           hypothesis: decision, posts, performance: []
         };
         const filePath = await saveCampaign(record);
-        return { content: [{ type: "text", text: JSON.stringify({ campaignId: newCampaignId, publishMode, platforms, analysis, decision, previousPerformance, video, videoUrl, narration, publishResults, filePath, publishing: publishMode === "autonomous" ? "autonomous publish attempted for configured platforms" : "not published" }, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify({ campaignId: newCampaignId, publishMode, platforms, analysis, decision, previousPerformance, video, videoUrl, narration, publishResults, filePath, publishing: publishMode === "autonomous" && confirmPublish ? "autonomous publish attempted for configured platforms" : "not published" }, null, 2) }] };
       } catch (error) {
         const message = error instanceof Error ? error.message : "広告サイクルの実行に失敗しました。";
         return { content: [{ type: "text", text: message }], isError: true };
@@ -392,6 +395,7 @@ function createServer(): McpServer {
       inputSchema: z.object({
         videoUrl: z.string().url().describe("TikTokから取得可能なHTTPS公開動画URL"),
         title: z.string().min(1).max(2200).describe("TikTokキャプション"),
+        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認"),
         privacyLevel: z.enum([
           "PUBLIC_TO_EVERYONE",
           "MUTUAL_FOLLOW_FRIENDS",
@@ -408,6 +412,7 @@ function createServer(): McpServer {
     },
     async (input) => {
       try {
+        if (!input.confirm) return { content: [{ type: "text", text: "投稿は実行していません。confirm=true を明示して再実行してください。" }], isError: true };
         const result = await publishTikTokVideo(input);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
@@ -447,6 +452,7 @@ function createServer(): McpServer {
         "YouTube Data API v3のvideos.insertを使い、ローカルMP4を認可済みYouTubeチャンネルへアップロードします。",
       inputSchema: z.object({
         filePath: z.string().min(1).describe("アップロードするMP4ファイルのローカルパス"),
+        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認"),
         title: z.string().min(1).max(100),
         description: z.string().optional(),
         tags: z.array(z.string()).optional(),
@@ -458,6 +464,7 @@ function createServer(): McpServer {
     },
     async (input) => {
       try {
+        if (!input.confirm) return { content: [{ type: "text", text: "投稿は実行していません。confirm=true を明示して再実行してください。" }], isError: true };
         const result = await uploadYouTubeVideo(input);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
@@ -493,11 +500,13 @@ function createServer(): McpServer {
       description: "Meta Graph APIでInstagramプロフェッショナルアカウントへReelsを公開します。",
       inputSchema: z.object({
         videoUrl: z.string().url(),
-        caption: z.string().optional()
+        caption: z.string().optional(),
+        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認")
       })
     },
     async (input) => {
       try {
+        if (!input.confirm) return { content: [{ type: "text", text: "投稿は実行していません。confirm=true を明示して再実行してください。" }], isError: true };
         const result = await publishInstagramReel(input);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
@@ -513,11 +522,13 @@ function createServer(): McpServer {
       description: "Meta Graph APIでFacebook PageへReelsを公開します。",
       inputSchema: z.object({
         videoUrl: z.string().url(),
-        caption: z.string().optional()
+        caption: z.string().optional(),
+        confirm: z.boolean().default(false).describe("実投稿を許可する明示確認")
       })
     },
     async (input) => {
       try {
+        if (!input.confirm) return { content: [{ type: "text", text: "投稿は実行していません。confirm=true を明示して再実行してください。" }], isError: true };
         const result = await publishFacebookReel(input);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
@@ -531,10 +542,11 @@ function createServer(): McpServer {
     "x-publish",
     {
       description: "X API v2で認可済みアカウントへテキスト投稿します。",
-      inputSchema: z.object({ text: z.string().min(1).max(280) })
+      inputSchema: z.object({ text: z.string().min(1).max(280), confirm: z.boolean().default(false).describe("実投稿を許可する明示確認") })
     },
-    async ({ text }) => {
+    async ({ text, confirm }) => {
       try {
+        if (!confirm) return { content: [{ type: "text", text: "投稿は実行していません。confirm=true を明示して再実行してください。" }], isError: true };
         const result = await publishXPost({ text });
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
@@ -592,6 +604,67 @@ function createServer(): McpServer {
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
         const message = error instanceof Error ? error.message : "実績取得に失敗しました。";
+        return { content: [{ type: "text", text: message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "evaluate-next-action",
+    {
+      description: "本番のEvidence → Teacher → DecisionエンジンでCONTINUE/PIVOT/STOP/WAITと次アクションを決定します。LLMではなくバージョン管理された決定ロジックが判定を行い、欠損値はunknownとして扱います。",
+      inputSchema: z.object({
+        asOf: z.string().datetime(),
+        product: z.object({
+          name: z.string().nullable(), url: z.string().url().nullable(),
+          price: z.number().nullable(), cost: z.number().nullable(),
+          features: z.array(z.string()).default([]), strengths: z.array(z.string()).default([]),
+          useCases: z.array(z.string()).default([]), salesChannels: z.array(z.string()).default([])
+        }),
+        customer: z.object({
+          target: z.string().nullable(), pain: z.string().nullable(), desire: z.string().nullable(),
+          valueProposition: z.string().nullable(), buyingTriggers: z.array(z.string()).default([]),
+          stage: z.string().nullable()
+        }),
+        market: z.object({
+          status: z.enum(["ok", "unavailable", "not_configured", "no_data"]),
+          error: z.string().optional(), runId: z.string().nullable().optional(),
+          capturedAt: z.string().datetime().nullable().optional(), commentsCount: z.number().nullable().optional(),
+          topPains: z.array(z.object({ pain: z.string(), count: z.number(), sharePercent: z.number() })).default([]),
+          emergingPains: z.array(z.object({ pain: z.string(), status: z.string(), shareDeltaPercent: z.number() })).default([]),
+          trendSignal: z.string().nullable().optional()
+        }),
+        hypothesis: z.object({
+          socialPostId: z.string(), network: z.string(), caption: z.string().nullable(),
+          hook: z.string().nullable(), angle: z.string().nullable(), hypothesis: z.string().nullable(),
+          primaryMetric: z.string().nullable(), publishedAt: z.string().datetime().nullable(),
+          lineageVerdicts: z.array(z.enum(["continue", "pivot", "stop", "wait"])).default([])
+        }),
+        current: z.object({
+          id: z.string().nullable().optional(), measuredAt: z.string().datetime(),
+          impressions: z.number().nullable(), views: z.number().nullable(), likes: z.number().nullable(),
+          comments: z.number().nullable(), shares: z.number().nullable(), saves: z.number().nullable(),
+          clicks: z.number().nullable(), conversions: z.number().nullable(), revenue: z.number().nullable(),
+          grossProfit: z.number().nullable(), adSpend: z.number().nullable(), source: z.string()
+        }).nullable(),
+        history: z.array(z.object({
+          socialPostId: z.string(), network: z.string(), publishedAt: z.string().datetime().nullable(),
+          metric: z.object({
+            id: z.string().nullable().optional(), measuredAt: z.string().datetime(),
+            impressions: z.number().nullable(), views: z.number().nullable(), likes: z.number().nullable(),
+            comments: z.number().nullable(), shares: z.number().nullable(), saves: z.number().nullable(),
+            clicks: z.number().nullable(), conversions: z.number().nullable(), revenue: z.number().nullable(),
+            grossProfit: z.number().nullable(), adSpend: z.number().nullable(), source: z.string()
+          })
+        })).default([])
+      })
+    },
+    async (evidence) => {
+      try {
+        const decision = buildDecision(evidence);
+        return { content: [{ type: "text", text: JSON.stringify(decision, null, 2) }] };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "次アクションの決定に失敗しました。";
         return { content: [{ type: "text", text: message }], isError: true };
       }
     }

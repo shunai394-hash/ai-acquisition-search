@@ -5,6 +5,29 @@ import type { DecisionEvidence, EvidenceItem, StructuredDecision, TeacherResult 
 export const DECISION_LOGIC_VERSION = `decision-2026.10.1+${TEACHER_LOGIC_VERSION}`;
 export const DECISION_PROMPT_VERSION = "next-action-refine-v1";
 
+function evidenceQuality(evidence: DecisionEvidence): { ok: boolean; issues: string[] } {
+  const issues: string[] = [];
+  const asOf = Date.parse(evidence.asOf);
+  if (!Number.isFinite(asOf)) issues.push("decision_as_of_invalid");
+  const metricAt = evidence.current?.measuredAt ? Date.parse(evidence.current.measuredAt) : null;
+  if (metricAt != null && Number.isFinite(asOf) && metricAt > asOf) issues.push("metric_after_decision_time");
+  const marketAt = evidence.market.capturedAt ? Date.parse(evidence.market.capturedAt) : null;
+  if (marketAt != null && Number.isFinite(asOf) && marketAt > asOf) issues.push("market_evidence_after_decision_time");
+  const m = evidence.current;
+  if (m) {
+    const keys = ["impressions","views","likes","comments","shares","saves","clicks","conversions","revenue","grossProfit","adSpend"] as const;
+    for (const key of keys) if (m[key] != null && (!Number.isFinite(m[key]) || m[key] < 0)) issues.push(`metric_invalid_${key}`);
+    if (m.clicks != null && m.impressions != null && m.clicks > m.impressions) issues.push("clicks_exceed_impressions");
+    if (m.views != null && m.impressions != null && m.views > m.impressions) issues.push("views_exceed_impressions");
+    if (m.conversions != null && m.clicks != null && m.conversions > m.clicks) issues.push("conversions_exceed_clicks");
+  }
+  const p = evidence.product;
+  if (p.price != null && (!Number.isFinite(p.price) || p.price < 0)) issues.push("product_price_invalid");
+  if (p.cost != null && (!Number.isFinite(p.cost) || p.cost < 0)) issues.push("product_cost_invalid");
+  if (p.price != null && p.cost != null && p.cost > p.price) issues.push("product_cost_exceeds_price");
+  return { ok: issues.length === 0, issues };
+}
+
 const OFFER_RULES = new Set(["no_conversion_paid", "ctr_ok_cvr_zero", "unprofitable_paid"]);
 
 function stableStringify(value: unknown): string {
@@ -107,7 +130,19 @@ function buildEvidenceItems(evidence: DecisionEvidence, teacher: TeacherResult):
 
 /** Deterministic structured decision. Same evidence -> same decision. */
 export function buildDecision(evidence: DecisionEvidence, now = new Date()): StructuredDecision {
-  const teacher = evaluateTeacher(evidence);
+  const quality = evidenceQuality(evidence);
+  const baseTeacher = evaluateTeacher(evidence);
+  const teacher: TeacherResult = quality.ok
+    ? baseTeacher
+    : {
+        ...baseTeacher,
+        verdict: "wait",
+        status: "insufficient_data",
+        ruleId: "evidence_quality",
+        reason: `証拠の整合性を確認できないため判定を保留: ${quality.issues.join(", ")}`,
+        confidence: 0.1,
+        missingData: [...baseTeacher.missingData, ...quality.issues],
+      };
   const h = evidence.hypothesis;
   const target = evidence.customer.target || "分析で特定した主要顧客";
   const metric = primaryMetric(evidence, teacher);

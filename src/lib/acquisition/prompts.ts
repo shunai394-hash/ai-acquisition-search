@@ -51,7 +51,12 @@ export function buildAcquisitionPrompt(
     "TikTok Shopデータは競合・価格・販売量の仮説を作るための観測値です。未取得値は事実として補完しないでください。",
     "SNSデータは反応の仮説を作るための観測値です。数値だけで売上を保証せず、投稿内容と指標を分けて評価してください。",
     "検索結果は発見材料です。category は customer_pain / customer_desire / competitor / market / channel の5分類です。evidenceType は official / product_listing / review / social / competitor / market / other、matchType は exact_product / brand_or_model / category / weak です。exact_product や official/product_listing を、単なるカテゴリ記事より優先してください。弱い一致の結果を、この商品の事実として扱わないでください。",
-    "JSONのみで返してください。product, market, customer, competitors, performance, acquisitionProblems, opportunities, priorities, nextActions, decision, nextPosts, searchEvidenceを必ず含めてください。",
+    "JSONのみで返してください。product, sellingPoints, customerCandidates, appealCandidates, channelRecommendation, market, customer, competitors, performance, acquisitionProblems, opportunities, priorities, nextActions, decision, nextPosts, searchEvidenceを必ず含めてください。",
+    "sellingPointsは5分類（functional_value / emotional_value / comparative_advantage / customer_context / reason_to_buy_now）を各1件以上、合計最大5件。各項目にstatement, evidence, confidenceを付け、商品ページや検索結果で確認できない価値は推測と明記してください。",
+    "customerCandidatesは最大3件。「20代女性」のような属性だけで終わらせず、必ずcontext, pain, desire, buyingTrigger, preferredChannel, resonantWords, avoidWords, reasonを付けてください。",
+    "appealCandidatesは最大5件。customerLabel, emotion, funnelStage, channelFit, strengthScore, riskScore, validationPriority, reasonを付け、同じ訴求の言い換えを重複させないでください。",
+    "channelRecommendationは媒体を1つに絞り、商品単価、視覚訴求、説明量、購買意図、データ適合、制作コスト、継続性を比較根拠にしてください。比較表も返してください。スコアは推測値であることが分かる説明を付けてください。",
+
     "decisionは「次に何をすべきか」の結論です。target, problem, desire, valueProposition, channel, format, testPlan, evidenceを必ず含めてください。",
     "nextPostsは最大3件。各項目にrank, concept, hook, format, channel, reason, testMetricを含め、互いに異なる仮説にしてください。",
     "hookは投稿冒頭で実際に使える具体的な一文にしてください。",

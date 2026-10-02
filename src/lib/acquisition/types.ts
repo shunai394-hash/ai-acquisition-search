@@ -6,8 +6,60 @@ export type ShopSignal = { platform: "tiktok_shop"; title: string; url: string; 
 
 export type SocialSignal = { platform: "tiktok"; title: string; url: string; author: string; views: number | null; likes: number | null; comments: number | null; shares: number | null; description: string; query: string };
 
+export type SellingPoint = {
+  type: "functional_value" | "emotional_value" | "comparative_advantage" | "customer_context" | "reason_to_buy_now";
+  statement: string;
+  evidence: string[];
+  confidence: number;
+};
+
+export type CustomerCandidate = {
+  label: string;
+  context: string;
+  pain: string;
+  desire: string;
+  buyingTrigger: string;
+  preferredChannel: string;
+  resonantWords: string[];
+  avoidWords: string[];
+  reason: string;
+};
+
+export type AppealCandidate = {
+  name: string;
+  copy: string;
+  customerLabel: string;
+  emotion: string;
+  funnelStage: "awareness" | "consideration" | "purchase";
+  channelFit: string;
+  strengthScore: number;
+  riskScore: number;
+  validationPriority: number;
+  reason: string;
+};
+
+export type ChannelRecommendation = {
+  recommended: string;
+  reason: string;
+  comparison: Array<{
+    channel: string;
+    visualFit: number;
+    explanationLoad: number;
+    purchaseIntent: number;
+    dataFit: number;
+    productionCost: number;
+    continuity: number;
+    note: string;
+  }>;
+  confidence: number;
+};
+
 export type AcquisitionAnalysis = {
   product: { summary: string; valueProposition: string[]; evidence: string[] };
+  sellingPoints: SellingPoint[];
+  customerCandidates: CustomerCandidate[];
+  appealCandidates: AppealCandidate[];
+  channelRecommendation: ChannelRecommendation;
   market: { summary: string; signals: string[] };
   customer: { summary: string; likelySegments: string[]; needs: string[] };
   competitors: { summary: string; signals: string[] };
