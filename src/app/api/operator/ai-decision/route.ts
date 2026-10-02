@@ -1,13 +1,24 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
-import { openAiJson, openAiModel } from "@/lib/ai/openai-json";
+import { openAiJsonResult, openAiModel } from "@/lib/ai/openai-json";
 import { buildDecision, refineNextAction } from "@/lib/decision/engine";
 import { collectDecisionEvidence } from "@/lib/decision/evidence";
-import { runIdempotentDecision } from "@/lib/decision/idempotency";
+import {
+  DECISION_ROUTE_MAX_DURATION_MS,
+  DECISION_WAIT_MAX_MS,
+  DecisionInProgressError,
+  decisionKeyFor,
+  runIdempotentDecision,
+} from "@/lib/decision/idempotency";
+import { operatorRunReservationStore } from "@/lib/decision/reservation-store";
 import type { StructuredDecision } from "@/lib/decision/types";
 
 export const runtime = "nodejs";
+// Keep equal to DECISION_ROUTE_MAX_DURATION_MS (checked by a test).
 export const maxDuration = 60;
+
+// Time this request keeps for itself after waiting on another request's decision.
+const RESPONSE_MARGIN_MS = 5_000;
 
 // Fields kept for existing clients (UI, operator-loop, MCP).
 function compatFields(decision: StructuredDecision) {
@@ -22,13 +33,15 @@ function compatFields(decision: StructuredDecision) {
   };
 }
 
-type StoredOutput = { aiConnected?: boolean; decision: StructuredDecision };
-
-function storedDecision(output: unknown): StoredOutput | null {
-  return output && typeof output === "object" && "decision" in output ? output as StoredOutput : null;
-}
+type StoredOutput = ReturnType<typeof compatFields> & {
+  aiConnected?: boolean;
+  decision: StructuredDecision;
+  /** Set when the LLM call failed and the deterministic wording was kept. */
+  llm?: { status: "failed"; reason: string; retryable: true };
+};
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   try {
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
@@ -44,92 +57,66 @@ export async function POST(request: Request) {
     const deterministic = buildDecision(evidence);
     // Same evidence -> same decision key -> the stored decision is reused, so
     // concurrent or repeated calls neither re-run the LLM nor insert duplicates.
-    // Idempotency is scoped to the same observed metric + the same EC-Pulse research run.
-    // This avoids duplicate decisions under concurrency while still allowing a new
-    // market-evidence run to trigger a fresh decision for the same post.
+    // input_hash covers every input of the decision (metrics, EC-Pulse run,
+    // history, lineage, product, customer, Teacher rule, logic version), so
+    // any change in evidence produces a new decision.
     const evidenceVersion = evidence.market.runId ?? evidence.market.status;
-    const decisionKey = `${post.id}:${metricId ?? "no-metric"}:${evidenceVersion}:${deterministic.logic_version}`;
+    const decisionKey = decisionKeyFor(post.id, metricId, evidenceVersion, deterministic);
 
-    const store = {
-      async reserve(decisionKey: string) {
-        const { data, error } = await db.from("operator_runs").insert({
-          product_id: body.productId || creative?.product_id || null,
-          user_id: user.id,
-          run_type: "ai_performance_verdict",
-          input: {
-            social_post_id: post.id,
-            creative_id: post.creative_id,
-            metric_id: metricId ?? null,
-            decision_key: decisionKey,
-            input_hash: deterministic.input_hash,
-            as_of: evidence.asOf,
-            evidence,
-          },
-          output: { state: "processing" },
-          started_at: new Date().toISOString(),
-        }).select("id").single();
-
-        if (!error && data?.id) return { status: "acquired" as const, id: data.id as string };
-        if (error?.code !== "23505") throw error ?? new Error("AI判定の予約に失敗しました。");
-
-        const { data: existing, error: existingError } = await db.from("operator_runs")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("run_type", "ai_performance_verdict")
-          .eq("input->>decision_key", decisionKey)
-          .order("created_at", { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        if (existingError) throw existingError;
-        if (!existing?.id) throw new Error("AI判定の予約競合を解決できませんでした。");
-        return { status: "existing" as const, id: existing.id as string };
+    const store = operatorRunReservationStore<StoredOutput>(db, {
+      userId: user.id,
+      productId: body.productId || creative?.product_id || null,
+      socialPostId: post.id,
+      input: {
+        social_post_id: post.id,
+        creative_id: post.creative_id,
+        metric_id: metricId ?? null,
+        input_hash: deterministic.input_hash,
+        as_of: evidence.asOf,
+        evidence,
       },
-      async getCompleted(id: string) {
-        const { data, error } = await db.from("operator_runs")
-          .select("id,output")
-          .eq("id", id)
-          .maybeSingle();
-        if (error) throw error;
-        const stored = storedDecision(data?.output);
-        return stored ? { id: data?.id as string, ...stored } : null;
-      },
-      async complete(id: string, output: StoredOutput) {
-        const { error } = await db.from("operator_runs")
-          .update({
-            status: "completed",
-            output,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", id);
-        if (error) throw error;
-      },
-      async release(id: string) {
-        const { error } = await db.from("operator_runs").delete().eq("id", id);
-        if (error) throw error;
-      },
-    };
-
-    const result = await runIdempotentDecision(store, decisionKey, async () => {
-      const decision = await refineNextAction(deterministic, evidence, openAiJson, openAiModel());
-      const aiConnected = decision.model_version !== "deterministic";
-      return { ...compatFields(decision), aiConnected, decision };
     });
 
-    if (result.status === "completed") {
-      return NextResponse.json({
-        ok: true,
-        reused: true,
-        runId: result.id,
-        aiConnected: result.output.aiConnected === true,
-        ...compatFields(result.output.decision),
-        decision: result.output.decision,
-      });
-    }
+    const result = await runIdempotentDecision(store, decisionKey, async () => {
+      const llm: { failure: string | null } = { failure: null };
+      const decision = await refineNextAction(deterministic, evidence, async (prompt) => {
+        const response = await openAiJsonResult(prompt);
+        if (response.status === "failed") llm.failure = response.reason;
+        return response.status === "ok" ? response.text : null;
+      }, openAiModel());
+      const aiConnected = decision.model_version !== "deterministic";
+      const output: StoredOutput = {
+        ...compatFields(decision),
+        aiConnected,
+        decision,
+        ...(llm.failure ? { llm: { status: "failed" as const, reason: llm.failure, retryable: true as const } } : {}),
+      };
+      return { output, retryable: Boolean(llm.failure) };
+    }, {
+      maxWaitMs: Math.min(DECISION_WAIT_MAX_MS, startedAt + DECISION_ROUTE_MAX_DURATION_MS - RESPONSE_MARGIN_MS - Date.now()),
+    });
 
-    const runId = result.id;
     const output = result.output;
-    return NextResponse.json({ ok: true, runId, aiConnected: output.aiConnected, ...compatFields(output.decision), decision: output.decision });
+    // The verdict is deterministic; only the LLM wording failed. The decision is
+    // returned as before, but its key was released so the next call retries the LLM.
+    const llmRetry = output.llm?.status === "failed" ? { llmFailed: true, retryable: true } : {};
+    return NextResponse.json({
+      ok: true,
+      ...(result.status === "completed" ? { reused: true } : {}),
+      runId: result.id,
+      aiConnected: output.aiConnected === true,
+      ...compatFields(output.decision),
+      decision: output.decision,
+      ...llmRetry,
+    });
   } catch (error) {
+    if (error instanceof DecisionInProgressError) {
+      const retryAfterSeconds = Math.max(1, Math.ceil(error.retryAfterMs / 1000));
+      return NextResponse.json(
+        { error: error.message, code: "decision_in_progress", retryable: true, retryAfterSeconds },
+        { status: 409, headers: { "Retry-After": String(retryAfterSeconds) } },
+      );
+    }
     console.error("ai decision error", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "AI判定に失敗しました。" }, { status: 500 });
   }

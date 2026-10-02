@@ -35,7 +35,8 @@ function parseOr(expr: string): Filter {
 }
 
 const UNIQUE: Record<string, Array<(row: Row) => string | null>> = {
-  operator_runs: [(r) => (r.run_type === "ai_performance_verdict" && get(r, "input->>decision_key") ? `dk:${get(r, "input->>decision_key")}` : null)],
+  // operator_runs_decision_key_uidx: (user_id, input->>'decision_key') for ai_performance_verdict.
+  operator_runs: [(r) => (r.run_type === "ai_performance_verdict" && get(r, "input->>decision_key") ? `dk:${r.user_id}:${get(r, "input->>decision_key")}` : null)],
   social_posts: [(r) => (get(r, "metadata->>source_social_post_id") ? `src:${r.user_id}:${get(r, "metadata->>source_social_post_id")}:${r.network}` : null)],
   post_metrics: [(r) => `pm:${r.social_post_id}:${Math.floor(Date.parse(String(r.measured_at)) / 300000)}`],
   operator_leases: [(r) => `lease:${r.name}`],
