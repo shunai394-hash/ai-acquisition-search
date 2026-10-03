@@ -163,6 +163,26 @@ export function evaluateTeacher(evidence: DecisionEvidence): TeacherResult {
   criteria.push({ name: "post_age_days", value: round(ageDays, 1), threshold: T.maxWaitDays, passed: null });
   criteria.push({ name: "lineage_consecutive_poor", value: lineagePoor, threshold: T.stopAfterPoorAttempts, passed: lineagePoor < T.stopAfterPoorAttempts });
 
+  // 1. Paid traffic must not fall back to CTR while commercial outcome data is missing.
+  // If ad spend is known but neither revenue nor gross profit is available, profitability is unknowable.
+  if (m.adSpend != null && m.adSpend > 0 && m.revenue == null && m.grossProfit == null) {
+    criteria.push({ name: "commercial_outcome_data", value: "missing", threshold: "revenue_or_gross_profit", passed: false });
+    missingData.push("revenue_or_gross_profit");
+    return result("wait", "profitability_data_missing", "広告費は取得できていますが、売上または粗利がないため採算を判定できません。CTRだけで続行/停止を決めず、売上データの取得を待ちます。", 0);
+  }
+
+  // Gross profit is sufficient to judge contribution after ad spend even when revenue is unavailable.
+  if (m.adSpend != null && m.adSpend > 0 && m.grossProfit != null && m.conversions != null) {
+    const netProfit = m.grossProfit - m.adSpend;
+    criteria.push({ name: "gross_profit_after_ad_cost", value: round(netProfit, 0), threshold: 0, passed: netProfit > 0 });
+    criteria.push({ name: "conversions", value: m.conversions, threshold: T.minConversionsForProfit, passed: m.conversions >= T.minConversionsForProfit });
+    if (m.conversions >= T.minConversionsForProfit) {
+      if (netProfit > 0) return result("continue", "profitable_paid_gross_profit", "売上額がなくても粗利から広告費控除後の利益が確認できています。同じ仮説を強化します。", confidenceFor(m.conversions, 10, 0.9));
+      if (lineagePoor >= T.stopAfterPoorAttempts) return result("stop", "unprofitable_repeated", `粗利は発生していますが広告費控除後は赤字で、同系統の仮説が${lineagePoor + 1}回連続で基準未達です。この仮説を停止します。`, confidenceFor(m.conversions, 10, 0.8));
+      return result("pivot", "unprofitable_paid", "粗利は発生していますが広告費を回収できていません。オファー・価格訴求・対象を変更して再テストします。", confidenceFor(m.conversions, 10, 0.75));
+    }
+  }
+
   // 1. Paid traffic with known revenue: profitability decides first.
   if (m.adSpend != null && m.adSpend > 0 && m.revenue != null && m.conversions != null) {
     const roas = m.revenue / m.adSpend;
