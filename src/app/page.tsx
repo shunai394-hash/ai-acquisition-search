@@ -582,7 +582,8 @@ export default function Home() {
                         <List items={leadScenario.evidence} />
                       </>
                     )}
-                  </div>
+                    <strong>CTA</strong>
+                    <p>{leadScenario.cta}</p>
               </div>
             </Section>
           )}
