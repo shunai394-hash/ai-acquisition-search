@@ -55,9 +55,16 @@ export function buildCreativeScenario(
   const proofStart = d.hook + d.problem;
   const solutionStart = proofStart + d.proof;
 
+  const objective = variable === "hook" ? "test_hook" : variable === "angle" ? "test_angle" : "test_offer";
   return {
+    scenarioVersion: "creative-scenario-1",
+    targetCustomer: target,
+    productName: product,
+    hypothesis: evidence.hypothesis.hypothesis || decision.hypothesis,
+    primaryMetric: evidence.hypothesis.primaryMetric || decision.primary_metric,
+    learningObjective: decision.learning_objective,
     durationSeconds: duration,
-    objective: variable === "hook" ? "test_hook" : variable === "angle" ? "test_angle" : "test_offer",
+    objective,
     changeVariable: variable,
     scenes: [
       { id: "hook", startSecond: 0, endSecond: d.hook, purpose: "hook", instruction: "冒頭で" + hook + "を提示。対象は" + target + "。" },
