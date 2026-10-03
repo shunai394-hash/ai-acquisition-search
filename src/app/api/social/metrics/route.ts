@@ -199,9 +199,10 @@ export async function POST(request: Request) {
     // clicks=0 を実測CTR 0% と解釈させない。
     const clickMetricAvailable = post.network === "linkedin"
       ? (() => {
-          const metric = Array.isArray((raw as any)?.elements)
-            ? ((raw as any)?.elements?.[0]?.total || (raw as any)?.elements?.[0] || {})
-            : ((raw as any)?.total || (raw as any) || {});
+          const root = asRecord(raw);
+          const elements = Array.isArray(root.elements) ? root.elements : [];
+          const first = asRecord(elements[0]);
+          const metric = Object.keys(first).length > 0 ? asRecord(first.total ?? first) : asRecord(root.total ?? root);
           return Object.prototype.hasOwnProperty.call(metric, "LINK_CLICKS")
             || Object.prototype.hasOwnProperty.call(metric, "linkClicks");
         })()
