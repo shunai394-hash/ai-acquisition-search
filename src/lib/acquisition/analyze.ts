@@ -257,7 +257,7 @@ function fallback(
 }
 
 function normalizeEvidenceText(value: string) {
-  return value.normalize("NFKC").replace(/\\s+/g, " ").trim().toLocaleLowerCase("ja-JP");
+  return value.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("ja-JP");
 }
 
 function evidenceMatchesCorpus(value: string, corpus: string[]) {
