@@ -213,7 +213,7 @@ export default function Home() {
   }
 
   return (
-    <main className="shell">
+    <main id="analysis" className="shell">
       <header className="topbar">
         <div>
           <strong>AI Acquisition Search</strong>
@@ -271,7 +271,7 @@ export default function Home() {
 
 
       {result && (
-        <div className="results">
+        <div id="results" className="results">
           <div className="source">
             <span>分析対象</span>
             <a href={result.source.url} target="_blank" rel="noreferrer">
@@ -586,7 +586,7 @@ export default function Home() {
             {verdict && <div className="verdict"><strong>{verdict.verdict}</strong><p>{verdict.reason}</p></div>}
           </section>
 
-          <section className="next test-loop">
+          <section id="teacher" className="next test-loop">
             <p className="eyebrow">AD TEST LOOP</p>
             <h2>次の広告を「テスト」として残す</h2>
             <p className="hint">今回の判断を仮説として保存し、投稿結果をもとに次のテストへつなげます。</p>
