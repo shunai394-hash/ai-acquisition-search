@@ -227,7 +227,7 @@ export default function Home() {
               <a href="#loop" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Loop</a>
             </nav>
           )}
-          <span className="status">AI AD OPERATOR · LIVE</span>
+          <span className="status">AI ACQUISITION · READY</span>
           <GoogleSignIn />
           <Link href="/billing" style={{ color: "#ffffff70", fontSize: 11 }}>契約管理</Link>
         </div>
@@ -256,6 +256,7 @@ export default function Home() {
             {loading ? "調査しています..." : "無料で集客分析を始める"}
           </button>
         </form>
+        <p className="hint">初回はGoogleログインが必要です。分析後は「根拠 → 仮説 → 1本のテスト → 実績 → 次の改善」まで進められます。</p>
 
         {error && <p className="error">{error}</p>}
         <div className="hero-proof">
