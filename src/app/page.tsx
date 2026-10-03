@@ -244,6 +244,26 @@ export default function Home() {
           商品URLから市場・レビュー・顧客の痛点を調査。頻出する不満から商品候補と広告訴求を作り、次のテストまでつなげます。
         </p>
 
+        <div className="hero-intent" aria-label="サービスの使い方">
+          <article>
+            <span>INPUT</span>
+            <strong>商品URLを1つ</strong>
+            <p>説明文を整理する必要はありません。</p>
+          </article>
+          <div className="hero-intent-arrow" aria-hidden="true">→</div>
+          <article>
+            <span>AI FIND</span>
+            <strong>売れる理由を分解</strong>
+            <p>市場・顧客・根拠を分けて確認します。</p>
+          </article>
+          <div className="hero-intent-arrow" aria-hidden="true">→</div>
+          <article>
+            <span>NEXT MOVE</span>
+            <strong>次に試す1本を決める</strong>
+            <p>仮説・訴求・測定指標までつなげます。</p>
+          </article>
+        </div>
+
         <form onSubmit={analyze} className="search">
           <input
             value={url}
