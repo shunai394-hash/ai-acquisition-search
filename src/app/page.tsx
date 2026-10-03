@@ -324,6 +324,22 @@ export default function Home() {
               <span>DECISION EVIDENCE</span>
               <div>{result.analysis.decision.evidence.slice(0,3).map((e,index)=><span key={index}>{e}</span>)}</div>
             </div>
+            {result.analysis.scenarios?.[0] && (
+              <div className="decision-experiment" aria-label="広告テストの実験条件">
+                <div>
+                  <span>CHANGE</span>
+                  <strong>{result.analysis.scenarios[0].variableToChange}</strong>
+                </div>
+                <div>
+                  <span>HOLD CONSTANT</span>
+                  <strong>{result.analysis.scenarios[0].variablesToHold.join(" · ") || "対象・商品事実・主要指標"}</strong>
+                </div>
+                <div>
+                  <span>LEARNING SIGNAL</span>
+                  <strong>{result.analysis.scenarios[0].primaryMetric}</strong>
+                </div>
+              </div>
+            )}
           </section>
 
           <section id="research" className="research-flow">
