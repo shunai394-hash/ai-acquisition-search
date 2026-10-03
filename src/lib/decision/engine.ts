@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { buildCreativeScenario } from "./creative-scenario";
 import { TEACHER_LOGIC_VERSION, TEACHER_THRESHOLDS, eligibleHistory, evaluateTeacher } from "./teacher";
 import type { DecisionEvidence, EvidenceItem, StructuredDecision, TeacherResult } from "./types";
 
@@ -218,7 +219,7 @@ export function buildDecision(evidence: DecisionEvidence, now = new Date()): Str
     };
   }
 
-  return {
+  const structured: StructuredDecision = {
     ...decision,
     verdict: teacher.verdict,
     target_customer: target,
@@ -233,6 +234,8 @@ export function buildDecision(evidence: DecisionEvidence, now = new Date()): Str
     generated_at: now.toISOString(),
     input_hash: evidenceHash(evidence, teacher),
   };
+  structured.next_action.scenario = buildCreativeScenario(structured, evidence);
+  return structured;
 }
 
 type Refiner = (prompt: { system: string; user: string }) => Promise<string | null>;
@@ -271,7 +274,7 @@ export async function refineNextAction(decision: StructuredDecision, evidence: D
     const angle = decision.next_action.change_variable === "angle"
       ? clean(parsed.angle, 80) ?? decision.next_action.angle
       : decision.next_action.angle;
-    return {
+    const refined: StructuredDecision = {
       ...decision,
       next_action: {
         ...decision.next_action,
@@ -281,6 +284,8 @@ export async function refineNextAction(decision: StructuredDecision, evidence: D
       },
       model_version: model,
     };
+    refined.next_action.scenario = buildCreativeScenario(refined, evidence);
+    return refined;
   } catch {
     return decision;
   }
