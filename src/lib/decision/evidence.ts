@@ -97,20 +97,35 @@ async function loadLineage(db: Db, userId: string, metadata: Row, asOf: string):
   const verdicts: Verdict[] = [];
   let parentId = asStr(metadata.source_social_post_id) || asStr(metadata.sourceSocialPostId);
   const seen = new Set<string>();
+
+  // Do not rely on a JSON-path filter for the critical learning lineage.
+  // Different Supabase mocks/clients can implement JSON operators differently;
+  // the production decision must inspect the actual stored input and output.
+  const { data: runs } = await db.from("operator_runs")
+    .select("input,output,completed_at")
+    .eq("user_id", userId)
+    .eq("run_type", "ai_performance_verdict")
+    .lte("completed_at", asOf)
+    .order("completed_at", { ascending: false })
+    .limit(100);
+
+  const candidates = (runs || []) as Row[];
   for (let depth = 0; parentId && depth < 6 && !seen.has(parentId); depth++) {
     seen.add(parentId);
-    const { data: run } = await db.from("operator_runs")
-      .select("output,completed_at")
-      .eq("user_id", userId)
-      .eq("run_type", "ai_performance_verdict")
-      .eq("input->>social_post_id", parentId)
-      .lte("completed_at", asOf)
-      .order("completed_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const run = candidates.find((candidate) => {
+      const input = asObj(candidate.input);
+      return asStr(input.social_post_id) === parentId;
+    });
     const verdict = asStr(asObj(run?.output).verdict);
-    if (verdict === "continue" || verdict === "pivot" || verdict === "stop" || verdict === "wait") verdicts.push(verdict);
-    const { data: parent } = await db.from("social_posts").select("metadata").eq("id", parentId).eq("user_id", userId).maybeSingle();
+    if (verdict === "continue" || verdict === "pivot" || verdict === "stop" || verdict === "wait") {
+      verdicts.push(verdict);
+    }
+
+    const { data: parent } = await db.from("social_posts")
+      .select("metadata")
+      .eq("id", parentId)
+      .eq("user_id", userId)
+      .maybeSingle();
     const pm = asObj(parent?.metadata);
     parentId = asStr(pm.source_social_post_id) || asStr(pm.sourceSocialPostId);
   }
