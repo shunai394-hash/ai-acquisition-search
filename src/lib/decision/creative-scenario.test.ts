@@ -15,16 +15,16 @@ const evidence = {
 
 const decision = {
   action_type: "reinforce_hypothesis", verdict: "continue", target_customer: "共働き世帯", hypothesis: "時短に反応する", reason: "ok", expected_outcome: "CTR", primary_metric: "CTR", learning_objective: "Hookを検証", priority: "high", evidence: [], confidence: 0.8,
-  next_action: { generate_creative: true, description: "Hook変更", hook: "5分で終わる", angle: "時短", change_variable: "hook" },
+  next_action: { generate_creative: true, description: "Hook変更", hook: "5分で終わる", angle: "時短", change_variable: "hook" }, 
   teacher: {} as StructuredDecision["teacher"], logic_version: "v", prompt_version: "v", model_version: "deterministic", generated_at: "2026-10-03T00:00:00.000Z", input_hash: "x",
 } satisfies StructuredDecision;
 
-test("scenario uses exact requested duration and contiguous scenes", () => {
-  const scenario = buildCreativeScenario(decision, evidence, 45);
+test("scenario uses exact supported duration and contiguous scenes", () => {
+  const scenario = buildCreativeScenario(decision, evidence, 30);
   assert.ok(scenario);
-  assert.equal(scenario.durationSeconds, 45);
+  assert.equal(scenario.durationSeconds, 30);
   assert.equal(scenario.scenes[0].startSecond, 0);
-  assert.equal(scenario.scenes.at(-1)?.endSecond, 45);
+  assert.equal(scenario.scenes.at(-1)?.endSecond, 30);
   for (let i = 1; i < scenario.scenes.length; i++) assert.equal(scenario.scenes[i].startSecond, scenario.scenes[i - 1].endSecond);
   assert.equal(scenario.changeVariable, "hook");
   assert.equal(scenario.scenarioVersion, "creative-scenario-1");
@@ -62,7 +62,6 @@ test("scenario exposes one causal chain from hook through CTA", () => {
   assert.deepEqual(scenario.scenes.map((scene) => scene.purpose), ["hook", "problem", "proof", "solution", "cta"]);
   assert.equal(scenario.scenes.reduce((sum, scene) => sum + (scene.endSecond - scene.startSecond), 0), scenario.durationSeconds);
 });
-
 
 test("single-video production contract caps unsupported long requests", () => {
   const scenario = buildCreativeScenario(decision, evidence, 60);
