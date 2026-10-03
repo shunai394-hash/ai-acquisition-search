@@ -64,11 +64,8 @@ test("scenario exposes one causal chain from hook through CTA", () => {
 });
 
 
-describe("single-video production contract", () => {
-  it("never creates a scenario longer than the current production contract", () => {
-    const evidence = makeEvidence();
-    const decision = makeDecision();
-    const scenario = buildCreativeScenario(decision, evidence, 60);
-    expect(scenario?.durationSeconds).toBe(15);
-  });
+test("single-video production contract caps unsupported long requests", () => {
+  const scenario = buildCreativeScenario(decision, evidence, 60);
+  assert.ok(scenario);
+  assert.equal(scenario.durationSeconds, 15);
 });
