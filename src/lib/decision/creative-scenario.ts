@@ -14,9 +14,9 @@ function automaticDuration(evidence: DecisionEvidence): Duration {
   return density <= 10 ? 15 : 30;
 }
 
-function normalizeDuration(value: number | undefined, evidence: DecisionEvidence): Duration {
-  if (value != null && isDuration(value)) return value;
-  return automaticDuration(evidence);
+function normalizeDuration(value: number | undefined, evidence: DecisionEvidence): Duration | null {
+  if (value == null) return automaticDuration(evidence);
+  return isDuration(value) ? value : null;
 }
 
 function splitDuration(duration: Duration) {
@@ -36,6 +36,7 @@ export function buildCreativeScenario(
   if (variable !== "hook" && variable !== "angle" && variable !== "offer") return null;
 
   const duration = normalizeDuration(durationSeconds, evidence);
+  if (duration == null) return null;
   const d = splitDuration(duration);
   const target = evidence.customer.target || decision.target_customer;
   const product = evidence.product.name || "商品";
