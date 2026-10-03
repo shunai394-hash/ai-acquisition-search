@@ -103,6 +103,10 @@ export async function POST(request: Request) {
       ? storedNextAction.scenario as Record<string, unknown>
       : null;
     const storedVerdict = String(storedOutput?.verdict || "");
+    const storedGenerateCreative = storedNextAction?.generate_creative;
+    if (storedGenerateCreative === false) {
+      return NextResponse.json({ error: "最新のDecisionがクリエイティブ生成を許可していません。", code: "creative_generation_not_allowed" }, { status: 409 });
+    }
     if (storedVerdict === "stop" || storedVerdict === "wait") {
       return NextResponse.json({
         error: storedVerdict === "stop" ? "最新のTeacher判定がSTOPのため次Creativeを生成しません。" : "最新のTeacher判定がWAIT(データ不足)のため次Creativeを生成しません。",
@@ -170,20 +174,27 @@ export async function POST(request: Request) {
     if (creativeError) throw creativeError;
     if (!creative) return NextResponse.json({ error: "元クリエイティブが見つかりません。" }, { status: 404 });
 
-    const verdict = body.verdict || (storedVerdict === "continue" || storedVerdict === "pivot" ? storedVerdict : "pivot");
-    const nextAction = body.nextAction || "前回と異なるHookと訴求で再テストする";
-    const hook = body.changedHook || (
-      verdict === "continue"
-        ? (creative.hook || "この商品の別の使い方、知っていますか？")
-        : "前の広告とは違う視点で、この商品を見てください。"
+    const verdict = storedVerdict === "continue" || storedVerdict === "pivot"
+      ? storedVerdict
+      : body.verdict || "pivot";
+    const lockedScenario = storedScenario;
+    const lockedChangeVariable = lockedScenario && ["hook", "angle", "offer"].includes(String(lockedScenario.changeVariable))
+      ? String(lockedScenario.changeVariable)
+      : null;
+    const changeVariable = lockedChangeVariable || (
+      storedNextAction?.change_variable === "hook" || storedNextAction?.change_variable === "angle" || storedNextAction?.change_variable === "offer"
+        ? storedNextAction.change_variable
+        : verdict === "continue" ? "hook" : "angle"
     );
-    const angle = body.changedAngle || (
-      typeof storedNextAction?.angle === "string" ? storedNextAction.angle :
-      verdict === "continue" ? "同一訴求の別Hook" : "前回と異なる顧客課題・訴求"
-    );
-    const changeVariable = typeof storedNextAction?.change_variable === "string"
-      ? storedNextAction.change_variable
-      : verdict === "continue" ? "hook" : "angle";
+    const nextAction = typeof storedNextAction?.description === "string"
+      ? storedNextAction.description
+      : body.nextAction || "前回と異なる条件を1つだけ変更して再テストする";
+    const hook = lockedScenario
+      ? String(lockedScenario.scenes?.find((scene) => scene && typeof scene === "object" && (scene as Record<string, unknown>).purpose === "hook")?.instruction || storedNextAction?.hook || creative.hook || "")
+      : body.changedHook || String(storedNextAction?.hook || (verdict === "continue" ? creative.hook || "冒頭で顧客課題を明確に提示する" : "前回とは異なる顧客課題の視点を提示する"));
+    const angle = lockedScenario
+      ? String(storedNextAction?.angle || lockedScenario.scenes?.find((scene) => scene && typeof scene === "object" && (scene as Record<string, unknown>).purpose === "solution")?.instruction || "")
+      : body.changedAngle || String(storedNextAction?.angle || (verdict === "continue" ? "同一訴求の別Hook" : "前回と異なる顧客課題・訴求"));
     const scenario = storedScenario || (creative.scenario && typeof creative.scenario === "object"
       ? creative.scenario as Record<string, unknown>
       : null);
@@ -203,7 +214,9 @@ export async function POST(request: Request) {
         change_variable: changeVariable,
         angle,
         next_action: nextAction,
-        test_metric: body.testMetric || (typeof storedDecision?.primary_metric === "string" ? storedDecision.primary_metric : "CTR / CVR / ROAS"),
+        test_metric: lockedScenario && typeof lockedScenario.primaryMetric === "string"
+          ? lockedScenario.primaryMetric
+          : (typeof storedDecision?.primary_metric === "string" ? storedDecision.primary_metric : body.testMetric || "CTR / CVR / ROAS"),
         decision_scenario: scenario,
         production_clip_duration_seconds: duration,
         scenes: [
@@ -256,7 +269,9 @@ export async function POST(request: Request) {
         cta: Array.isArray(scenario?.scenes)
           ? String((scenario.scenes.find((scene) => scene && typeof scene === "object" && (scene as Record<string, unknown>).purpose === "cta") as Record<string, unknown> | undefined)?.instruction || "")
           : "",
-        primaryMetric: typeof storedDecision?.primary_metric === "string" ? storedDecision.primary_metric : body.testMetric,
+        primaryMetric: lockedScenario && typeof lockedScenario.primaryMetric === "string"
+          ? lockedScenario.primaryMetric
+          : typeof storedDecision?.primary_metric === "string" ? storedDecision.primary_metric : body.testMetric,
         holdConstant: scenario?.continuity && typeof scenario.continuity === "object" && Array.isArray((scenario.continuity as Record<string, unknown>).keep)
           ? ((scenario.continuity as Record<string, unknown>).keep as unknown[]).map(String)
           : Array.isArray(scenario?.variablesToHold)
