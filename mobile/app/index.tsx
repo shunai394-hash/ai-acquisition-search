@@ -2,9 +2,19 @@ import { useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { analyzeProduct, researchProduct, type ResearchBundle } from "../lib/api";
 
+type AnalysisResult = {
+  decision?: {
+    target?: string;
+    problem?: string;
+    valueProposition?: string;
+    channel?: string;
+    testPlan?: string;
+  };
+};
+
 export default function HomeScreen() {
   const [url, setUrl] = useState("");
-  const [analysis, setAnalysis] = useState<any>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [research, setResearch] = useState<ResearchBundle | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
