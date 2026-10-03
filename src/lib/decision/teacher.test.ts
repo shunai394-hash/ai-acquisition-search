@@ -68,7 +68,7 @@ test("good CTR but zero conversions after enough clicks -> PIVOT on offer", () =
 test("profitable paid traffic -> CONTINUE", () => {
   const r = evaluateTeacher(evidence({ current: metric({ impressions: 3000, clicks: 90, conversions: 5, revenue: 15000, grossProfit: 9000, adSpend: 4000 }) }));
   assert.equal(r.verdict, "continue");
-  assert.equal(r.ruleId, "profitable_paid");
+  assert.equal(r.ruleId, "profitable_paid_gross_profit");
 });
 
 test("paid traffic with spend but no revenue or gross profit -> WAIT", () => {
@@ -180,4 +180,24 @@ test("unknown click data remains null instead of becoming zero", () => {
 });
 
 
-test("strong CTR but materially worse CVR than own baseline -> PIVOT on offer", () => {\n  const history = [\n    past("a", { impressions: 4000, clicks: 100, conversions: 10 }),\n    past("b", { impressions: 4000, clicks: 100, conversions: 9 }),\n    past("c", { impressions: 4000, clicks: 100, conversions: 11 }),\n  ];\n  const r = evaluateTeacher(evidence({ current: metric({ impressions: 6000, clicks: 180, conversions: 3 }), history }));\n  assert.equal(r.verdict, "pivot");\n  assert.equal(r.ruleId, "cvr_below_baseline");\n  assert.ok(r.criteria.some((x) => x.name === "cvr_ci95"));\n});\n\ntest("CVR baseline ignores histories with too few clicks", () => {\n  const history = [\n    past("a", { impressions: 4000, clicks: 10, conversions: 1 }),\n    past("b", { impressions: 4000, clicks: 10, conversions: 1 }),\n    past("c", { impressions: 4000, clicks: 10, conversions: 1 }),\n  ];\n  const r = evaluateTeacher(evidence({ current: metric({ impressions: 6000, clicks: 180, conversions: 3 }), history }));\n  assert.notEqual(r.ruleId, "cvr_below_baseline");\n});\n
+test("strong CTR but materially worse CVR than own baseline -> PIVOT on offer", () => {
+  const history = [
+    past("a", { impressions: 4000, clicks: 100, conversions: 10 }),
+    past("b", { impressions: 4000, clicks: 100, conversions: 9 }),
+    past("c", { impressions: 4000, clicks: 100, conversions: 11 }),
+  ];
+  const r = evaluateTeacher(evidence({ current: metric({ impressions: 6000, clicks: 180, conversions: 3 }), history }));
+  assert.equal(r.verdict, "pivot");
+  assert.equal(r.ruleId, "cvr_below_baseline");
+  assert.ok(r.criteria.some((x) => x.name === "cvr_ci95"));
+});
+
+test("CVR baseline ignores histories with too few clicks", () => {
+  const history = [
+    past("a", { impressions: 4000, clicks: 10, conversions: 1 }),
+    past("b", { impressions: 4000, clicks: 10, conversions: 1 }),
+    past("c", { impressions: 4000, clicks: 10, conversions: 1 }),
+  ];
+  const r = evaluateTeacher(evidence({ current: metric({ impressions: 6000, clicks: 180, conversions: 3 }), history }));
+  assert.notEqual(r.ruleId, "cvr_below_baseline");
+});
