@@ -52,7 +52,7 @@ test("scenario is rejected when the decision requests an uncontrolled variable",
   const invalid = {
     ...decision,
     next_action: { ...decision.next_action, change_variable: "target" as const },
-  };
+  } as unknown as StructuredDecision;
   assert.equal(buildCreativeScenario(invalid, evidence, 30), null);
 });
 
