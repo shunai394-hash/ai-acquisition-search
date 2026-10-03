@@ -212,6 +212,8 @@ export default function Home() {
     } catch(err) { setError(err instanceof Error ? err.message : "実績保存に失敗しました。"); }
   }
 
+  const leadScenario = result?.analysis.scenarios?.[0];
+
   return (
     <main className="shell">
       <header className="topbar">
@@ -548,44 +550,40 @@ export default function Home() {
             </Section>
           )}
 
-          {result.analysis.scenarios?.[0] && (
+          {leadScenario && (
             <Section title="GOLD CASE · 今回まず試す1本">
-              {(() => {
-                const scenario = result.analysis.scenarios[0];
-                return (
-                  <div className="gold-case">
+              <div className="gold-case">
                     <p className="hint">一度に多くの要素を変えず、仮説・根拠・測定指標を1本にまとめて検証します。</p>
-                    <h2>{scenario.hook}</h2>
+                    <h2>{leadScenario.hook}</h2>
                     <strong>検証する仮説</strong>
-                    <p>{scenario.hypothesis}</p>
+                    <p>{leadScenario.hypothesis}</p>
                     <strong>誰に向けるか</strong>
-                    <p>{scenario.targetCustomer} — {scenario.painOrDesire}</p>
+                    <p>{leadScenario.targetCustomer} — {leadScenario.painOrDesire}</p>
                     <strong>動画の流れ</strong>
                     <ol>
-                      {scenario.beats.map((beat, index) => <li key={index}>{beat}</li>)}
+                      {leadScenario.beats.map((beat) => <li key={beat}>{beat}</li>)}
                     </ol>
-                    {scenario.proof.length > 0 && (
+                    {leadScenario.proof.length > 0 && (
                       <>
                         <strong>広告に使える確認済み情報</strong>
-                        <List items={scenario.proof} />
+                        <List items={leadScenario.proof} />
                       </>
                     )}
                     <strong>今回測る数字</strong>
-                    <p>{scenario.primaryMetric}{scenario.secondaryMetric !== "未確定" ? "（補助指標: " + scenario.secondaryMetric + "）" : ""}</p>
+                    <p>{leadScenario.primaryMetric}{leadScenario.secondaryMetric !== "未確定" ? "（補助指標: " + leadScenario.secondaryMetric + "）" : ""}</p>
                     <strong>変える要素 / 固定する要素</strong>
-                    <p>変更: {scenario.variableToChange}</p>
-                    <p>固定: {scenario.variablesToHold.join("・") || "未指定"}</p>
+                    <p>変更: {leadScenario.variableToChange}</p>
+                    <p>固定: {leadScenario.variablesToHold.join("・") || "未指定"}</p>
                     <strong>注意点</strong>
-                    <p>{scenario.risk}</p>
-                    {scenario.evidence.length > 0 && (
+                    <p>{leadScenario.risk}</p>
+                    {leadScenario.evidence.length > 0 && (
                       <>
                         <strong>判断の根拠</strong>
-                        <List items={scenario.evidence} />
+                        <List items={leadScenario.evidence} />
                       </>
                     )}
                   </div>
-                );
-              })()}
+              </div>
             </Section>
           )}
 
