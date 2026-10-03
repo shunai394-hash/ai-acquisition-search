@@ -194,7 +194,7 @@ test("STOP after repeated poor results: no creative, and next-creative refuses e
   });
   seedPost("p1", { metadata: { source_social_post_id: "pc" } });
   // Old posts already have fresh metrics so only p1 is processed.
-  for (const id of chain) db.seed("post_metrics", [{ social_post_id: id, impressions: 5000, likes: 300, raw: { source: "x" }, measured_at: iso(-HOUR) }]);
+  for (const id of chain) db.seed("post_metrics", [{ social_post_id: id, impressions: 5000, likes: 10, comments: 1, shares: 0, raw: { source: "x" }, measured_at: iso(-HOUR) }]);
 
   const body = await (await operatorLoop(cronRequest())).json();
   const r = body.results.find((x: { postId?: string }) => x.postId === "p1");
