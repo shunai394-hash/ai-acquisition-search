@@ -141,3 +141,44 @@ test("scenario normalizer requires evidence even when all execution fields exist
   assert.equal(result.length, 1);
   assert.equal(result[0].archetype, "comparison_discovery");
 });
+
+test("grounded gold-case evidence survives when it matches retrieved source text", () => {
+  const source = "薄手素材で軽やかな着用感。UVカット機能を備えています。";
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      evidence: ["薄手素材で軽やかな着用感。"],
+      proof: ["UVカット機能を備えています。"],
+    }),
+  ], [source]);
+  assert.equal(result.length, 1);
+  assert.deepEqual(result[0].evidence, ["薄手素材で軽やかな着用感。"]);
+  assert.deepEqual(result[0].proof, ["UVカット機能を備えています。"]);
+});
+
+test("ungrounded AI claims cannot become gold-case evidence", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      evidence: ["医師推奨で満足度99%"],
+      proof: ["医師推奨で満足度99%"],
+    }),
+  ], ["商品ページにはUVカット機能があります。"]);
+  assert.deepEqual(result, []);
+});
+
+test("mixed evidence keeps grounded proof and removes unsupported proof", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      evidence: ["商品ページにはUVカット機能があります。"],
+      proof: ["商品ページにはUVカット機能があります。", "満足度99%で医師推奨"],
+    }),
+  ], ["商品ページにはUVカット機能があります。"]);
+  assert.equal(result.length, 1);
+  assert.deepEqual(result[0].proof, ["商品ページにはUVカット機能があります。"]);
+});
+
+test("generic evidence labels are rejected in grounded mode", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", { evidence: ["商品ページ"], proof: ["レビュー"] }),
+  ], ["商品ページにはUVカット機能があります。レビューでは薄手と評価されています。"]);
+  assert.deepEqual(result, []);
+});
