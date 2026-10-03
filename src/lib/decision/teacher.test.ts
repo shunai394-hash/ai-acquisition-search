@@ -160,3 +160,6 @@ test("unknown click data remains null instead of becoming zero", () => {
   assert.equal(r.sample.clicks, null);
   assert.ok(r.missingData.includes("clicks"));
 });
+
+
+test("strong CTR but materially worse CVR than own baseline -> PIVOT on offer", () => {\n  const history = [\n    past("a", { impressions: 4000, clicks: 100, conversions: 10 }),\n    past("b", { impressions: 4000, clicks: 100, conversions: 9 }),\n    past("c", { impressions: 4000, clicks: 100, conversions: 11 }),\n  ];\n  const r = evaluateTeacher(evidence({ current: metric({ impressions: 6000, clicks: 180, conversions: 3 }), history }));\n  assert.equal(r.verdict, "pivot");\n  assert.equal(r.ruleId, "cvr_below_baseline");\n  assert.ok(r.criteria.some((x) => x.name === "cvr_ci95"));\n});\n\ntest("CVR baseline ignores histories with too few clicks", () => {\n  const history = [\n    past("a", { impressions: 4000, clicks: 10, conversions: 1 }),\n    past("b", { impressions: 4000, clicks: 10, conversions: 1 }),\n    past("c", { impressions: 4000, clicks: 10, conversions: 1 }),\n  ];\n  const r = evaluateTeacher(evidence({ current: metric({ impressions: 6000, clicks: 180, conversions: 3 }), history }));\n  assert.notEqual(r.ruleId, "cvr_below_baseline");\n});\n
