@@ -256,7 +256,20 @@ function fallback(
   };
 }
 
-export function normalizeAcquisitionScenarios(value: unknown): PostScenario[] {
+function normalizeEvidenceText(value: string) {
+  return value.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("ja-JP");
+}
+
+function evidenceMatchesCorpus(value: string, corpus: string[]) {
+  const candidate = normalizeEvidenceText(value);
+  if (!candidate || candidate.length < 6) return false;
+  return corpus.some((item) => {
+    const source = normalizeEvidenceText(item);
+    return source === candidate || source.includes(candidate);
+  });
+}
+
+export function normalizeAcquisitionScenarios(value: unknown, evidenceCorpus?: string[]): PostScenario[] {
     const items = Array.isArray(value) ? value : [];
     const archetypes = new Set<PostScenario["archetype"]>([
       "empathy",
@@ -275,12 +288,16 @@ export function normalizeAcquisitionScenarios(value: unknown): PostScenario[] {
       const beats = Array.isArray(x.beats)
         ? x.beats.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 6)
         : [];
-      const proof = Array.isArray(x.proof)
+      const rawProof = Array.isArray(x.proof)
         ? x.proof.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 6)
         : [];
-      const evidence = Array.isArray(x.evidence)
+      const rawEvidence = Array.isArray(x.evidence)
         ? x.evidence.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 6)
         : [];
+      const enforceGrounding = Array.isArray(evidenceCorpus);
+      const corpus = evidenceCorpus ?? [];
+      const proof = enforceGrounding ? rawProof.filter((v) => evidenceMatchesCorpus(v, corpus)) : rawProof;
+      const evidence = enforceGrounding ? rawEvidence.filter((v) => evidenceMatchesCorpus(v, corpus)) : rawEvidence;
       const hypothesis = typeof x.hypothesis === "string" ? x.hypothesis.trim() : "";
       const hook = typeof x.hook === "string" ? x.hook.trim() : "";
       const variableToChange = typeof x.variableToChange === "string" ? x.variableToChange.trim() : "";
@@ -465,7 +482,17 @@ export async function analyzePage(
   const customerCandidates = normalizeCustomerCandidates(parsed.customerCandidates);
   const appealCandidates = normalizeAppealCandidates(parsed.appealCandidates);
   const channelRecommendation = normalizeChannelRecommendation(parsed.channelRecommendation, base.channelRecommendation);
-  const scenarios = normalizeAcquisitionScenarios(parsed.scenarios).map((scenario) => ({
+  const evidenceCorpus = [
+    source.title,
+    source.description,
+    source.text,
+    ...source.headings,
+    ...source.productSignals,
+    ...webResults.results.flatMap((item) => [item.title, item.snippet]),
+    ...socialSignals.flatMap((item) => [item.title, item.description]),
+    ...shopSignals.map((item) => item.title),
+  ].filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  const scenarios = normalizeAcquisitionScenarios(parsed.scenarios, evidenceCorpus).map((scenario) => ({
     ...scenario,
     channel:
       channelRecommendation.recommended && channelRecommendation.recommended !== "未確定"
