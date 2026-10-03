@@ -257,10 +257,10 @@ export async function POST(request: Request) {
           ? String((scenario.scenes.find((scene) => scene && typeof scene === "object" && (scene as Record<string, unknown>).purpose === "cta") as Record<string, unknown> | undefined)?.instruction || "")
           : "",
         primaryMetric: typeof storedDecision?.primary_metric === "string" ? storedDecision.primary_metric : body.testMetric,
-        holdConstant: Array.isArray(scenario?.continuity)
-          ? []
-          : Array.isArray((scenario as Record<string, unknown> | null)?.variablesToHold)
-            ? ((scenario as Record<string, unknown>).variablesToHold as unknown[]).map(String)
+        holdConstant: scenario?.continuity && typeof scenario.continuity === "object" && Array.isArray((scenario.continuity as Record<string, unknown>).keep)
+          ? ((scenario.continuity as Record<string, unknown>).keep as unknown[]).map(String)
+          : Array.isArray(scenario?.variablesToHold)
+            ? scenario.variablesToHold.map(String)
             : [],
       });
 
