@@ -217,3 +217,66 @@ textarea[readonly]{cursor:default;color:#c5c8d0}
   .topbar>div:last-child{gap:8px!important}
   .topbar .status{font-size:8px;padding:7px 9px}
 }
+
+
+/* AWARD PASS 03 — decision as the product's visual command center */
+.decision-command{
+  position:relative;
+  overflow:hidden;
+  padding:32px;
+  margin-bottom:16px;
+  border:1px solid rgba(155,140,255,.22);
+  border-radius:24px;
+  background:
+    radial-gradient(700px 260px at 100% 0%,rgba(155,140,255,.11),transparent 62%),
+    linear-gradient(135deg,rgba(155,140,255,.055),rgba(255,255,255,.018));
+  box-shadow:0 28px 90px rgba(0,0,0,.25),inset 0 1px rgba(255,255,255,.055);
+}
+.decision-command:before{
+  content:"";
+  position:absolute;
+  top:0;left:0;bottom:0;width:2px;
+  background:linear-gradient(180deg,#aaa0ff,rgba(102,227,255,.2),transparent);
+}
+.decision-command-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.decision-command-head h2{margin:0;font-size:clamp(28px,4vw,46px);letter-spacing:-.055em;font-weight:600}
+.decision-command-badge{
+  flex:none;padding:8px 10px;border:1px solid rgba(155,140,255,.25);border-radius:999px;
+  color:#c9c2ff;background:rgba(155,140,255,.06);font-size:9px;letter-spacing:.14em;
+}
+.decision-command-grid{
+  display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);
+  gap:28px;margin-top:30px;
+}
+.decision-command-main{
+  min-height:190px;display:flex;flex-direction:column;justify-content:center;
+  padding:28px;border-radius:18px;background:rgba(0,0,0,.2);
+  border:1px solid rgba(255,255,255,.08);
+}
+.decision-label,.decision-evidence>span{
+  color:#858091;font-size:9px;letter-spacing:.16em
+}
+.decision-command-main>strong{
+  display:block;margin-top:12px;max-width:760px;
+  font-size:clamp(25px,3.3vw,43px);line-height:1.08;letter-spacing:-.045em;font-weight:600;
+}
+.decision-command-main>p{max-width:650px;margin:15px 0 0;color:#898e99;font-size:12px;line-height:1.75}
+.decision-command-side{display:grid;gap:1px;border:1px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;background:rgba(255,255,255,.025)}
+.decision-command-side>div{padding:18px;background:rgba(0,0,0,.16)}
+.decision-command-side span{display:block;color:#606570;font-size:8px;letter-spacing:.15em}
+.decision-command-side strong{display:block;margin-top:6px;color:#d8dae0;font-size:12px;line-height:1.5;font-weight:500}
+.decision-evidence{margin-top:14px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)}
+.decision-evidence>div{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.decision-evidence>div span{
+  max-width:100%;padding:7px 9px;border-radius:9px;background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.065);color:#777d88;font-size:10px;line-height:1.45;
+}
+@media(max-width:700px){
+  .decision-command{padding:22px;border-radius:20px}
+  .decision-command-head{gap:12px}
+  .decision-command-badge{font-size:7px;padding:7px 8px}
+  .decision-command-grid{grid-template-columns:1fr;gap:10px;margin-top:22px}
+  .decision-command-main{min-height:170px;padding:22px}
+  .decision-command-main>strong{font-size:28px}
+  .decision-command-side{border-radius:14px}
+}
