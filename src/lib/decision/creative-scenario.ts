@@ -1,6 +1,8 @@
 import type { CreativeScenario, DecisionEvidence, StructuredDecision } from "./types";
 
-const ALLOWED_DURATIONS = [15, 30, 45, 60, 90, 180, 300] as const;
+// MVP production contract: one Scenario must map to one finished 9:16 video.
+// Long-form (45s+) requires an explicit multi-clip/stitch contract and is intentionally not inferred here.
+const ALLOWED_DURATIONS = [15, 30] as const;
 type Duration = CreativeScenario["durationSeconds"];
 
 function isDuration(value: number): value is Duration {
@@ -9,13 +11,7 @@ function isDuration(value: number): value is Duration {
 
 function automaticDuration(evidence: DecisionEvidence): Duration {
   const density = evidence.product.features.length + evidence.product.strengths.length + evidence.product.useCases.length + evidence.customer.buyingTriggers.length + evidence.market.topPains.length + evidence.market.emergingPains.length + [evidence.customer.pain, evidence.customer.desire, evidence.customer.valueProposition].filter(Boolean).length;
-  if (density <= 5) return 15;
-  if (density <= 10) return 30;
-  if (density <= 16) return 45;
-  if (density <= 22) return 60;
-  if (density <= 32) return 90;
-  if (density <= 48) return 180;
-  return 300;
+  return density <= 10 ? 15 : 30;
 }
 
 function normalizeDuration(value: number | undefined, evidence: DecisionEvidence): Duration {
@@ -26,13 +22,7 @@ function normalizeDuration(value: number | undefined, evidence: DecisionEvidence
 function splitDuration(duration: Duration) {
   if (duration === 15) return { hook: 3, problem: 3, proof: 3, solution: 3, cta: 3 };
   if (duration === 30) return { hook: 3, problem: 6, proof: 7, solution: 9, cta: 5 };
-  if (duration === 45) return { hook: 3, problem: 8, proof: 10, solution: 15, cta: 9 };
-  if (duration === 60) return { hook: 3, problem: 12, proof: 15, solution: 20, cta: 10 };
-  if (duration === 90) return { hook: 3, problem: 17, proof: 20, solution: 35, cta: 15 };
-  const hook = 5;
-  const cta = Math.round(duration * 0.08);
-  const remaining = duration - hook - cta;
-  return { hook, problem: Math.round(remaining * 0.22), proof: Math.round(remaining * 0.28), solution: remaining - Math.round(remaining * 0.22) - Math.round(remaining * 0.28), cta };
+  return { hook: 3, problem: 6, proof: 7, solution: 9, cta: 5 };
 }
 
 /** Builds a deterministic production scaffold from a locked decision. */
