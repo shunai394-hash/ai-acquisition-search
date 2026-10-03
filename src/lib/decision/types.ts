@@ -103,7 +103,7 @@ export type TeacherResult = {
 };
 
 export type CreativeScenario = {
-  durationSeconds: 15 | 30 | 45 | 60 | 90;
+  durationSeconds: number;
   objective: "test_hook" | "test_angle" | "test_offer";
   changeVariable: "hook" | "angle" | "offer";
   scenes: Array<{
