@@ -102,6 +102,23 @@ export type TeacherResult = {
   logicVersion: string;
 };
 
+export type CreativeScenario = {
+  durationSeconds: 15 | 30 | 45 | 60 | 90;
+  objective: "test_hook" | "test_angle" | "test_offer";
+  changeVariable: "hook" | "angle" | "offer";
+  scenes: Array<{
+    id: string;
+    startSecond: number;
+    endSecond: number;
+    purpose: "hook" | "problem" | "proof" | "solution" | "cta";
+    instruction: string;
+  }>;
+  continuity: {
+    keep: string[];
+    change: string[];
+  };
+};
+
 export type EvidenceItem = {
   source: "product" | "customer" | "ec_pulse" | "post_metrics" | "history" | "hypothesis";
   key: string;
