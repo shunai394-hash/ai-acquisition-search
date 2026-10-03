@@ -37,6 +37,33 @@ function evidenceQuality(evidence: DecisionEvidence): { ok: boolean; issues: str
 }
 
 const OFFER_RULES = new Set(["no_conversion_paid", "ctr_ok_cvr_zero", "unprofitable_paid"]);
+const UNSUPPORTED_AUTHORITY_TERMS = ["医師推奨", "医師が推奨", "専門家推奨", "専門家が推奨", "No.1", "No1", "日本一", "世界一", "満足度", "満足率", "絶対", "必ず"];
+const NUMBER_TOKEN = /(?:\\d+(?:\\.\\d+)?|\\d+%|[０-９]+(?:％)?)/g;
+
+function creativeClaimIsGrounded(text: string, evidence: DecisionEvidence) {
+  const corpus = [
+    evidence.product.name,
+    ...evidence.product.features,
+    ...evidence.product.strengths,
+    ...evidence.product.useCases,
+    evidence.customer.pain,
+    evidence.customer.desire,
+    evidence.customer.valueProposition,
+    ...evidence.market.topPains.map((x) => x.pain),
+    ...evidence.market.emergingPains.map((x) => x.pain),
+  ].filter((x): x is string => typeof x === "string" && x.trim());
+
+  const normalized = text.normalize("NFKC").toLocaleLowerCase("ja-JP");
+  const corpusText = corpus.join(" ").normalize("NFKC").toLocaleLowerCase("ja-JP");
+
+  if (UNSUPPORTED_AUTHORITY_TERMS.some((term) => normalized.includes(term.normalize("NFKC").toLocaleLowerCase("ja-JP")))) {
+    return false;
+  }
+
+  const numbers = normalized.match(NUMBER_TOKEN) ?? [];
+  return numbers.every((token) => corpusText.includes(token));
+}
+
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value ?? null);
@@ -274,13 +301,30 @@ export async function refineNextAction(decision: StructuredDecision, evidence: D
     const angle = decision.next_action.change_variable === "angle"
       ? clean(parsed.angle, 80) ?? decision.next_action.angle
       : decision.next_action.angle;
+    const candidateHook = hook ?? decision.next_action.hook;
+    const candidateAngle = angle;
+    const candidateDescription = clean(parsed.description, 120) ?? decision.next_action.description;
+
+    // A creative rewrite must not introduce unsupported factual claims. The
+    // deterministic decision remains authoritative; an unsafe rewrite falls
+    // back to the deterministic wording instead of silently shipping it.
+    const safeHook = candidateHook && creativeClaimIsGrounded(candidateHook, evidence)
+      ? candidateHook
+      : decision.next_action.hook;
+    const safeAngle = candidateAngle && creativeClaimIsGrounded(candidateAngle, evidence)
+      ? candidateAngle
+      : decision.next_action.angle;
+    const safeDescription = creativeClaimIsGrounded(candidateDescription, evidence)
+      ? candidateDescription
+      : decision.next_action.description;
+
     const refined: StructuredDecision = {
       ...decision,
       next_action: {
         ...decision.next_action,
-        hook: hook ?? decision.next_action.hook,
-        angle,
-        description: clean(parsed.description, 120) ?? decision.next_action.description,
+        hook: safeHook,
+        angle: safeAngle,
+        description: safeDescription,
       },
       model_version: model,
     };
