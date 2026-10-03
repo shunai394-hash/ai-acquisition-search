@@ -212,6 +212,8 @@ export default function Home() {
     } catch(err) { setError(err instanceof Error ? err.message : "実績保存に失敗しました。"); }
   }
 
+  const leadScenario = result?.analysis.scenarios?.[0];
+
   return (
     <main className="shell">
       <header className="topbar">
@@ -545,6 +547,44 @@ export default function Home() {
           {result.analysis.searchEvidence?.length > 0 && (
             <Section title="検索エビデンス">
               <List items={result.analysis.searchEvidence.map((item) => item.title + " — " + item.url + " — " + item.snippet)} />
+            </Section>
+          )}
+
+          {leadScenario && (
+            <Section title="GOLD CASE · 今回まず試す1本">
+              <div className="gold-case">
+                    <p className="hint">一度に多くの要素を変えず、仮説・根拠・測定指標を1本にまとめて検証します。</p>
+                    <h2>{leadScenario.hook}</h2>
+                    <strong>検証する仮説</strong>
+                    <p>{leadScenario.hypothesis}</p>
+                    <strong>誰に向けるか</strong>
+                    <p>{leadScenario.targetCustomer} — {leadScenario.painOrDesire}</p>
+                    <strong>動画の流れ</strong>
+                    <ol>
+                      {leadScenario.beats.map((beat) => <li key={beat}>{beat}</li>)}
+                    </ol>
+                    {leadScenario.proof.length > 0 && (
+                      <>
+                        <strong>広告に使える確認済み情報</strong>
+                        <List items={leadScenario.proof} />
+                      </>
+                    )}
+                    <strong>今回測る数字</strong>
+                    <p>{leadScenario.primaryMetric}{leadScenario.secondaryMetric !== "未確定" ? "（補助指標: " + leadScenario.secondaryMetric + "）" : ""}</p>
+                    <strong>変える要素 / 固定する要素</strong>
+                    <p>変更: {leadScenario.variableToChange}</p>
+                    <p>固定: {leadScenario.variablesToHold.join("・") || "未指定"}</p>
+                    <strong>注意点</strong>
+                    <p>{leadScenario.risk}</p>
+                    {leadScenario.evidence.length > 0 && (
+                      <>
+                        <strong>判断の根拠</strong>
+                        <List items={leadScenario.evidence} />
+                      </>
+                    )}
+                    <strong>CTA</strong>
+                    <p>{leadScenario.cta}</p>
+              </div>
             </Section>
           )}
 

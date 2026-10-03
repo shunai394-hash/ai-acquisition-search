@@ -141,3 +141,47 @@ test("scenario normalizer requires evidence even when all execution fields exist
   assert.equal(result.length, 1);
   assert.equal(result[0].archetype, "comparison_discovery");
 });
+
+test("gold-case scenario only accepts evidence traceable to retrieved source text", () => {
+  const source = "UVカット機能で日差し対策をサポートします。薄手素材で軽やかな着用感。";
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      evidence: ["UVカット機能で日差し対策をサポートします。"],
+      proof: ["UVカット機能で日差し対策をサポートします。"],
+    }),
+  ], [source]);
+  assert.equal(result.length, 1);
+  assert.deepEqual(result[0].evidence, ["UVカット機能で日差し対策をサポートします。"]);
+  assert.deepEqual(result[0].proof, ["UVカット機能で日差し対策をサポートします。"]);
+});
+
+test("unsupported AI evidence rejects a scenario instead of turning into an ad claim", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      evidence: ["医師が推奨し、満足度99%を達成"],
+      proof: ["医師が推奨し、満足度99%を達成"],
+    }),
+  ], ["商品ページにはUVカット機能と記載されています。"]);
+  assert.deepEqual(result, []);
+});
+
+test("gold-case scenario removes unsupported proof even when one evidence quote is grounded", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      evidence: ["商品ページにはUVカット機能と記載されています。"],
+      proof: [
+        "商品ページにはUVカット機能と記載されています。",
+        "満足度99%で医師も推奨",
+      ],
+    }),
+  ], ["商品ページにはUVカット機能と記載されています。"]);
+  assert.equal(result.length, 1);
+  assert.deepEqual(result[0].proof, ["商品ページにはUVカット機能と記載されています。"]);
+});
+
+test("generic labels are not accepted as evidence during grounded production normalization", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", { evidence: ["商品ページ"], proof: ["レビュー"] }),
+  ], ["商品ページにはUVカット機能と記載されています。"]);
+  assert.deepEqual(result, []);
+});
