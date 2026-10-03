@@ -46,6 +46,7 @@ export default function Home() {
   const [videoStatus, setVideoStatus] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [videoError, setVideoError] = useState("");
+  const [videoDuration, setVideoDuration] = useState<15 | 30>(15);
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -94,6 +95,7 @@ export default function Home() {
         "Rules: factual claims only; use confirmed product facts; no watermark; do not invent evidence.",
       ].filter(Boolean);
       setVideoPrompt(scenarioLines.join("\n"));
+      setVideoDuration((scenario?.beats?.length || 0) >= 3 || (scenario?.proof?.length || 0) >= 2 ? 30 : 15);
       setEcPulse(null);
       setEcPulseLoading(true);
       try {
@@ -172,7 +174,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
           prompt: videoPrompt.trim(),
-          duration: Math.min(30, Math.max(15, (videoPrompt.match(/^Beats:/m)?.[0] ? 30 : 15))),
+          duration: videoDuration,
           resolution: "1080p",
           aspectRatio: "9:16",
           generateAudio: false,
