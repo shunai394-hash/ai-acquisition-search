@@ -478,10 +478,6 @@ export async function analyzePage(
   const competitors = obj(parsed.competitors, base.competitors);
   const performance = obj(parsed.performance, base.performance);
   const decision = obj(parsed.decision, base.decision);
-  const sellingPoints = normalizeSellingPoints(parsed.sellingPoints);
-  const customerCandidates = normalizeCustomerCandidates(parsed.customerCandidates);
-  const appealCandidates = normalizeAppealCandidates(parsed.appealCandidates);
-  const channelRecommendation = normalizeChannelRecommendation(parsed.channelRecommendation, base.channelRecommendation);
   const evidenceCorpus = [
     source.title,
     source.description,
@@ -492,6 +488,10 @@ export async function analyzePage(
     ...socialSignals.flatMap((item) => [item.title, item.description]),
     ...shopSignals.map((item) => item.title),
   ].filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  const sellingPoints = normalizeSellingPoints(parsed.sellingPoints, evidenceCorpus);
+  const customerCandidates = normalizeCustomerCandidates(parsed.customerCandidates);
+  const appealCandidates = normalizeAppealCandidates(parsed.appealCandidates);
+  const channelRecommendation = normalizeChannelRecommendation(parsed.channelRecommendation, base.channelRecommendation);
   const scenarios = normalizeAcquisitionScenarios(parsed.scenarios, evidenceCorpus).map((scenario) => ({
     ...scenario,
     channel:
