@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { consumeMonthlyUsage, getUserFromBearer, refundMonthlyUsage } from "@/lib/billing";
-import { generateHiggsfieldVideo } from "@/lib/video/higgsfield";
+import { generateHiggsfieldVideo, uploadHiggsfieldReference } from "@/lib/video/higgsfield";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,7 +23,9 @@ export async function POST(request: Request) {
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
     userId = user.id;
-    const body = await request.json();
+    const contentType = request.headers.get("content-type") || "";
+    const isMultipart = contentType.toLowerCase().includes("multipart/form-data");
+    const body = isMultipart ? Object.fromEntries((await request.formData()).entries()) : await request.json();
     const prompt = String(body.prompt || "").trim();
     if (!prompt) return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     if (prompt.length > 10000) return NextResponse.json({ error: "prompt is too long" }, { status: 400 });
@@ -33,7 +35,14 @@ export async function POST(request: Request) {
     if (!Number.isFinite(duration) || duration < 2 || duration > 30) return NextResponse.json({ error: "duration must be between 2 and 30 seconds" }, { status: 400 });
     const resolution = body.resolution === "480p" || body.resolution === "720p" || body.resolution === "1080p" ? body.resolution : "1080p";
     const aspectRatio = ["16:9","4:3","1:1","3:4","9:16","adaptive"].includes(body.aspectRatio) ? body.aspectRatio : "9:16";
-    const generateAudio = Boolean(body.generateAudio ?? false);
+    const generateAudio = String(body.generateAudio ?? "false") === "true" || body.generateAudio === true;
+    let imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
+    const image = body.image;
+    if (image instanceof File) {
+      if (!image.type.startsWith("image/")) return NextResponse.json({ error: "商品画像は画像ファイルを指定してください。" }, { status: 400 });
+      if (image.size > 10 * 1024 * 1024) return NextResponse.json({ error: "商品画像は10MB以下にしてください。" }, { status: 400 });
+      imageUrl = await uploadHiggsfieldReference(await image.arrayBuffer(), image.type);
+    }
     const socialPostId = body.socialPostId ? String(body.socialPostId) : null;
     const { admin } = clients();
 
@@ -76,6 +85,7 @@ export async function POST(request: Request) {
       resolution,
       aspectRatio,
       generateAudio,
+      imageUrl: imageUrl || undefined,
     });
     const requestId = String(started.request_id ?? started.requestId ?? started.id ?? "");
     if (!requestId) throw new Error("Higgsfieldからrequest_idを取得できませんでした。");
