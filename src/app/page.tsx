@@ -216,17 +216,22 @@ export default function Home() {
       <header className="topbar">
         <div>
           <strong>AI Acquisition Search</strong>
-          <span>AI集客検索エンジン</span>
+          <span>DECISION ENGINE FOR CUSTOMER ACQUISITION</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span className="status">AI AD OPERATOR</span>
+          <nav aria-label="主要メニュー" style={{ display: "flex", gap: 18, alignItems: "center" }}>
+            <a href="#research" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Research</a>
+            <a href="#decision" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Decision</a>
+            <a href="#loop" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Loop</a>
+          </nav>
+          <span className="status">AI AD OPERATOR · LIVE</span>
           <GoogleSignIn />
           <a href="/billing" style={{ color: "#ffffff70", fontSize: 11 }}>契約管理</a>
         </div>
       </header>
 
       <section className="hero">
-        <p className="eyebrow">AI CUSTOMER ACQUISITION</p>
+        <p className="eyebrow">AI CUSTOMER ACQUISITION · DECISION ENGINE</p>
         <h1>
           市場の声から、
           <br />
@@ -258,7 +263,7 @@ export default function Home() {
         <div className="hero-loop">
           <span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span>
         </div>
-        <p className="hint">まずは商品URLを入力。調査結果は履歴として蓄積し、再調査で変化を追えます。</p>
+        <p className="hint">URLを1つ入力するだけ。市場のシグナルを読み、次に試すべき施策まで一本のループにします。</p>
       </section>
 
 
@@ -272,7 +277,7 @@ export default function Home() {
             <small>{result.source.url}</small>
           </div>
 
-          <section className="research-flow">
+          <section id="research" className="research-flow">
             <div className="research-head">
               <div>
                 <p className="eyebrow">EC PULSE RESEARCH LOOP</p>
@@ -540,7 +545,7 @@ export default function Home() {
             </Section>
           )}
 
-          <section className="next video-generator">
+          <section id="decision" className="next video-generator">
             <p className="eyebrow">AI VIDEO CREATOR</p>
             <h2>このサイトだけで広告動画を作る</h2>
             <p className="hint">分析結果をもとに9:16広告動画をHiggsfield APIで生成します。HiggsfieldやCloud Codeをユーザー側で起動する必要はありません。</p>
@@ -564,7 +569,7 @@ export default function Home() {
               </div>
             )}
           </section>
-          <section className="next performance-loop">
+          <section id="loop" className="next performance-loop">
             <p className="eyebrow">PERFORMANCE LOOP</p>
             <h2>投稿結果を入れて、次の判断へ</h2>
             <p className="hint">投稿後の数字を保存すると、AIが継続・ピボット・停止の次アクションを判断します。</p>
