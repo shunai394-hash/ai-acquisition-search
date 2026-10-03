@@ -548,6 +548,47 @@ export default function Home() {
             </Section>
           )}
 
+          {result.analysis.scenarios?.[0] && (
+            <Section title="GOLD CASE · 今回まず試す1本">
+              {(() => {
+                const scenario = result.analysis.scenarios[0];
+                return (
+                  <div className="gold-case">
+                    <p className="hint">一度に多くの要素を変えず、仮説・根拠・測定指標を1本にまとめて検証します。</p>
+                    <h2>{scenario.hook}</h2>
+                    <strong>検証する仮説</strong>
+                    <p>{scenario.hypothesis}</p>
+                    <strong>誰に向けるか</strong>
+                    <p>{scenario.targetCustomer} — {scenario.painOrDesire}</p>
+                    <strong>動画の流れ</strong>
+                    <ol>
+                      {scenario.beats.map((beat, index) => <li key={index}>{beat}</li>)}
+                    </ol>
+                    {scenario.proof.length > 0 && (
+                      <>
+                        <strong>広告に使える確認済み情報</strong>
+                        <List items={scenario.proof} />
+                      </>
+                    )}
+                    <strong>今回測る数字</strong>
+                    <p>{scenario.primaryMetric}{scenario.secondaryMetric !== "未確定" ? "（補助指標: " + scenario.secondaryMetric + "）" : ""}</p>
+                    <strong>変える要素 / 固定する要素</strong>
+                    <p>変更: {scenario.variableToChange}</p>
+                    <p>固定: {scenario.variablesToHold.join("・") || "未指定"}</p>
+                    <strong>注意点</strong>
+                    <p>{scenario.risk}</p>
+                    {scenario.evidence.length > 0 && (
+                      <>
+                        <strong>判断の根拠</strong>
+                        <List items={scenario.evidence} />
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </Section>
+          )}
+
           <section id="decision" className="next video-generator">
             <p className="eyebrow">CREATIVE EXECUTION · HIGGSFIELD</p>
             <h2>決めた一手を、そのまま広告にする</h2>
