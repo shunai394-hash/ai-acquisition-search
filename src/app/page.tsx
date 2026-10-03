@@ -241,10 +241,11 @@ export default function Home() {
           <span>次に売るための一手を決める。</span>
         </h1>
         <p className="lead">
-          商品URLから市場・レビュー・顧客の痛点を調査。頻出する不満から商品候補と広告訴求を作り、次のテストまでつなげます。
+          商品URLを1つ貼るだけ。市場の声と商品情報を整理し、<strong>「誰に・何を・どう試すか」</strong>まで1本のテストに落とします。
         </p>
 
-        <form onSubmit={analyze} className="search">
+        <form onSubmit={analyze} className="search" aria-label="商品分析">
+
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -253,9 +254,19 @@ export default function Home() {
             required
           />
           <button disabled={loading}>
-            {loading ? "集客分析中..." : "集客分析を開始"}
+            {loading ? "分析しています…" : "この商品を分析する"}
           </button>
         </form>
+        <p className="search-note">Googleログイン後に分析を開始します。入力したURLは分析対象の商品情報として使用します。</p>
+        <div className="journey" aria-label="AI集客の流れ">
+          <div className="journey-step active"><b>01</b><span>貼る</span><small>商品URL</small></div>
+          <i>→</i>
+          <div className="journey-step"><b>02</b><span>知る</span><small>市場・顧客</small></div>
+          <i>→</i>
+          <div className="journey-step"><b>03</b><span>試す</span><small>最初の1本</small></div>
+          <i>→</i>
+          <div className="journey-step"><b>04</b><span>学ぶ</span><small>実績 → 改善</small></div>
+        </div>
 
         {error && <p className="error">{error}</p>}
         <div className="hero-proof">
@@ -273,11 +284,17 @@ export default function Home() {
       {result && (
         <div className="results">
           <div className="source">
-            <span>分析対象</span>
-            <a href={result.source.url} target="_blank" rel="noreferrer">
-              {result.source.title || result.source.url}
-            </a>
-            <small>{result.source.url}</small>
+            <div>
+              <span>ANALYSIS READY</span>
+              <a href={result.source.url} target="_blank" rel="noreferrer">
+                {result.source.title || result.source.url}
+              </a>
+              <small>{result.source.url}</small>
+            </div>
+            <div className="source-next">
+              <b>次にやること</b>
+              <span>{result.analysis.nextPosts[0]?.hook || result.analysis.decision.testPlan || "最初のテストを確認する"}</span>
+            </div>
           </div>
 
           <section id="research" className="research-flow">
