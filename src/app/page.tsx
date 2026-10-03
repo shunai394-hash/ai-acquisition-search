@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import type { SyntheticEvent } from "react";
 import GoogleSignIn from "@/components/GoogleSignIn";
 import BillingButton from "@/components/BillingButton";
 import Link from "next/link";
@@ -58,7 +59,7 @@ export default function Home() {
     return data.session.access_token;
   }
 
-  async function analyze(e?: FormEvent) {
+  async function analyze(e?: SyntheticEvent) {
     e?.preventDefault();
     setLoading(true);
     setError("");
