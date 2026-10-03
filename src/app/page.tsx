@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import GoogleSignIn from "@/components/GoogleSignIn";
 import BillingButton from "@/components/BillingButton";
+import Link from "next/link";
 import type { AcquisitionAnalyzeResult, EcPulseResearchBundle, EcPulseResearchRun } from "@/lib/acquisition/types";
 
 function List({ items }: { items: string[] }) {
@@ -219,14 +220,16 @@ export default function Home() {
           <span>DECISION ENGINE FOR CUSTOMER ACQUISITION</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <nav aria-label="主要メニュー" style={{ display: "flex", gap: 18, alignItems: "center" }}>
-            <a href="#research" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Research</a>
-            <a href="#decision" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Decision</a>
-            <a href="#loop" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Loop</a>
-          </nav>
+          {result && (
+            <nav aria-label="主要メニュー" style={{ display: "flex", gap: 18, alignItems: "center" }}>
+              <a href="#research" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Research</a>
+              <a href="#decision" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Decision</a>
+              <a href="#loop" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Loop</a>
+            </nav>
+          )}
           <span className="status">AI AD OPERATOR · LIVE</span>
           <GoogleSignIn />
-          <a href="/billing" style={{ color: "#ffffff70", fontSize: 11 }}>契約管理</a>
+          <Link href="/billing" style={{ color: "#ffffff70", fontSize: 11 }}>契約管理</Link>
         </div>
       </header>
 
@@ -235,7 +238,7 @@ export default function Home() {
         <h1>
           市場の声から、
           <br />
-          <span>次の商品と広告を決める。</span>
+          <span>次に売るための一手を決める。</span>
         </h1>
         <p className="lead">
           商品URLから市場・レビュー・顧客の痛点を調査。頻出する不満から商品候補と広告訴求を作り、次のテストまでつなげます。
@@ -546,18 +549,19 @@ export default function Home() {
           )}
 
           <section id="decision" className="next video-generator">
-            <p className="eyebrow">AI VIDEO CREATOR</p>
-            <h2>このサイトだけで広告動画を作る</h2>
+            <p className="eyebrow">CREATIVE EXECUTION · HIGGSFIELD</p>
+            <h2>決めた一手を、そのまま広告にする</h2>
             <p className="hint">分析結果をもとに9:16広告動画をHiggsfield APIで生成します。HiggsfieldやCloud Codeをユーザー側で起動する必要はありません。</p>
             <textarea
               value={videoPrompt}
-              onChange={(e) => setVideoPrompt(e.target.value)}
-              placeholder="動画の内容・Hook・訴求を入力"
+              readOnly
+              aria-label="AIが決定した動画シナリオ"
+              placeholder="分析結果からAIが動画シナリオを生成します"
               rows={5}
               style={{ width: "100%", marginTop: 12, padding: 14, borderRadius: 12, background: "#101012", color: "#fff", border: "1px solid #29292e" }}
             />
             <button type="button" onClick={generateVideo} disabled={videoGenerating || !videoPrompt.trim()}>
-              {videoGenerating ? "動画生成中..." : "🎬 動画を生成"}
+              {videoGenerating ? "動画生成中..." : "決定したシナリオから動画を生成"}
             </button>
             {videoStatus && <p className="hint">{videoStatus}</p>}
             {videoJobId && <small className="hint">Job: {videoJobId}</small>}
