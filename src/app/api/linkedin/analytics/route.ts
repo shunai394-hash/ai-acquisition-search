@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     if (!postUrn && !socialPostId) return NextResponse.json({ error: "LinkedIn投稿を指定してください。" }, { status: 400 });
 
     const supabase = getAdminSupabase();
-    let linkedPostId = socialPostId;
+    const linkedPostId = socialPostId;
     let resolvedPostUrn = postUrn;
     if (socialPostId) {
       const { data: socialPost, error: socialPostError } = await supabase.from("social_posts").select("id,external_post_id,network").eq("id", socialPostId).eq("user_id", user.id).maybeSingle();
@@ -36,8 +36,14 @@ export async function POST(request: Request) {
       decryptLinkedInToken(account.access_token_encrypted),
       resolvedPostUrn,
     );
-    const metric = Array.isArray((analytics as any)?.elements) ? ((analytics as any).elements[0]?.total || (analytics as any).elements[0] || {}) : ((analytics as any)?.total || (analytics as any) || {});
-    const num = (v: unknown) => typeof v === "number" ? v : Number(v || 0);
+    const asRecord = (value: unknown): Record<string, unknown> =>
+      value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+    const analyticsRecord = asRecord(analytics);
+    const elements = Array.isArray(analyticsRecord.elements) ? analyticsRecord.elements : [];
+    const firstElement = asRecord(elements[0]);
+    const total = asRecord(firstElement.total);
+    const metric = Object.keys(total).length > 0 ? total : Object.keys(firstElement).length > 0 ? firstElement : asRecord(analyticsRecord.total);
+    const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : Number(v || 0);
     const impressions = num(metric.IMPRESSION ?? metric.impression);
     const clicks = num(metric.LINK_CLICKS ?? metric.linkClicks);
     const likes = num(metric.REACTION ?? metric.reaction);
