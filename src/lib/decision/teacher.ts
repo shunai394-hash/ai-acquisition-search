@@ -3,7 +3,7 @@ import type { Criterion, DecisionEvidence, HistoricalResult, MetricSnapshot, Tea
 // Deterministic Teacher. The LLM never decides CONTINUE / PIVOT / STOP / WAIT:
 // the verdict is a pure function of the evidence so the same input always
 // yields the same verdict, and every verdict lists the criteria it used.
-export const TEACHER_LOGIC_VERSION = "teacher-2026.10.1";
+export const TEACHER_LOGIC_VERSION = "teacher-2026.10.2";
 
 export const TEACHER_THRESHOLDS = {
   /** Minimum views/impressions before anything is judged. */
@@ -76,6 +76,11 @@ function ctrBaseline(history: HistoricalResult[]) {
   const values = history
     .filter((h) => h.metric.clicks != null && (h.metric.impressions ?? 0) >= T.minImpressionsForCtr)
     .map((h) => (h.metric.clicks as number) / (h.metric.impressions as number));
+  return values.length >= T.minBaselineSamples ? median(values) : null;
+}
+
+function cvrBaseline(history: HistoricalResult[]) {
+  const values = history.filter((h) => h.metric.clicks != null && h.metric.conversions != null && h.metric.clicks >= T.minClicksForCvr).map((h) => (h.metric.conversions as number) / (h.metric.clicks as number));
   return values.length >= T.minBaselineSamples ? median(values) : null;
 }
 
@@ -210,9 +215,17 @@ export function evaluateTeacher(evidence: DecisionEvidence): TeacherResult {
     if (ci.low > benchmark) {
       if (m.conversions != null && m.clicks >= T.minClicksForCvr) {
         const cvr = m.conversions / m.clicks;
-        criteria.push({ name: "cvr", value: round(cvr), threshold: ">0", passed: cvr > 0 });
+        const cvrBaselineValue = cvrBaseline(history);
+        criteria.push({ name: "cvr", value: round(cvr), threshold: cvrBaselineValue == null ? ">0" : round(cvrBaselineValue), passed: cvrBaselineValue == null ? cvr > 0 : cvr >= cvrBaselineValue });
         if (cvr === 0) {
           return result("pivot", "ctr_ok_cvr_zero", "CTRは基準を上回っていますが、十分なクリックに対してCVが0件です。遷移先・オファーとの接続を変更します。", confidenceFor(m.clicks, 100, 0.75));
+        }
+        if (cvrBaselineValue != null) {
+          const cvrCi = wilson(m.conversions, m.clicks);
+          criteria.push({ name: "cvr_ci95", value: `${round(cvrCi.low)}-${round(cvrCi.high)}`, threshold: "own_baseline_median", passed: null });
+          if (cvrCi.high < cvrBaselineValue) {
+            return result("pivot", "cvr_below_baseline", "CVR " + (cvr * 100).toFixed(2) + "% は過去実績の中央値" + (cvrBaselineValue * 100).toFixed(2) + "%を統計的に下回っています。CTRではなくオファー・遷移先を変更します。", confidenceFor(m.clicks, 100, 0.8));
+          }
         }
       }
       return result("continue", "ctr_above_benchmark", `CTR ${(ctr * 100).toFixed(2)}% は${baseline != null ? "過去実績の中央値" : "標準基準"}${(benchmark * 100).toFixed(2)}%を統計的に上回っています。同じ仮説を強化します。`, confidenceFor(m.impressions, 5000, 0.85));
