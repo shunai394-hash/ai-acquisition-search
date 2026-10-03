@@ -289,3 +289,53 @@ test("unknown metrics remain unknown and do not become zero", () => {
   assert.ok(!d.evidence.some((x) => x.source === "post_metrics" && x.key === "clicks" && x.value === 0));
   assert.ok(!d.evidence.some((x) => x.source === "post_metrics" && x.key === "conversions" && x.value === 0));
 });
+
+test("LLM creative rewrite rejects unsupported numeric claims", async () => {
+  const e = evidence({ current: metric({ impressions: 4000, clicks: 120 }) });
+  const d = buildDecision(e);
+  const refined = await refineNextAction(
+    d,
+    e,
+    async () => JSON.stringify({ hook: "満足度99%の人が選ぶ新Hook", angle: d.next_action.angle, description: "99%を実現する商品です" }),
+    "test-model",
+  );
+  assert.equal(refined.next_action.hook, d.next_action.hook);
+  assert.equal(refined.next_action.description, d.next_action.description);
+});
+
+test("LLM creative rewrite rejects unsupported authority claims", async () => {
+  const e = evidence({ current: metric({ impressions: 4000, clicks: 120 }) });
+  const d = buildDecision(e);
+  const refined = await refineNextAction(
+    d,
+    e,
+    async () => JSON.stringify({ hook: "医師推奨の新Hook", angle: d.next_action.angle, description: "専門家推奨の商品" }),
+    "test-model",
+  );
+  assert.equal(refined.next_action.hook, d.next_action.hook);
+  assert.equal(refined.next_action.description, d.next_action.description);
+});
+
+test("LLM creative rewrite can use a grounded product number", async () => {
+  const e = evidence({
+    current: metric({ impressions: 4000, clicks: 120 }),
+    product: {
+      name: "テスト商品",
+      url: "https://example.com/product",
+      price: 1000,
+      cost: 400,
+      features: ["30日間使える"],
+      strengths: ["軽量"],
+      useCases: ["通勤"],
+      salesChannels: ["EC"],
+    },
+  });
+  const d = buildDecision(e);
+  const refined = await refineNextAction(
+    d,
+    e,
+    async () => JSON.stringify({ hook: "30日間使える毎日の新Hook", angle: d.next_action.angle, description: "通勤で使える軽量商品" }),
+    "test-model",
+  );
+  assert.equal(refined.next_action.hook, "30日間使える毎日の新Hook");
+});
