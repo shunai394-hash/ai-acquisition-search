@@ -273,7 +273,7 @@ function createServer(): McpServer {
               continue;
             }
             results.push(normalized);
-          } catch (error) {
+          } catch {
             // Failed metric collection is omitted from normalized performance; the caller receives only valid records.
           }
         }
