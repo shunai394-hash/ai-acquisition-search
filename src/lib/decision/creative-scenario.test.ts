@@ -27,6 +27,13 @@ test("scenario uses exact requested duration and contiguous scenes", () => {
   assert.equal(scenario.scenes.at(-1)?.endSecond, 45);
   for (let i = 1; i < scenario.scenes.length; i++) assert.equal(scenario.scenes[i].startSecond, scenario.scenes[i - 1].endSecond);
   assert.equal(scenario.changeVariable, "hook");
+  assert.equal(scenario.scenarioVersion, "creative-scenario-1");
+  assert.equal(scenario.targetCustomer, "共働き世帯");
+  assert.equal(scenario.productName, "Test商品");
+  assert.equal(scenario.hypothesis, "時短に反応する");
+  assert.equal(scenario.primaryMetric, "CTR");
+  assert.equal(scenario.learningObjective, "Hookを検証");
+  assert.deepEqual(scenario.continuity.keep, ["target customer", "product facts", "primary metric", "learning objective"]);
   assert.deepEqual(scenario.continuity.change, ["冒頭Hook"]);
 });
 
@@ -39,4 +46,19 @@ test("invalid duration falls back to deterministic default", () => {
   const scenario = buildCreativeScenario(decision, evidence, 31);
   assert.ok(scenario);
   assert.equal(scenario.durationSeconds, 15);
+});
+
+test("scenario is rejected when the decision requests an uncontrolled variable", () => {
+  const invalid = {
+    ...decision,
+    next_action: { ...decision.next_action, change_variable: "target" as const },
+  };
+  assert.equal(buildCreativeScenario(invalid, evidence, 30), null);
+});
+
+test("scenario exposes one causal chain from hook through CTA", () => {
+  const scenario = buildCreativeScenario(decision, evidence, 30);
+  assert.ok(scenario);
+  assert.deepEqual(scenario.scenes.map((scene) => scene.purpose), ["hook", "problem", "proof", "solution", "cta"]);
+  assert.equal(scenario.scenes.reduce((sum, scene) => sum + (scene.endSecond - scene.startSecond), 0), scenario.durationSeconds);
 });
