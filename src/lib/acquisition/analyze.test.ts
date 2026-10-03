@@ -141,3 +141,19 @@ test("scenario normalizer requires evidence even when all execution fields exist
   assert.equal(result.length, 1);
   assert.equal(result[0].archetype, "comparison_discovery");
 });
+
+test("AI confidence is capped by grounded evidence count", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      evidence: [
+        "UVカット機能を搭載しています。",
+        "薄手素材で軽やかな着用感です。",
+        "指穴付きで手の甲まで覆えます。",
+      ],
+      proof: ["UVカット機能を搭載しています。"],
+    }),
+  ], [
+    "UVカット機能を搭載しています。薄手素材で軽やかな着用感です。指穴付きで手の甲まで覆えます。",
+  ]);
+  assert.equal(result.length, 1);
+});
