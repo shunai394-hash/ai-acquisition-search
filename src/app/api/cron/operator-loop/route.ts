@@ -52,64 +52,6 @@ async function internalRequest(
   return { status: response.status, payload };
 }
 
-async function publishCompletedVideo(
-  db: ReturnType<typeof getAdminSupabase>,
-  userId: string,
-  socialPostId: string,
-  videoUrl: string,
-) {
-  const { data: nextPost } = await db.from("social_posts")
-    .select("id,network,caption,status,metadata")
-    .eq("id", socialPostId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!nextPost) return { ok: false, skipped: true, reason: "next social post not found" };
-  if (!["tiktok","instagram","facebook","youtube","x","linkedin"].includes(nextPost.network)) {
-    return { ok: false, skipped: true, reason: `unsupported network: ${nextPost.network}` };
-  }
-
-  const { data: existing } = await db.from("social_posts")
-    .select("id,status,external_post_id")
-    .eq("user_id", userId)
-    .or(`metadata->>sourceSocialPostId.eq.${nextPost.id},metadata->>source_social_post_id.eq.${nextPost.id}`)
-    .eq("network", nextPost.network)
-    .limit(1);
-
-  if (existing?.[0]?.external_post_id) {
-    return { ok: true, skipped: true, reason: "already published", postId: existing[0].id };
-  }
-
-  const result = await internalRequest("POST", "/api/social/publish", userId, {
-    socialPostId: nextPost.id,
-    videoUrl,
-    caption: nextPost.caption || "AI-generated acquisition creative",
-    platforms: [nextPost.network],
-  });
-
-  if (result.status < 200 || result.status >= 300) {
-    return { ok: false, status: result.status, error: result.payload?.error };
-  }
-
-  const published = Array.isArray(result.payload?.results)
-    ? result.payload.results.filter((item: { ok?: boolean } | null) => item?.ok)
-    : [];
-
-  if (published.length > 0) {
-    await db.from("social_posts").update({
-      status: "published",
-      metadata: {
-        ...(nextPost.metadata || {}),
-        auto_published_at: new Date().toISOString(),
-        auto_publish_result: result.payload,
-      },
-      updated_at: new Date().toISOString(),
-    }).eq("id", nextPost.id).eq("user_id", userId);
-  }
-
-  return { ok: published.length > 0, status: result.status, result: result.payload };
-}
-
 const LEASE_NAME = "operator-loop";
 
 export async function GET(request: Request) {
@@ -283,13 +225,12 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
           results.push({ jobId: job.id, step: "video-publish", status: "completed-without-asset" });
           continue;
         }
-        const publish = await publishCompletedVideo(db, job.user_id, job.social_post_id, asset.video_url);
         results.push({
           jobId: job.id,
-          step: "video-publish-retry",
+          step: "video-ready-for-review",
           status: "completed",
-          published: publish.ok,
-          publishResult: publish,
+          published: false,
+          reason: "automatic social publishing is disabled; human approval is required",
         });
         continue;
       }
@@ -372,13 +313,12 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
       const asset = polled.payload?.asset;
 
       if (polled.status >= 200 && polled.status < 300 && asset?.video_url && polled.payload?.job?.status === "completed" && job.social_post_id) {
-        const publish = await publishCompletedVideo(db, job.user_id, job.social_post_id, asset.video_url);
         results.push({
           jobId: job.id,
-          step: "video-publish",
+          step: "video-ready-for-review",
           status: polled.payload?.job?.status,
-          published: publish.ok,
-          publishResult: publish,
+          published: false,
+          reason: "automatic social publishing is disabled; human approval is required",
         });
       } else {
         results.push({
