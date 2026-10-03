@@ -76,13 +76,24 @@ export default function Home() {
       setResult(data.data);
       const decision = data.data?.analysis?.decision;
       const firstPost = data.data?.analysis?.nextPosts?.[0];
-      setVideoPrompt([
-        data.data?.source?.title || "商品",
-        decision?.valueProposition ? "訴求: " + decision.valueProposition : "",
-        firstPost?.hook ? "Hook: " + firstPost.hook : "",
-        decision?.format ? "形式: " + decision.format : "9:16 short-form ad",
-        "Natural UGC-style product advertising, clear first 3 seconds, factual claims only, no watermark.",
-      ].filter(Boolean).join("\n"));
+      const scenario = data.data?.analysis?.scenarios?.[0];
+      const scenarioLines = [
+        "PRODUCTION CONTRACT",
+        "Product: " + (data.data?.source?.title || "商品"),
+        "Target: " + (scenario?.targetCustomer || decision?.target || ""),
+        "Hypothesis: " + (scenario?.hypothesis || decision?.testPlan || ""),
+        "Change variable: " + (scenario?.variableToChange || "hook"),
+        "Hook: " + (scenario?.hook || firstPost?.hook || ""),
+        "Beats: " + (scenario?.beats || []).join(" → "),
+        "Proof: " + (scenario?.proof || []).join(" / "),
+        "CTA: " + (scenario?.cta || ""),
+        "Channel: " + (scenario?.channel || decision?.channel || ""),
+        "Format: " + (scenario?.format || decision?.format || "9:16 short-form ad"),
+        "Primary metric: " + (scenario?.primaryMetric || firstPost?.testMetric || ""),
+        "Hold constant: " + (scenario?.variablesToHold || []).join(", "),
+        "Rules: factual claims only; use confirmed product facts; no watermark; do not invent evidence.",
+      ].filter(Boolean);
+      setVideoPrompt(scenarioLines.join("\n"));
       setEcPulse(null);
       setEcPulseLoading(true);
       try {
@@ -159,7 +170,14 @@ export default function Home() {
       const response = await fetch("/api/video/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ prompt: videoPrompt.trim(), duration: 5, resolution: "1080p", aspectRatio: "9:16", generateAudio: false }),
+        body: JSON.stringify({
+          prompt: videoPrompt.trim(),
+          duration: Math.min(30, Math.max(15, (videoPrompt.match(/^Beats:/m)?.[0] ? 30 : 15))),
+          resolution: "1080p",
+          aspectRatio: "9:16",
+          generateAudio: false,
+          socialPostId: socialPostId || undefined,
+        }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "動画生成の開始に失敗しました。");
