@@ -71,6 +71,24 @@ test("profitable paid traffic -> CONTINUE", () => {
   assert.equal(r.ruleId, "profitable_paid");
 });
 
+test("paid traffic with spend but no revenue or gross profit -> WAIT", () => {
+  const r = evaluateTeacher(evidence({ current: metric({ impressions: 5000, clicks: 120, conversions: 4, adSpend: 5000 }) }));
+  assert.equal(r.verdict, "wait");
+  assert.equal(r.ruleId, "profitability_data_missing");
+});
+
+test("gross profit can decide paid traffic even when revenue is missing", () => {
+  const r = evaluateTeacher(evidence({ current: metric({ impressions: 3000, clicks: 90, conversions: 5, grossProfit: 9000, adSpend: 4000 }) }));
+  assert.equal(r.verdict, "continue");
+  assert.equal(r.ruleId, "profitable_paid_gross_profit");
+});
+
+test("negative contribution after ad spend -> PIVOT", () => {
+  const r = evaluateTeacher(evidence({ current: metric({ impressions: 3000, clicks: 90, conversions: 5, grossProfit: 4000, adSpend: 5000 }) }));
+  assert.equal(r.verdict, "pivot");
+  assert.equal(r.ruleId, "unprofitable_paid");
+});
+
 test("conversions but unprofitable -> PIVOT; repeated -> STOP", () => {
   const m = metric({ impressions: 3000, clicks: 90, conversions: 4, revenue: 12000, grossProfit: 4800, adSpend: 9000 });
   assert.equal(evaluateTeacher(evidence({ current: m })).verdict, "pivot");
