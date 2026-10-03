@@ -125,6 +125,3 @@ export async function POST(request: Request) {
   }
 }
 
-function postErrorOr(post: any, error: any) {
-  return Boolean(error) || !post;
-}

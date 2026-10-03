@@ -9,6 +9,11 @@ import { getXPostMetrics } from "@/lib/social/x";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+type JsonRecord = Record<string, unknown>;
+
+const asRecord = (value: unknown): JsonRecord =>
+  value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
+
 type NormalizedMetrics = {
   impressions: number; views: number; likes: number; comments: number; shares: number;
   saves: number; clicks: number; conversions: number; revenue: number; grossProfit: number; adSpend: number;
@@ -16,8 +21,12 @@ type NormalizedMetrics = {
 
 const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : Number(v || 0);
 
-function linkedinMetric(raw: any): NormalizedMetrics {
-  const metric = Array.isArray(raw?.elements) ? (raw.elements[0]?.total || raw.elements[0] || {}) : (raw?.total || raw || {});
+function linkedinMetric(raw: unknown): NormalizedMetrics {
+  const root = asRecord(raw);
+  const elements = Array.isArray(root.elements) ? root.elements : [];
+  const first = asRecord(elements[0]);
+  const total = asRecord(first.total);
+  const metric = Object.keys(total).length > 0 ? total : Object.keys(first).length > 0 ? first : asRecord(root.total);
   return {
     impressions: num(metric.IMPRESSION ?? metric.impression),
     views: 0,
@@ -30,8 +39,8 @@ function linkedinMetric(raw: any): NormalizedMetrics {
   };
 }
 
-function tiktokMetric(raw: any): NormalizedMetrics {
-  const m = raw || {};
+function tiktokMetric(raw: unknown): NormalizedMetrics {
+  const m = asRecord(raw);
   return {
     impressions: 0,
     views: num(m.view_count),
@@ -44,23 +53,30 @@ function tiktokMetric(raw: any): NormalizedMetrics {
   };
 }
 
-function instagramMetric(raw: any): NormalizedMetrics {
+function instagramMetric(raw: unknown): NormalizedMetrics {
+  const m = asRecord(raw);
   return {
-    impressions: num(raw?.impressions ?? raw?.reach),
-    views: num(raw?.views ?? raw?.plays ?? raw?.video_views),
-    likes: num(raw?.like_count),
-    comments: num(raw?.comments_count),
-    shares: num(raw?.shares),
-    saves: num(raw?.saved ?? raw?.saves),
+    impressions: num(m.impressions ?? m.reach),
+    views: num(m.views ?? m.plays ?? m.video_views),
+    likes: num(m.like_count),
+    comments: num(m.comments_count),
+    shares: num(m.shares),
+    saves: num(m.saved ?? m.saves),
     clicks: 0,
     conversions: 0, revenue: 0, grossProfit: 0, adSpend: 0,
   };
 }
 
-function facebookMetric(raw: any): NormalizedMetrics {
-  const likes = raw?.likes?.summary?.total_count ?? raw?.likes?.data?.length ?? raw?.like_count;
-  const comments = raw?.comments?.summary?.total_count ?? raw?.comments?.data?.length ?? raw?.comment_count;
-  const shares = raw?.shares?.count ?? raw?.share_count;
+function facebookMetric(raw: unknown): NormalizedMetrics {
+  const m = asRecord(raw);
+  const likesObject = asRecord(m.likes);
+  const likesSummary = asRecord(likesObject.summary);
+  const commentsObject = asRecord(m.comments);
+  const commentsSummary = asRecord(commentsObject.summary);
+  const sharesObject = asRecord(m.shares);
+  const likes = likesSummary.total_count ?? (Array.isArray(likesObject.data) ? likesObject.data.length : m.like_count);
+  const comments = commentsSummary.total_count ?? (Array.isArray(commentsObject.data) ? commentsObject.data.length : m.comment_count);
+  const shares = sharesObject.count ?? m.share_count;
   return {
     impressions: 0,
     views: num(raw?.views ?? raw?.view_count),
@@ -73,8 +89,8 @@ function facebookMetric(raw: any): NormalizedMetrics {
   };
 }
 
-function youtubeMetric(raw: any): NormalizedMetrics {
-  const s = raw?.statistics || {};
+function youtubeMetric(raw: unknown): NormalizedMetrics {
+  const s = asRecord(asRecord(raw).statistics);
   return {
     impressions: 0,
     views: num(s.viewCount),
@@ -87,8 +103,9 @@ function youtubeMetric(raw: any): NormalizedMetrics {
   };
 }
 
-function xMetric(raw: any): NormalizedMetrics {
-  const m = raw?.organicMetrics || raw?.publicMetrics || {};
+function xMetric(raw: unknown): NormalizedMetrics {
+  const root = asRecord(raw);
+  const m = asRecord(root.organicMetrics || root.publicMetrics);
   return {
     impressions: num(m.impression_count),
     views: 0,
