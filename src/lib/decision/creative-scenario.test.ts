@@ -42,10 +42,10 @@ test("scenario refuses to generate when decision says wait or stop", () => {
   assert.equal(buildCreativeScenario(blocked, evidence, 30), null);
 });
 
-test("invalid duration falls back to deterministic default", () => {
-  const scenario = buildCreativeScenario(decision, evidence, 31);
-  assert.ok(scenario);
-  assert.equal(scenario.durationSeconds, 15);
+test("unsupported explicit duration is rejected instead of silently converted", () => {
+  assert.equal(buildCreativeScenario(decision, evidence, 31), null);
+  assert.equal(buildCreativeScenario(decision, evidence, 45), null);
+  assert.equal(buildCreativeScenario(decision, evidence, 60), null);
 });
 
 test("scenario is rejected when the decision requests an uncontrolled variable", () => {
@@ -63,8 +63,7 @@ test("scenario exposes one causal chain from hook through CTA", () => {
   assert.equal(scenario.scenes.reduce((sum, scene) => sum + (scene.endSecond - scene.startSecond), 0), scenario.durationSeconds);
 });
 
-test("single-video production contract caps unsupported long requests", () => {
-  const scenario = buildCreativeScenario(decision, evidence, 60);
-  assert.ok(scenario);
-  assert.equal(scenario.durationSeconds, 15);
+test("MVP single-video contract rejects unsupported long requests", () => {
+  assert.equal(buildCreativeScenario(decision, evidence, 45), null);
+  assert.equal(buildCreativeScenario(decision, evidence, 60), null);
 });
