@@ -60,14 +60,22 @@ export async function POST(request: Request) {
     planId = plan.id;
 
     const firstPost = analysis.nextPosts?.[0];
+    const firstScenario = analysis.scenarios?.[0];
+    const scenarioId = firstScenario?.id || null;
     const { data: creative, error: creativeError } = await db.from("creatives").insert({
       product_id: productId,
       plan_id: plan.id,
       user_id: user.id,
-      title: firstPost?.concept || "広告テストクリエイティブ",
+      title: firstPost?.concept || firstScenario?.hypothesis || "広告テストクリエイティブ",
       variation: "A",
-      hook: firstPost?.hook || decision.valueProposition,
-      scenario: { concept: firstPost?.concept, hook: firstPost?.hook, format: firstPost?.format, channel: firstPost?.channel, testMetric: firstPost?.testMetric },
+      hook: firstScenario?.hook || firstPost?.hook || decision.valueProposition,
+      scenario: firstScenario ?? {
+        concept: firstPost?.concept,
+        hook: firstPost?.hook,
+        format: firstPost?.format,
+        channel: firstPost?.channel,
+        testMetric: firstPost?.testMetric,
+      },
       status: "planned",
     }).select("id").single();
     if (creativeError) throw creativeError;
@@ -77,8 +85,16 @@ export async function POST(request: Request) {
       user_id: user.id,
       network: firstPost?.channel || decision.channel,
       status: "planned",
-      caption: firstPost?.hook || decision.valueProposition,
-      metadata: { plan_id: plan.id, hypothesis: decision.testPlan },
+      caption: firstScenario?.hook || firstPost?.hook || decision.valueProposition,
+      metadata: {
+        plan_id: plan.id,
+        hypothesis: firstScenario?.hypothesis || decision.testPlan,
+        scenario_id: scenarioId,
+        scenario: firstScenario ?? null,
+        change_variable: firstScenario?.variableToChange || null,
+        primary_metric: firstScenario?.primaryMetric || firstPost?.testMetric || null,
+        variables_to_hold: firstScenario?.variablesToHold || [],
+      },
     }).select("id").single();
     if (socialPostError) throw socialPostError;
     socialPostId = socialPost.id;
