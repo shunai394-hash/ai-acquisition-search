@@ -102,6 +102,23 @@ export type TeacherResult = {
   logicVersion: string;
 };
 
+export type CreativeScenario = {
+  durationSeconds: number;
+  objective: "test_hook" | "test_angle" | "test_offer";
+  changeVariable: "hook" | "angle" | "offer";
+  scenes: Array<{
+    id: string;
+    startSecond: number;
+    endSecond: number;
+    purpose: "hook" | "problem" | "proof" | "solution" | "cta";
+    instruction: string;
+  }>;
+  continuity: {
+    keep: string[];
+    change: string[];
+  };
+};
+
 export type EvidenceItem = {
   source: "product" | "customer" | "ec_pulse" | "post_metrics" | "history" | "hypothesis";
   key: string;
@@ -127,6 +144,7 @@ export type StructuredDecision = {
     hook: string | null;
     angle: string | null;
     change_variable: "none" | "hook" | "angle" | "target" | "offer" | null;
+    scenario?: CreativeScenario | null;
   };
   teacher: TeacherResult;
   logic_version: string;

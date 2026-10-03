@@ -1,0 +1,42 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { buildCreativeScenario } from "./creative-scenario";
+import type { DecisionEvidence, StructuredDecision } from "./types";
+
+const evidence = {
+  asOf: "2026-10-03T00:00:00.000Z",
+  product: { name: "Test商品", url: null, price: 4000, cost: 1600, features: [], strengths: ["時短"], useCases: [], salesChannels: [] },
+  customer: { target: "共働き世帯", pain: "家事に時間がない", desire: "時短したい", valueProposition: "5分で使える", buyingTriggers: [], stage: null },
+  market: { status: "ok" as const, topPains: [], emergingPains: [] },
+  hypothesis: { socialPostId: "p1", network: "tiktok", caption: null, hook: "5分で終わる", angle: "時短", hypothesis: "時短に反応する", primaryMetric: "CTR", publishedAt: null, lineageVerdicts: [] },
+  current: null,
+  history: [],
+} satisfies DecisionEvidence;
+
+const decision = {
+  action_type: "reinforce_hypothesis", verdict: "continue", target_customer: "共働き世帯", hypothesis: "時短に反応する", reason: "ok", expected_outcome: "CTR", primary_metric: "CTR", learning_objective: "Hookを検証", priority: "high", evidence: [], confidence: 0.8,
+  next_action: { generate_creative: true, description: "Hook変更", hook: "5分で終わる", angle: "時短", change_variable: "hook" },
+  teacher: {} as StructuredDecision["teacher"], logic_version: "v", prompt_version: "v", model_version: "deterministic", generated_at: "2026-10-03T00:00:00.000Z", input_hash: "x",
+} satisfies StructuredDecision;
+
+test("scenario uses exact requested duration and contiguous scenes", () => {
+  const scenario = buildCreativeScenario(decision, evidence, 45);
+  assert.ok(scenario);
+  assert.equal(scenario.durationSeconds, 45);
+  assert.equal(scenario.scenes[0].startSecond, 0);
+  assert.equal(scenario.scenes.at(-1)?.endSecond, 45);
+  for (let i = 1; i < scenario.scenes.length; i++) assert.equal(scenario.scenes[i].startSecond, scenario.scenes[i - 1].endSecond);
+  assert.equal(scenario.changeVariable, "hook");
+  assert.deepEqual(scenario.continuity.change, ["冒頭Hook"]);
+});
+
+test("scenario refuses to generate when decision says wait or stop", () => {
+  const blocked = { ...decision, next_action: { ...decision.next_action, generate_creative: false, change_variable: null } };
+  assert.equal(buildCreativeScenario(blocked, evidence, 30), null);
+});
+
+test("invalid duration falls back to deterministic default", () => {
+  const scenario = buildCreativeScenario(decision, evidence, 31);
+  assert.ok(scenario);
+  assert.equal(scenario.durationSeconds, 15);
+});
