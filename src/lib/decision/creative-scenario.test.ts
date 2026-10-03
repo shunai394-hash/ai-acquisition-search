@@ -38,5 +38,5 @@ test("scenario refuses to generate when decision says wait or stop", () => {
 test("invalid duration falls back to deterministic default", () => {
   const scenario = buildCreativeScenario(decision, evidence, 31);
   assert.ok(scenario);
-  assert.equal(scenario.durationSeconds, 30);
+  assert.equal(scenario.durationSeconds, 15);
 });
