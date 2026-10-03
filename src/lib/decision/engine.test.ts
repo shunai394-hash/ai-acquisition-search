@@ -90,6 +90,8 @@ test("invalid evidence always waits instead of making a business decision", () =
     metric({ impressions: 1000, clicks: 1001 }),
     metric({ impressions: 1000, views: 1001 }),
     metric({ impressions: 1000, clicks: 100, conversions: 101 }),
+    metric({ impressions: 1000, likes: 1001 }),
+    metric({ impressions: 1000, comments: 1001 }),
   ];
   for (const current of cases.slice(0, 4)) {
     const d = buildDecision(evidence({ current }));
