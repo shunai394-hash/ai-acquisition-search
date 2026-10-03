@@ -227,7 +227,7 @@ export default function Home() {
               <a href="#loop" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Loop</a>
             </nav>
           )}
-          <span className="status">AI AD OPERATOR · LIVE</span>
+          <span className="status">AI ACQUISITION · READY</span>
           <GoogleSignIn />
           <Link href="/billing" style={{ color: "#ffffff70", fontSize: 11 }}>契約管理</Link>
         </div>
@@ -241,7 +241,7 @@ export default function Home() {
           <span>次に売るための一手を決める。</span>
         </h1>
         <p className="lead">
-          商品URLから市場・レビュー・顧客の痛点を調査。頻出する不満から商品候補と広告訴求を作り、次のテストまでつなげます。
+          商品URLを貼るだけ。市場・レビュー・顧客の声を調べ、何が刺さるかを整理し、根拠のある広告仮説と「次に試す1本」までつなげます。
         </p>
 
         <form onSubmit={analyze} className="search">
@@ -253,20 +253,21 @@ export default function Home() {
             required
           />
           <button disabled={loading}>
-            {loading ? "集客分析中..." : "集客分析を開始"}
+            {loading ? "調査しています..." : "無料で集客分析を始める"}
           </button>
         </form>
+        <p className="hint">初回はGoogleログインが必要です。分析後は「根拠 → 仮説 → 1本のテスト → 実績 → 次の改善」まで進められます。</p>
 
         {error && <p className="error">{error}</p>}
         <div className="hero-proof">
-          <div><b>01</b><strong>市場を調査</strong><span>レビュー・コメントから顧客の声を集計</span></div>
-          <div><b>02</b><strong>痛点から商品を探す</strong><span>頻出する不満を商品候補と設計方向へ</span></div>
-          <div><b>03</b><strong>広告をテストする</strong><span>痛点をHookに変えて次の検証へ</span></div>
+          <div><b>01</b><strong>何が困りごとか分かる</strong><span>商品情報と市場の声を整理して、顧客の痛点を見える化</span></div>
+          <div><b>02</b><strong>誰に何を伝えるか分かる</strong><span>顧客仮説・訴求・根拠を分けて、思いつきだけで決めない</span></div>
+          <div><b>03</b><strong>次に試す1本が分かる</strong><span>Hook・動画構成・測る数字を1つのテストにまとめる</span></div>
         </div>
         <div className="hero-loop">
           <span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span>
         </div>
-        <p className="hint">URLを1つ入力するだけ。市場のシグナルを読み、次に試すべき施策まで一本のループにします。</p>
+        <p className="hint">難しいマーケティング用語や複雑な設定は不要。まず1商品を分析し、結果を見て、次の改善へ進めます。</p>
       </section>
 
 

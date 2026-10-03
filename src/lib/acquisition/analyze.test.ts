@@ -141,3 +141,36 @@ test("scenario normalizer requires evidence even when all execution fields exist
   assert.equal(result.length, 1);
   assert.equal(result[0].archetype, "comparison_discovery");
 });
+
+test("grounded production mode keeps only evidence found in retrieved source text", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      evidence: ["UVカット機能で日差し対策をサポートします。"],
+      proof: ["UVカット機能で日差し対策をサポートします。"],
+    }),
+  ], ["商品ページ: UVカット機能で日差し対策をサポートします。薄手素材。"]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].evidence.length, 1);
+  assert.equal(result[0].proof.length, 1);
+});
+
+test("grounded production mode rejects fabricated claims instead of turning them into ad proof", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      evidence: ["医師推奨・満足度99%"],
+      proof: ["医師推奨・満足度99%"],
+    }),
+  ], ["商品ページ: UVカット機能で日差し対策をサポートします。"]);
+  assert.deepEqual(result, []);
+});
+
+test("grounded production mode filters unsupported proof without losing a supported scenario", () => {
+  const result = normalizeAcquisitionScenarios([
+    valid("empathy", {
+      evidence: ["UVカット機能で日差し対策をサポートします。"],
+      proof: ["UVカット機能で日差し対策をサポートします。", "満足度99%"],
+    }),
+  ], ["UVカット機能で日差し対策をサポートします。"]);
+  assert.equal(result.length, 1);
+  assert.deepEqual(result[0].proof, ["UVカット機能で日差し対策をサポートします。"]);
+});
