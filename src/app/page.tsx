@@ -241,21 +241,31 @@ export default function Home() {
           <span>次に売るための一手を決める。</span>
         </h1>
         <p className="lead">
-          商品URLから市場・レビュー・顧客の痛点を調査。頻出する不満から商品候補と広告訴求を作り、次のテストまでつなげます。
+          「何を売ればいいか」「誰に刺さるか」「次に何を試すか」で迷う時間を減らす。
+          商品URLを1つ渡すと、市場の声・顧客の痛点・広告仮説をつなぎ、実績を見て次の1本まで更新します。
         </p>
 
-        <form onSubmit={analyze} className="search">
+        <form onSubmit={analyze} className="search" aria-label="商品分析">
+          <label className="sr-only" htmlFor="product-url">商品URL</label>
           <input
+            id="product-url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://example.com/product"
+            placeholder="商品URLを貼る 例: https://example.com/product"
             type="url"
+            autoComplete="url"
+            inputMode="url"
             required
           />
           <button disabled={loading}>
-            {loading ? "集客分析中..." : "集客分析を開始"}
+            {loading ? "市場と顧客を分析中…" : "この商品を分析する"}
           </button>
         </form>
+        <div className="hero-promise" aria-label="この分析で分かること">
+          <div><strong>① 何が刺さる？</strong><span>市場の声から、顧客の痛点と訴求候補を整理</span></div>
+          <div><strong>② 次に何を試す？</strong><span>根拠・未検証を分け、まず試す1本を決める</span></div>
+          <div><strong>③ 次はどう改善する？</strong><span>実績を入れるとAIが判定し、次の変更点へつなぐ</span></div>
+        </div>
 
         {error && <p className="error">{error}</p>}
         <div className="hero-proof">
