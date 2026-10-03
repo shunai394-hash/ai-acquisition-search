@@ -9,6 +9,7 @@ export type HiggsfieldVideoInput = {
   resolution?: "480p" | "720p" | "1080p";
   aspectRatio?: "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "adaptive";
   generateAudio?: boolean;
+  imageUrl?: string;
 };
 
 function credentials() {
@@ -52,9 +53,33 @@ export async function generateHiggsfieldVideo(input: HiggsfieldVideoInput) {
       resolution: input.resolution ?? "1080p",
       aspect_ratio: input.aspectRatio ?? "9:16",
       generate_audio: input.generateAudio ?? false,
-      enable_thinking: false
+      enable_thinking: false,
+      ...(input.imageUrl ? { image_url: input.imageUrl } : {})
     })
   });
+}
+
+export async function uploadHiggsfieldReference(bytes: ArrayBuffer, contentType: string) {
+  if (!bytes.byteLength) throw new Error("Reference file is empty.");
+  const response = await fetch("https://api.higgsfield.ai/files/generate-upload-url", {
+    method: "POST",
+    headers: { Authorization: credentials(), "Content-Type": "application/json" },
+    body: JSON.stringify({ content_type: contentType })
+  });
+  const text = await response.text();
+  let data: unknown;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  if (!response.ok) throw new Error("Higgsfield upload URL error " + response.status + ": " + JSON.stringify(data));
+  const result = data as Record<string, unknown>;
+  const uploadUrl = typeof result.upload_url === "string" ? result.upload_url : "";
+  const publicUrl = typeof result.public_url === "string" ? result.public_url : "";
+  const uploadHeaders = result.upload_headers && typeof result.upload_headers === "object"
+    ? result.upload_headers as Record<string, string>
+    : {};
+  if (!uploadUrl || !publicUrl) throw new Error("Higgsfield upload URL response is incomplete.");
+  const upload = await fetch(uploadUrl, { method: "PUT", headers: uploadHeaders, body: bytes });
+  if (!upload.ok) throw new Error("Higgsfield reference upload failed: " + upload.status);
+  return publicUrl;
 }
 
 export async function uploadHiggsfieldReference(filePath: string) {
