@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import type { SyntheticEvent } from "react";
 import GoogleSignIn from "@/components/GoogleSignIn";
 import BillingButton from "@/components/BillingButton";
 import Link from "next/link";
@@ -46,6 +47,7 @@ export default function Home() {
   const [videoStatus, setVideoStatus] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [videoError, setVideoError] = useState("");
+  const [videoDuration, setVideoDuration] = useState<15 | 30>(15);
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -57,7 +59,7 @@ export default function Home() {
     return data.session.access_token;
   }
 
-  async function analyze(e?: FormEvent) {
+  async function analyze(e?: SyntheticEvent) {
     e?.preventDefault();
     setLoading(true);
     setError("");
@@ -74,15 +76,34 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || "分析に失敗しました。");
 
       setResult(data.data);
+      // 分析完了時にテスト計画を先に確定し、動画生成と結果計測を同じexperiment lineageへ束ねる。
+      // 保存失敗でも分析画面自体は利用可能にする。
+      try {
+        await saveTestPlan(data.data);
+      } catch {
+        // saveTestPlan handles its own user-facing error state.
+      }
       const decision = data.data?.analysis?.decision;
       const firstPost = data.data?.analysis?.nextPosts?.[0];
-      setVideoPrompt([
-        data.data?.source?.title || "商品",
-        decision?.valueProposition ? "訴求: " + decision.valueProposition : "",
-        firstPost?.hook ? "Hook: " + firstPost.hook : "",
-        decision?.format ? "形式: " + decision.format : "9:16 short-form ad",
-        "Natural UGC-style product advertising, clear first 3 seconds, factual claims only, no watermark.",
-      ].filter(Boolean).join("\n"));
+      const scenario = data.data?.analysis?.scenarios?.[0];
+      const scenarioLines = [
+        "PRODUCTION CONTRACT",
+        "Product: " + (data.data?.source?.title || "商品"),
+        "Target: " + (scenario?.targetCustomer || decision?.target || ""),
+        "Hypothesis: " + (scenario?.hypothesis || decision?.testPlan || ""),
+        "Change variable: " + (scenario?.variableToChange || "hook"),
+        "Hook: " + (scenario?.hook || firstPost?.hook || ""),
+        "Beats: " + (scenario?.beats || []).join(" → "),
+        "Proof: " + (scenario?.proof || []).join(" / "),
+        "CTA: " + (scenario?.cta || ""),
+        "Channel: " + (scenario?.channel || decision?.channel || ""),
+        "Format: " + (scenario?.format || decision?.format || "9:16 short-form ad"),
+        "Primary metric: " + (scenario?.primaryMetric || firstPost?.testMetric || ""),
+        "Hold constant: " + (scenario?.variablesToHold || []).join(", "),
+        "Rules: factual claims only; use confirmed product facts; no watermark; do not invent evidence.",
+      ].filter(Boolean);
+      setVideoPrompt(scenarioLines.join("\n"));
+      setVideoDuration((scenario?.beats?.length || 0) >= 3 || (scenario?.proof?.length || 0) >= 2 ? 30 : 15);
       setEcPulse(null);
       setEcPulseLoading(true);
       try {
@@ -121,8 +142,8 @@ export default function Home() {
     }
   }
 
-  async function saveTestPlan() {
-    if (!result) return;
+  async function saveTestPlan(inputResult: AcquisitionAnalyzeResult | null = result) {
+    if (!inputResult) return;
     setTestSaving(true);
     setTestSaved("");
     try {
@@ -136,7 +157,7 @@ export default function Home() {
       const res = await fetch("/api/operator/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` },
-        body: JSON.stringify({ source: result.source, analysis: result.analysis }),
+        body: JSON.stringify({ source: inputResult.source, analysis: inputResult.analysis }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "テスト計画の保存に失敗しました。");
@@ -159,7 +180,14 @@ export default function Home() {
       const response = await fetch("/api/video/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ prompt: videoPrompt.trim(), duration: 5, resolution: "1080p", aspectRatio: "9:16", generateAudio: false }),
+        body: JSON.stringify({
+          prompt: videoPrompt.trim(),
+          duration: videoDuration,
+          resolution: "1080p",
+          aspectRatio: "9:16",
+          generateAudio: false,
+          socialPostId: socialPostId || undefined,
+        }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "動画生成の開始に失敗しました。");
@@ -279,6 +307,48 @@ export default function Home() {
             </a>
             <small>{result.source.url}</small>
           </div>
+
+          <section className="decision-command" aria-labelledby="decision-command-title">
+            <div className="decision-command-head">
+              <div>
+                <p className="eyebrow">THE NEXT MOVE</p>
+                <h2 id="decision-command-title">AIが決めた、今回の一手</h2>
+              </div>
+              <span className="decision-command-badge">DECISION READY</span>
+            </div>
+            <div className="decision-command-grid">
+              <div className="decision-command-main">
+                <span className="decision-label">VALUE PROPOSITION</span>
+                <strong>{result.analysis.decision.valueProposition}</strong>
+                <p>{result.analysis.decision.testPlan}</p>
+              </div>
+              <div className="decision-command-side">
+                <div><span>WHO</span><strong>{result.analysis.decision.target}</strong></div>
+                <div><span>PROBLEM</span><strong>{result.analysis.decision.problem}</strong></div>
+                <div><span>CHANNEL</span><strong>{result.analysis.decision.channel} · {result.analysis.decision.format}</strong></div>
+              </div>
+            </div>
+            <div className="decision-evidence">
+              <span>DECISION EVIDENCE</span>
+              <div>{result.analysis.decision.evidence.slice(0,3).map((e,index)=><span key={index}>{e}</span>)}</div>
+            </div>
+            {result.analysis.scenarios?.[0] && (
+              <div className="decision-experiment" aria-label="広告テストの実験条件">
+                <div>
+                  <span>CHANGE</span>
+                  <strong>{result.analysis.scenarios[0].variableToChange}</strong>
+                </div>
+                <div>
+                  <span>HOLD CONSTANT</span>
+                  <strong>{result.analysis.scenarios[0].variablesToHold.join(" · ") || "対象・商品事実・主要指標"}</strong>
+                </div>
+                <div>
+                  <span>LEARNING SIGNAL</span>
+                  <strong>{result.analysis.scenarios[0].primaryMetric}</strong>
+                </div>
+              </div>
+            )}
+          </section>
 
           <section id="research" className="research-flow">
             <div className="research-head">
@@ -551,7 +621,10 @@ export default function Home() {
           <section id="decision" className="next video-generator">
             <p className="eyebrow">CREATIVE EXECUTION · HIGGSFIELD</p>
             <h2>決めた一手を、そのまま広告にする</h2>
-            <p className="hint">分析結果をもとに9:16広告動画をHiggsfield APIで生成します。HiggsfieldやCloud Codeをユーザー側で起動する必要はありません。</p>
+            <p className="hint">AIが決めた仮説を先にテストとして固定し、その同じ仮説から広告を生成します。結果は次のAI判断へ戻ります。</p>
+            <div className="loop-steps" aria-label="AI集客ループ">
+              <span className="active">01 決める</span><i>→</i><span>02 作る</span><i>→</i><span>03 測る</span><i>→</i><span>04 学ぶ</span><i>→</i><span>05 次を決める</span>
+            </div>
             <textarea
               value={videoPrompt}
               readOnly
@@ -560,9 +633,10 @@ export default function Home() {
               rows={5}
               style={{ width: "100%", marginTop: 12, padding: 14, borderRadius: 12, background: "#101012", color: "#fff", border: "1px solid #29292e" }}
             />
-            <button type="button" onClick={generateVideo} disabled={videoGenerating || !videoPrompt.trim()}>
-              {videoGenerating ? "動画生成中..." : "決定したシナリオから動画を生成"}
+            <button type="button" onClick={generateVideo} disabled={videoGenerating || !videoPrompt.trim() || !socialPostId}>
+              {videoGenerating ? "動画生成中..." : socialPostId ? "決定したシナリオから動画を生成" : "テスト計画を確定中..."}
             </button>
+            {!socialPostId && <p className="hint">テスト計画を確定してから動画を生成します。</p>}
             {videoStatus && <p className="hint">{videoStatus}</p>}
             {videoJobId && <small className="hint">Job: {videoJobId}</small>}
             {videoError && <p className="error">{videoError}</p>}
@@ -595,7 +669,7 @@ export default function Home() {
               <article><span>最初に試す</span><strong>{result.analysis.nextPosts[0]?.hook || "次の投稿仮説"}</strong><p>{result.analysis.nextPosts[0]?.channel} · {result.analysis.nextPosts[0]?.format}</p></article>
               <article><span>見る数字</span><strong>{result.analysis.nextPosts[0]?.testMetric || "CTR / CVR / CPA"}</strong><p>結果を取得したら、次の訴求・クリエイティブを変更します。</p></article>
             </div>
-            <button type="button" onClick={saveTestPlan} disabled={testSaving}>
+            <button type="button" onClick={() => void saveTestPlan()} disabled={testSaving}>
               {testSaving ? "保存中..." : "このテスト計画を保存"}
             </button>
             {testSaved && <p className="success">{testSaved}</p>}

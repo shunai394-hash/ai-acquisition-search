@@ -7,19 +7,34 @@ export const maxDuration = 60;
 
 function makePrompt(input: {
   title: string; originalHook: string; changedAngle?: string; changedHook?: string;
-  nextAction: string; network: string;
+  nextAction: string; network: string; hypothesis?: string; beats?: string[];
+  proof?: string[]; cta?: string; primaryMetric?: string; holdConstant?: string[];
 }) {
   return [
-    "Create the next short-form advertising video for iterative acquisition testing.",
+    "Create the next advertising video strictly from this locked experiment contract.",
     "Product/creative: " + input.title,
     "Original hook: " + input.originalHook,
     "Network: " + input.network,
-    "Decision: " + input.nextAction,
+    input.hypothesis ? "Hypothesis: " + input.hypothesis : "",
     input.changedAngle ? "Changed angle: " + input.changedAngle : "",
     input.changedHook ? "Changed hook: " + input.changedHook : "",
+    input.beats?.length ? "Beats: " + input.beats.join(" → ") : "",
+    input.proof?.length ? "Proof: " + input.proof.join(" / ") : "",
+    input.cta ? "CTA: " + input.cta : "",
+    input.primaryMetric ? "Primary metric: " + input.primaryMetric : "",
+    input.holdConstant?.length ? "Hold constant: " + input.holdConstant.join(", ") : "",
     "Use natural UGC-style visuals, 9:16, clear first 3 seconds, no fake claims, no watermark, no platform UI.",
-    "Keep the product recognizable and make the change from the previous creative explicit in the hook or angle.",
+    "Do not invent product facts, evidence, testimonials, prices, or performance claims.",
   ].filter(Boolean).join("\n");
+}
+
+function productionClipDuration(scenario: Record<string, unknown> | null) {
+  const requested = Number(scenario?.durationSeconds);
+  if (requested === 15 || requested === 30) return requested;
+  if (requested > 30) return 30;
+  const beats = Array.isArray(scenario?.beats) ? scenario.beats.length : 0;
+  const proof = Array.isArray(scenario?.proof) ? scenario.proof.length : 0;
+  return beats >= 3 || proof >= 2 ? 30 : 15;
 }
 
 export async function POST(request: Request) {
@@ -75,9 +90,33 @@ export async function POST(request: Request) {
         decisionRunId: pending.id,
       }, { status: 409, headers: { "Retry-After": "5" } });
     }
-    const storedVerdict = latestVerdict?.output && typeof latestVerdict.output === "object"
-      ? String((latestVerdict.output as Record<string, unknown>).verdict || "")
-      : "";
+    const storedOutput = (() => {
+      const raw = latestVerdict?.output;
+      if (raw && typeof raw === "object") return raw as Record<string, unknown>;
+      if (typeof raw === "string") {
+        try {
+          const parsed: unknown = JSON.parse(raw);
+          return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    })();
+    const storedDecision = storedOutput?.decision && typeof storedOutput.decision === "object"
+      ? storedOutput.decision as Record<string, unknown>
+      : null;
+    const storedNextAction = storedDecision?.next_action && typeof storedDecision.next_action === "object"
+      ? storedDecision.next_action as Record<string, unknown>
+      : null;
+    const storedScenario = storedNextAction?.scenario && typeof storedNextAction.scenario === "object"
+      ? storedNextAction.scenario as Record<string, unknown>
+      : null;
+    const storedVerdict = String(storedOutput?.verdict || storedDecision?.verdict || "");
+    const storedGenerateCreative = storedNextAction?.generate_creative;
+    if (storedGenerateCreative === false) {
+      return NextResponse.json({ error: "最新のDecisionがクリエイティブ生成を許可していません。", code: "creative_generation_not_allowed" }, { status: 409 });
+    }
     if (storedVerdict === "stop" || storedVerdict === "wait") {
       return NextResponse.json({
         error: storedVerdict === "stop" ? "最新のTeacher判定がSTOPのため次Creativeを生成しません。" : "最新のTeacher判定がWAIT(データ不足)のため次Creativeを生成しません。",
@@ -145,16 +184,35 @@ export async function POST(request: Request) {
     if (creativeError) throw creativeError;
     if (!creative) return NextResponse.json({ error: "元クリエイティブが見つかりません。" }, { status: 404 });
 
-    const verdict = body.verdict || (storedVerdict === "continue" || storedVerdict === "pivot" ? storedVerdict : "pivot");
-    const nextAction = body.nextAction || "前回と異なるHookと訴求で再テストする";
-    const hook = body.changedHook || (
-      verdict === "continue"
-        ? (creative.hook || "この商品の別の使い方、知っていますか？")
-        : "前の広告とは違う視点で、この商品を見てください。"
+    const verdict = storedVerdict === "continue" || storedVerdict === "pivot"
+      ? storedVerdict
+      : body.verdict || "pivot";
+    const lockedScenario = storedScenario;
+    const lockedChangeVariable = lockedScenario && ["hook", "angle", "offer"].includes(String(lockedScenario.changeVariable))
+      ? String(lockedScenario.changeVariable)
+      : null;
+    const changeVariable = lockedChangeVariable || (
+      storedNextAction?.change_variable === "hook" || storedNextAction?.change_variable === "angle" || storedNextAction?.change_variable === "offer"
+        ? storedNextAction.change_variable
+        : verdict === "continue" ? "hook" : "angle"
     );
-    const angle = body.changedAngle || (
-      verdict === "continue" ? "同一訴求の別Hook" : "前回と異なる顧客課題・訴求"
-    );
+    const scenarioScenes = lockedScenario && Array.isArray(lockedScenario.scenes)
+      ? lockedScenario.scenes.filter((scene): scene is Record<string, unknown> => !!scene && typeof scene === "object")
+      : [];
+    const scenarioScene = (purpose: string) => scenarioScenes.find((scene) => scene.purpose === purpose);
+    const nextAction = typeof storedNextAction?.description === "string"
+      ? storedNextAction.description
+      : body.nextAction || "前回と異なる条件を1つだけ変更して再テストする";
+    const hook = lockedScenario
+      ? String(scenarioScene("hook")?.instruction || storedNextAction?.hook || creative.hook || "")
+      : body.changedHook || String(storedNextAction?.hook || (verdict === "continue" ? creative.hook || "冒頭で顧客課題を明確に提示する" : "前回とは異なる顧客課題の視点を提示する"));
+    const angle = lockedScenario
+      ? String(storedNextAction?.angle || scenarioScene("solution")?.instruction || "")
+      : body.changedAngle || String(storedNextAction?.angle || (verdict === "continue" ? "同一訴求の別Hook" : "前回と異なる顧客課題・訴求"));
+    const scenario = storedScenario || (creative.scenario && typeof creative.scenario === "object"
+      ? creative.scenario as Record<string, unknown>
+      : null);
+    const duration = productionClipDuration(scenario);
 
     const { data: nextCreative, error: nextCreativeError } = await db.from("creatives").insert({
       product_id: creative.product_id,
@@ -167,9 +225,14 @@ export async function POST(request: Request) {
         type: "iterative_ad",
         source_creative_id: creative.id,
         verdict,
+        change_variable: changeVariable,
         angle,
         next_action: nextAction,
-        test_metric: body.testMetric || "CTR / CVR / ROAS",
+        test_metric: lockedScenario && typeof lockedScenario.primaryMetric === "string"
+          ? lockedScenario.primaryMetric
+          : (typeof storedDecision?.primary_metric === "string" ? storedDecision.primary_metric : body.testMetric || "CTR / CVR / ROAS"),
+        decision_scenario: scenario,
+        production_clip_duration_seconds: duration,
         scenes: [
           { order: 1, role: "hook", text: hook },
           { order: 2, role: "problem", text: verdict === "continue" ? "前回と同じ顧客課題を、別の切り口で具体化する" : "前回と異なる顧客課題を具体化する" },
@@ -196,7 +259,8 @@ export async function POST(request: Request) {
         operator_decision_run_id: latestVerdict?.id ?? null,
         iteration_angle: angle,
         test_metric: body.testMetric || "CTR / CVR / ROAS",
-        auto_publish: true,
+        // MVPでは投稿公開は人が最終確認する。AI循環は「判断→制作→計測→再判断」まで自動化し、公開操作は勝手に行わない。
+        auto_publish: false,
       }
     }).select("id,network,status,caption,metadata").single();
     if (nextPostError || !nextPost) throw new Error(nextPostError?.message || "次の投稿レコード作成に失敗しました。");
@@ -211,6 +275,23 @@ export async function POST(request: Request) {
         changedHook: hook,
         nextAction,
         network: post.network,
+        hypothesis: typeof storedDecision?.hypothesis === "string" ? storedDecision.hypothesis : undefined,
+        beats: Array.isArray(scenario?.scenes) ? scenario.scenes.map((scene) => {
+          if (!scene || typeof scene !== "object") return "";
+          return String((scene as Record<string, unknown>).instruction || "");
+        }).filter(Boolean) : [],
+        proof: Array.isArray(scenario?.proof) ? scenario.proof.map(String) : [],
+        cta: Array.isArray(scenario?.scenes)
+          ? String((scenario.scenes.find((scene) => scene && typeof scene === "object" && (scene as Record<string, unknown>).purpose === "cta") as Record<string, unknown> | undefined)?.instruction || "")
+          : "",
+        primaryMetric: lockedScenario && typeof lockedScenario.primaryMetric === "string"
+          ? lockedScenario.primaryMetric
+          : typeof storedDecision?.primary_metric === "string" ? storedDecision.primary_metric : body.testMetric,
+        holdConstant: scenario?.continuity && typeof scenario.continuity === "object" && Array.isArray((scenario.continuity as Record<string, unknown>).keep)
+          ? ((scenario.continuity as Record<string, unknown>).keep as unknown[]).map(String)
+          : Array.isArray(scenario?.variablesToHold)
+            ? scenario.variablesToHold.map(String)
+            : [],
       });
 
       const { data: job, error: jobError } = await db.from("production_jobs").insert({
@@ -221,7 +302,7 @@ export async function POST(request: Request) {
         model: process.env.HF_VIDEO_MODEL || "alibaba/wan-3.0/text-to-video",
         status: "queued",
         prompt,
-        duration: 5,
+        duration,
         resolution: "1080p",
         aspect_ratio: "9:16",
         generate_audio: false

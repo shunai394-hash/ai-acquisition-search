@@ -103,6 +103,13 @@ export type TeacherResult = {
 };
 
 export type CreativeScenario = {
+  /** Self-contained experiment contract for exactly one production creative. */
+  scenarioVersion: "creative-scenario-1";
+  targetCustomer: string;
+  productName: string;
+  hypothesis: string;
+  primaryMetric: string;
+  learningObjective: string;
   durationSeconds: number;
   objective: "test_hook" | "test_angle" | "test_offer";
   changeVariable: "hook" | "angle" | "offer";

@@ -180,7 +180,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
       }
 
       // STOP: never generate. WAIT (insufficient data): re-evaluate on a later run.
-      const verdict = decision.payload?.verdict;
+      const verdict = decision.payload?.verdict ?? (decision.payload?.decision && typeof decision.payload.decision === "object" ? String((decision.payload.decision as Record<string, unknown>).verdict || "") : undefined);
       if (verdict === "stop" || verdict === "wait" || decision.payload?.generateCreative === false) {
         results.push({
           postId: post.id,
