@@ -75,6 +75,13 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || "分析に失敗しました。");
 
       setResult(data.data);
+      // 分析完了時にテスト計画を先に確定し、動画生成と結果計測を同じexperiment lineageへ束ねる。
+      // 保存失敗でも分析画面自体は利用可能にする。
+      try {
+        await saveTestPlan(data.data);
+      } catch {
+        // saveTestPlan handles its own user-facing error state.
+      }
       const decision = data.data?.analysis?.decision;
       const firstPost = data.data?.analysis?.nextPosts?.[0];
       const scenario = data.data?.analysis?.scenarios?.[0];
@@ -134,8 +141,8 @@ export default function Home() {
     }
   }
 
-  async function saveTestPlan() {
-    if (!result) return;
+  async function saveTestPlan(inputResult: AcquisitionAnalyzeResult | null = result) {
+    if (!inputResult) return;
     setTestSaving(true);
     setTestSaved("");
     try {
@@ -149,7 +156,7 @@ export default function Home() {
       const res = await fetch("/api/operator/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` },
-        body: JSON.stringify({ source: result.source, analysis: result.analysis }),
+        body: JSON.stringify({ source: inputResult.source, analysis: inputResult.analysis }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "テスト計画の保存に失敗しました。");
@@ -613,7 +620,10 @@ export default function Home() {
           <section id="decision" className="next video-generator">
             <p className="eyebrow">CREATIVE EXECUTION · HIGGSFIELD</p>
             <h2>決めた一手を、そのまま広告にする</h2>
-            <p className="hint">分析結果をもとに9:16広告動画をHiggsfield APIで生成します。HiggsfieldやCloud Codeをユーザー側で起動する必要はありません。</p>
+            <p className="hint">AIが決めた仮説を先にテストとして固定し、その同じ仮説から広告を生成します。結果は次のAI判断へ戻ります。</p>
+            <div className="loop-steps" aria-label="AI集客ループ">
+              <span className="active">01 決める</span><i>→</i><span>02 作る</span><i>→</i><span>03 測る</span><i>→</i><span>04 学ぶ</span><i>→</i><span>05 次を決める</span>
+            </div>
             <textarea
               value={videoPrompt}
               readOnly
@@ -622,9 +632,10 @@ export default function Home() {
               rows={5}
               style={{ width: "100%", marginTop: 12, padding: 14, borderRadius: 12, background: "#101012", color: "#fff", border: "1px solid #29292e" }}
             />
-            <button type="button" onClick={generateVideo} disabled={videoGenerating || !videoPrompt.trim()}>
-              {videoGenerating ? "動画生成中..." : "決定したシナリオから動画を生成"}
+            <button type="button" onClick={generateVideo} disabled={videoGenerating || !videoPrompt.trim() || !socialPostId}>
+              {videoGenerating ? "動画生成中..." : socialPostId ? "決定したシナリオから動画を生成" : "テスト計画を確定中..."}
             </button>
+            {!socialPostId && <p className="hint">テスト計画を確定してから動画を生成します。</p>}
             {videoStatus && <p className="hint">{videoStatus}</p>}
             {videoJobId && <small className="hint">Job: {videoJobId}</small>}
             {videoError && <p className="error">{videoError}</p>}
