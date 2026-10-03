@@ -99,6 +99,30 @@ test("invalid evidence always waits instead of making a business decision", () =
   }
 });
 
+test("invalid metric timestamp is rejected instead of being treated as usable evidence", () => {
+  const d = buildDecision(evidence({
+    current: metric({ impressions: 4000, clicks: 120, measuredAt: "not-a-date" }),
+  }));
+  assert.equal(d.verdict, "wait");
+  assert.equal(d.teacher.ruleId, "evidence_quality");
+  assert.ok(d.teacher.missingData.includes("metric_measured_at_invalid"));
+});
+
+test("invalid EC-Pulse capture timestamp is rejected instead of being treated as usable evidence", () => {
+  const d = buildDecision(evidence({
+    market: {
+      status: "ok",
+      capturedAt: "not-a-date",
+      topPains: [],
+      emergingPains: [],
+    },
+    current: metric({ impressions: 4000, clicks: 120 }),
+  }));
+  assert.equal(d.verdict, "wait");
+  assert.equal(d.teacher.ruleId, "evidence_quality");
+  assert.ok(d.teacher.missingData.includes("market_evidence_captured_at_invalid"));
+});
+
 test("metric measured after decision time is rejected", () => {
   const d = buildDecision(evidence({
     asOf: "2026-10-01T00:00:00.000Z",
