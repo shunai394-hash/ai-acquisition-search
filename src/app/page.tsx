@@ -87,6 +87,8 @@ export default function Home() {
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [metrics, setMetrics] = useState({ impressions:"", views:"", clicks:"", conversions:"", revenue:"", grossProfit:"", adSpend:"" });
   const [verdict, setVerdict] = useState<{verdict:string;reason:string}|null>(null);
+  const [nextCreative, setNextCreative] = useState<{title?:string;hook?:string;scenario?:{angle?:string;next_action?:string}}|null>(null);
+  const [nextCreativeLoading, setNextCreativeLoading] = useState(false);
   const [socialPostId, setSocialPostId] = useState("");
   const [researchHistory, setResearchHistory] = useState<EcPulseResearchRun[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -242,6 +244,34 @@ export default function Home() {
       setVideoGenerating(false);
     }
   }
+  async function createNextCreative() {
+    if (!socialPostId || !verdict || !["continue", "pivot"].includes(verdict.verdict)) return;
+    setNextCreativeLoading(true);
+    setNextCreative(null);
+    setError("");
+    try {
+      const token = await getAccessToken();
+      const response = await fetch("/api/operator/next-creative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({
+          socialPostId,
+          verdict: verdict.verdict,
+          nextAction: verdict.reason,
+          testMetric: "CTR / CVR",
+          autoGenerate: true,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "次のクリエイティブ作成に失敗しました。");
+      setNextCreative(body.creative || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "次のクリエイティブ作成に失敗しました。");
+    } finally {
+      setNextCreativeLoading(false);
+    }
+  }
+
   async function saveMetrics() {
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -641,7 +671,26 @@ export default function Home() {
               <p className="hint">テスト計画を保存すると投稿IDが自動発行されます。投稿後の実績を入力してください。</p>
               <button type="button" onClick={saveMetrics}>実績を保存してAI判定</button>
             </div>}
-            {verdict && <div className="verdict"><strong>{verdict.verdict}</strong><p>{verdict.reason}</p></div>}
+            {verdict && (
+              <div className="verdict">
+                <strong>{verdict.verdict === "continue" ? "CONTINUE · 継続" : verdict.verdict === "pivot" ? "PIVOT · 変更" : verdict.verdict === "stop" ? "STOP · 停止" : "WAIT · データ待ち"}</strong>
+                <p>{verdict.reason}</p>
+                {["continue", "pivot"].includes(verdict.verdict) && (
+                  <button type="button" className="primary-action" onClick={createNextCreative} disabled={nextCreativeLoading || !socialPostId}>
+                    {nextCreativeLoading ? "次の1本を設計中..." : "この判定から次の1本を作る"}
+                  </button>
+                )}
+                {nextCreative && (
+                  <div className="next-creative-card">
+                    <span>NEXT CREATIVE</span>
+                    <strong>{nextCreative.title || "次のクリエイティブ"}</strong>
+                    <p>{nextCreative.hook || "新しいHookを設定しました。"}</p>
+                    {nextCreative.scenario?.angle && <small>変更する軸: {nextCreative.scenario.angle}</small>}
+                    <small>動画ジョブをキューに登録。前回と同じ投稿の重複生成を防ぎます。</small>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <section className="next test-loop">
