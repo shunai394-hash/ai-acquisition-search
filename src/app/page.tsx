@@ -46,6 +46,9 @@ export default function Home() {
   const [videoStatus, setVideoStatus] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [videoError, setVideoError] = useState("");
+  const [videoImage, setVideoImage] = useState<File | null>(null);
+  const [videoImagePreview, setVideoImagePreview] = useState("");
+  const [videoMode, setVideoMode] = useState<"simple" | "guided">("simple");
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -158,8 +161,17 @@ export default function Home() {
       const token = await getAccessToken();
       const response = await fetch("/api/video/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ prompt: videoPrompt.trim(), duration: 5, resolution: "1080p", aspectRatio: "9:16", generateAudio: false }),
+        headers: { Authorization: "Bearer " + token },
+        body: (() => {
+          const form = new FormData();
+          form.set("prompt", videoPrompt.trim());
+          form.set("duration", "5");
+          form.set("resolution", "1080p");
+          form.set("aspectRatio", "9:16");
+          form.set("generateAudio", "false");
+          if (videoImage) form.set("image", videoImage);
+          return form;
+        })(),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "動画生成の開始に失敗しました。");
@@ -551,17 +563,36 @@ export default function Home() {
           <section id="decision" className="next video-generator">
             <p className="eyebrow">CREATIVE EXECUTION · HIGGSFIELD</p>
             <h2>決めた一手を、そのまま広告にする</h2>
-            <p className="hint">分析結果をもとに9:16広告動画をHiggsfield APIで生成します。HiggsfieldやCloud Codeをユーザー側で起動する必要はありません。</p>
+            <p className="hint">商品画像とあなたの指示だけで作れます。AIが裏側で動画用の指示に整理し、Higgsfieldで生成します。</p>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button type="button" onClick={() => setVideoMode("simple")} disabled={videoMode === "simple"}>AIにおまかせ</button>
+              <button type="button" onClick={() => setVideoMode("guided")} disabled={videoMode === "guided"}>プロンプトを細かく指定</button>
+            </div>
+            <label style={{ display: "block", marginTop: 14 }}>
+              <span className="hint">商品画像</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  setVideoImage(file);
+                  setVideoImagePreview(file ? URL.createObjectURL(file) : "");
+                }}
+                style={{ display: "block", marginTop: 8 }}
+              />
+            </label>
+            {videoImagePreview && <img src={videoImagePreview} alt="動画生成に使う商品画像" style={{ width: 140, height: 140, objectFit: "cover", borderRadius: 14, marginTop: 10 }} />}
             <textarea
               value={videoPrompt}
-              readOnly
-              aria-label="AIが決定した動画シナリオ"
-              placeholder="分析結果からAIが動画シナリオを生成します"
-              rows={5}
+              onChange={(e) => setVideoPrompt(e.target.value)}
+              aria-label="動画への指示"
+              placeholder="例：この商品を20代女性向けTikTok広告に。最初の3秒で商品の魅力を見せ、最後に購入を促して。"
+              rows={videoMode === "simple" ? 4 : 7}
               style={{ width: "100%", marginTop: 12, padding: 14, borderRadius: 12, background: "#101012", color: "#fff", border: "1px solid #29292e" }}
             />
-            <button type="button" onClick={generateVideo} disabled={videoGenerating || !videoPrompt.trim()}>
-              {videoGenerating ? "動画生成中..." : "決定したシナリオから動画を生成"}
+            <p className="hint">生成後も「もっと商品を大きく」「カメラをゆっくり」など、指示を変えて再生成できます。</p>
+            <button type="button" onClick={generateVideo} disabled={videoGenerating || !videoPrompt.trim() || !videoImage}>
+              {videoGenerating ? "動画生成中..." : "🎬 動画を作成"}
             </button>
             {videoStatus && <p className="hint">{videoStatus}</p>}
             {videoJobId && <small className="hint">Job: {videoJobId}</small>}
