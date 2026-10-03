@@ -299,13 +299,13 @@ export default function Home() {
         {error && <p className="error">{error}</p>}
         <div className="hero-proof">
           <div><b>01</b><strong>市場を調査</strong><span>レビュー・コメントから顧客の声を集計</span></div>
-          <div><b>02</b><strong>痛点から商品を探す</strong><span>頻出する不満を商品候補と設計方向へ</span></div>
-          <div><b>03</b><strong>広告をテストする</strong><span>痛点をHookに変えて次の検証へ</span></div>
+          <div><b>02</b><strong>次の訴求を決める</strong><span>顧客の痛点から、今回変える一手を1つに絞る</span></div>
+          <div><b>03</b><strong>広告をテストする</strong><span>決めた仮説を15秒 / 30秒のクリエイティブへ</span></div>
         </div>
         <div className="hero-loop">
-          <span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span>
+          <span>RESEARCH</span><i>→</i><span>CUSTOMER SIGNAL</span><i>→</i><span>NEXT MOVE</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span>
         </div>
-        <p className="hint">プロンプトを書く必要はありません。AIが判断の根拠を示し、同じ実験条件を保ったまま次の判断へ循環します。</p>
+        <p className="hint">プロンプトを書く必要はありません。AIが判断の根拠と「今回変えるもの / 変えないもの」を示し、結果を次の判断へ循環させます。</p>
       </section>
 
 
