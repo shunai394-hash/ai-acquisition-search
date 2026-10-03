@@ -28,7 +28,11 @@ function splitDuration(duration: Duration) {
   if (duration === 30) return { hook: 3, problem: 6, proof: 7, solution: 9, cta: 5 };
   if (duration === 45) return { hook: 3, problem: 8, proof: 10, solution: 15, cta: 9 };
   if (duration === 60) return { hook: 3, problem: 12, proof: 15, solution: 20, cta: 10 };
-  if (duration === 90) return { hook: 3, problem: 17, proof: 20, solution: 35, cta: 15 };\n  const hook = 5;\n  const cta = Math.round(duration * 0.08);\n  const remaining = duration - hook - cta;\n  return { hook, problem: Math.round(remaining * 0.22), proof: Math.round(remaining * 0.28), solution: remaining - Math.round(remaining * 0.22) - Math.round(remaining * 0.28), cta };
+  if (duration === 90) return { hook: 3, problem: 17, proof: 20, solution: 35, cta: 15 };
+  const hook = 5;
+  const cta = Math.round(duration * 0.08);
+  const remaining = duration - hook - cta;
+  return { hook, problem: Math.round(remaining * 0.22), proof: Math.round(remaining * 0.28), solution: remaining - Math.round(remaining * 0.22) - Math.round(remaining * 0.28), cta };
 }
 
 /** Builds a deterministic production scaffold from a locked decision. */
