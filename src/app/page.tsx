@@ -25,6 +25,56 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+const GOLD_STEPS = [
+  ["01", "商品理解", "何を売る商品か"],
+  ["02", "市場・顧客", "誰の悩みか"],
+  ["03", "広告仮説", "何を1本で試すか"],
+  ["04", "制作", "動画・投稿を作る"],
+  ["05", "実績", "数字を記録する"],
+  ["06", "AI改善", "次の1本へ反映"],
+] as const;
+
+function GoldCaseProgress({
+  hasResult,
+  hasVideo,
+  hasPlan,
+  hasVerdict,
+  researchLoading,
+}: {
+  hasResult: boolean;
+  hasVideo: boolean;
+  hasPlan: boolean;
+  hasVerdict: boolean;
+  researchLoading: boolean;
+}) {
+  const active = !hasResult ? 0 : hasVerdict ? 5 : hasVideo ? 4 : hasPlan ? 3 : researchLoading ? 1 : 2;
+  return (
+    <section className="gold-progress" aria-label="1本の検証進捗">
+      <div className="gold-progress-head">
+        <div>
+          <p className="eyebrow">ONE PRODUCT · ONE TEST</p>
+          <h2>まず1本を、最後まで通す</h2>
+          <p>分析で終わらせず、制作 → 実績 → AI判定 → 次の改善までつなげます。</p>
+        </div>
+        <span>{hasVerdict ? "LOOP READY" : "IN PROGRESS"}</span>
+      </div>
+      <div className="gold-steps">
+        {GOLD_STEPS.map(([number, title, detail], index) => {
+          const done = index < active || (index === 5 && hasVerdict);
+          const current = index === active && !done;
+          return (
+            <div className={done ? "gold-step done" : current ? "gold-step current" : "gold-step"} key={number}>
+              <b>{done ? "✓" : number}</b>
+              <strong>{title}</strong>
+              <small>{detail}</small>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<AcquisitionAnalyzeResult | null>(null);
@@ -37,6 +87,8 @@ export default function Home() {
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [metrics, setMetrics] = useState({ impressions:"", views:"", clicks:"", conversions:"", revenue:"", grossProfit:"", adSpend:"" });
   const [verdict, setVerdict] = useState<{verdict:string;reason:string}|null>(null);
+  const [nextCreative, setNextCreative] = useState<{title?:string;hook?:string;scenario?:{angle?:string;next_action?:string}}|null>(null);
+  const [nextCreativeLoading, setNextCreativeLoading] = useState(false);
   const [socialPostId, setSocialPostId] = useState("");
   const [researchHistory, setResearchHistory] = useState<EcPulseResearchRun[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -192,6 +244,34 @@ export default function Home() {
       setVideoGenerating(false);
     }
   }
+  async function createNextCreative() {
+    if (!socialPostId || !verdict || !["continue", "pivot"].includes(verdict.verdict)) return;
+    setNextCreativeLoading(true);
+    setNextCreative(null);
+    setError("");
+    try {
+      const token = await getAccessToken();
+      const response = await fetch("/api/operator/next-creative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({
+          socialPostId,
+          verdict: verdict.verdict,
+          nextAction: verdict.reason,
+          testMetric: "CTR / CVR",
+          autoGenerate: true,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "次のクリエイティブ作成に失敗しました。");
+      setNextCreative(body.creative || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "次のクリエイティブ作成に失敗しました。");
+    } finally {
+      setNextCreativeLoading(false);
+    }
+  }
+
   async function saveMetrics() {
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -236,12 +316,12 @@ export default function Home() {
       <section className="hero">
         <p className="eyebrow">AI CUSTOMER ACQUISITION · DECISION ENGINE</p>
         <h1>
-          市場の声から、
+          商品URLを貼る。
           <br />
-          <span>次に売るための一手を決める。</span>
+          <span>次に売る一手を、1本にする。</span>
         </h1>
         <p className="lead">
-          商品URLから市場・レビュー・顧客の痛点を調査。頻出する不満から商品候補と広告訴求を作り、次のテストまでつなげます。
+          商品を理解し、市場の声から顧客仮説と広告仮説をつくる。さらに動画制作・実績計測・AI改善まで、次の一手を一本のループでつなぎます。
         </p>
 
         <form onSubmit={analyze} className="search">
@@ -253,7 +333,7 @@ export default function Home() {
             required
           />
           <button disabled={loading}>
-            {loading ? "集客分析中..." : "集客分析を開始"}
+            {loading ? "集客分析中..." : "無料で1商品を分析"}
           </button>
         </form>
 
@@ -266,12 +346,19 @@ export default function Home() {
         <div className="hero-loop">
           <span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span>
         </div>
-        <p className="hint">URLを1つ入力するだけ。市場のシグナルを読み、次に試すべき施策まで一本のループにします。</p>
+        <p className="hero-trust">入力は商品URLだけ · 不明な情報は「未検証」として扱う · 最終判断は実績データで更新</p>
       </section>
 
 
       {result && (
         <div className="results">
+          <GoldCaseProgress
+            hasResult={Boolean(result)}
+            hasVideo={Boolean(videoUrl)}
+            hasPlan={Boolean(socialPostId)}
+            hasVerdict={Boolean(verdict)}
+            researchLoading={ecPulseLoading}
+          />
           <div className="source">
             <span>分析対象</span>
             <a href={result.source.url} target="_blank" rel="noreferrer">
@@ -577,13 +664,33 @@ export default function Home() {
             <p className="eyebrow">PERFORMANCE LOOP</p>
             <h2>投稿結果を入れて、次の判断へ</h2>
             <p className="hint">投稿後の数字を保存すると、AIが継続・ピボット・停止の次アクションを判断します。</p>
-            <button type="button" onClick={()=>setMetricsOpen(!metricsOpen)}>{metricsOpen ? "入力を閉じる" : "実績を入力する"}</button>
+            <button type="button" className="primary-action" onClick={()=>setMetricsOpen(!metricsOpen)}>{metricsOpen ? "入力を閉じる" : "実績を入力する"}</button>
             {metricsOpen && <div className="metrics-form">
               {(["impressions","views","clicks","conversions","revenue","grossProfit","adSpend"] as const).map(k=><label key={k}>{k}<input type="number" value={metrics[k]} onChange={e=>setMetrics({...metrics,[k]:e.target.value})}/></label>)}
+              <p className="metric-note"><strong>実測値だけを入力してください。</strong> 未計測は空欄のまま。空欄を0として扱わず、AIが「不明」として次の判断に反映します。</p>
               <p className="hint">テスト計画を保存すると投稿IDが自動発行されます。投稿後の実績を入力してください。</p>
               <button type="button" onClick={saveMetrics}>実績を保存してAI判定</button>
             </div>}
-            {verdict && <div className="verdict"><strong>{verdict.verdict}</strong><p>{verdict.reason}</p></div>}
+            {verdict && (
+              <div className="verdict">
+                <strong>{verdict.verdict === "continue" ? "CONTINUE · 継続" : verdict.verdict === "pivot" ? "PIVOT · 変更" : verdict.verdict === "stop" ? "STOP · 停止" : "WAIT · データ待ち"}</strong>
+                <p>{verdict.reason}</p>
+                {["continue", "pivot"].includes(verdict.verdict) && (
+                  <button type="button" className="primary-action" onClick={createNextCreative} disabled={nextCreativeLoading || !socialPostId}>
+                    {nextCreativeLoading ? "次の1本を設計中..." : "この判定から次の1本を作る"}
+                  </button>
+                )}
+                {nextCreative && (
+                  <div className="next-creative-card">
+                    <span>NEXT CREATIVE</span>
+                    <strong>{nextCreative.title || "次のクリエイティブ"}</strong>
+                    <p>{nextCreative.hook || "新しいHookを設定しました。"}</p>
+                    {nextCreative.scenario?.angle && <small>変更する軸: {nextCreative.scenario.angle}</small>}
+                    <small>動画ジョブをキューに登録。前回と同じ投稿の重複生成を防ぎます。</small>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <section className="next test-loop">
