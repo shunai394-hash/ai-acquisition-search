@@ -249,7 +249,8 @@ export async function POST(request: Request) {
         operator_decision_run_id: latestVerdict?.id ?? null,
         iteration_angle: angle,
         test_metric: body.testMetric || "CTR / CVR / ROAS",
-        auto_publish: true,
+        // MVPでは投稿公開は人が最終確認する。AI循環は「判断→制作→計測→再判断」まで自動化し、公開操作は勝手に行わない。
+        auto_publish: false,
       }
     }).select("id,network,status,caption,metadata").single();
     if (nextPostError || !nextPost) throw new Error(nextPostError?.message || "次の投稿レコード作成に失敗しました。");
