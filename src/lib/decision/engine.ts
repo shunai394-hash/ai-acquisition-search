@@ -3,7 +3,7 @@ import { buildCreativeScenario } from "./creative-scenario";
 import { TEACHER_LOGIC_VERSION, TEACHER_THRESHOLDS, eligibleHistory, evaluateTeacher } from "./teacher";
 import type { DecisionEvidence, EvidenceItem, StructuredDecision, TeacherResult } from "./types";
 
-export const DECISION_LOGIC_VERSION = `decision-2026.10.2+${TEACHER_LOGIC_VERSION}`;
+export const DECISION_LOGIC_VERSION = `decision-2026.10.3+${TEACHER_LOGIC_VERSION}`;
 export const DECISION_PROMPT_VERSION = "next-action-refine-v1";
 
 function evidenceQuality(evidence: DecisionEvidence): { ok: boolean; issues: string[] } {
@@ -37,6 +37,28 @@ function evidenceQuality(evidence: DecisionEvidence): { ok: boolean; issues: str
 }
 
 const OFFER_RULES = new Set(["no_conversion_paid", "ctr_ok_cvr_zero", "unprofitable_paid"]);
+const MARKET_MAX_AGE_DAYS = 14;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function marketEvidenceIsFresh(evidence: DecisionEvidence) {
+  if (evidence.market.status !== "ok" || !evidence.market.capturedAt) return false;
+  const capturedAt = Date.parse(evidence.market.capturedAt);
+  const asOf = Date.parse(evidence.asOf);
+  return Number.isFinite(capturedAt) && Number.isFinite(asOf) && asOf - capturedAt <= MARKET_MAX_AGE_DAYS * DAY_MS;
+}
+
+function decisionInputIssues(evidence: DecisionEvidence, teacher: TeacherResult) {
+  const issues: string[] = [];
+  if (!evidence.product.name) issues.push("product.name_missing");
+  if (!evidence.product.url) issues.push("product.url_missing");
+  if (!evidence.customer.target) issues.push("customer.target_missing");
+  if (!evidence.customer.pain && !evidence.customer.desire) issues.push("customer.pain_or_desire_missing");
+  if (!evidence.hypothesis.hypothesis) issues.push("hypothesis.statement_missing");
+  if (!evidence.hypothesis.primaryMetric) issues.push("hypothesis.primary_metric_missing");
+  if (!evidence.hypothesis.socialPostId || !evidence.hypothesis.network) issues.push("hypothesis.identity_missing");
+  if (teacher.verdict !== "wait" && !evidence.current) issues.push("current_metrics_missing");
+  return issues;
+}
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value ?? null);
@@ -71,10 +93,12 @@ function nextPain(evidence: DecisionEvidence) {
       .filter((x): x is string => Boolean(x)),
   );
   const isUsed = (pain: string) => [...used].some((u) => u.includes(pain));
-  const emerging = evidence.market.emergingPains.find((p) => !isUsed(p.pain));
-  if (emerging) return { pain: emerging.pain, source: "ec_pulse.emerging_pain" };
-  const top = evidence.market.topPains.find((p) => !isUsed(p.pain));
-  if (top) return { pain: top.pain, source: "ec_pulse.top_pain" };
+  if (marketEvidenceIsFresh(evidence)) {
+    const emerging = evidence.market.emergingPains.find((p) => !isUsed(p.pain));
+    if (emerging) return { pain: emerging.pain, source: "ec_pulse.emerging_pain" };
+    const top = evidence.market.topPains.find((p) => !isUsed(p.pain));
+    if (top) return { pain: top.pain, source: "ec_pulse.top_pain" };
+  }
   if (evidence.customer.pain && evidence.customer.pain !== evidence.hypothesis.angle) {
     return { pain: evidence.customer.pain, source: "customer.pain" };
   }
@@ -140,16 +164,17 @@ function buildEvidenceItems(evidence: DecisionEvidence, teacher: TeacherResult):
 export function buildDecision(evidence: DecisionEvidence, now = new Date()): StructuredDecision {
   const quality = evidenceQuality(evidence);
   const baseTeacher = evaluateTeacher(evidence);
-  const teacher: TeacherResult = quality.ok
+  const inputIssues = decisionInputIssues(evidence, baseTeacher);
+  const teacher: TeacherResult = quality.ok && inputIssues.length === 0
     ? baseTeacher
     : {
         ...baseTeacher,
         verdict: "wait",
         status: "insufficient_data",
         ruleId: "evidence_quality",
-        reason: `証拠の整合性を確認できないため判定を保留: ${quality.issues.join(", ")}`,
+        reason: `判断に必要な根拠が揃っていないため判定を保留: ${[...quality.issues, ...inputIssues].join(", ")}`,
         confidence: 0.1,
-        missingData: [...baseTeacher.missingData, ...quality.issues],
+        missingData: [...baseTeacher.missingData, ...quality.issues, ...inputIssues],
       };
   const h = evidence.hypothesis;
   const target = evidence.customer.target || "分析で特定した主要顧客";
@@ -177,8 +202,24 @@ export function buildDecision(evidence: DecisionEvidence, now = new Date()): Str
     const offer = OFFER_RULES.has(teacher.ruleId);
     const pain = offer ? null : nextPain(evidence);
     const angle = offer ? h.angle : pain?.pain ?? null;
-    decision = {
-      action_type: "pivot_hypothesis",
+    if (!offer && !pain) {
+      teacher.verdict = "wait";
+      teacher.status = "insufficient_data";
+      teacher.ruleId = "no_new_hypothesis_evidence";
+      teacher.reason = "PIVOTは必要ですが、現在の訴求と重ならない新しい顧客課題の根拠がないため、推測で新訴求を作らず追加調査を待ちます。";
+      teacher.confidence = 0;
+      teacher.missingData.push("new_hypothesis_evidence");
+      decision = {
+        action_type: "wait_for_data",
+        hypothesis: currentHypothesis,
+        expected_outcome: "新しい顧客課題の根拠が揃う",
+        learning_objective: "推測で訴求を作らず、新しい顧客課題の根拠を取得してから再テストする",
+        priority: "low",
+        next_action: { generate_creative: false, description: "新しい顧客課題の根拠を待つ（次回巡回で再判定）", hook: null, angle: null, change_variable: null },
+      };
+    } else {
+      decision = {
+        action_type: "pivot_hypothesis",
       hypothesis: offer
         ? `${target}は興味を持っているが、提示しているオファー/遷移先が購入理由になっていない`
         : pain
@@ -198,7 +239,8 @@ export function buildDecision(evidence: DecisionEvidence, now = new Date()): Str
         angle,
         change_variable: offer ? "offer" : "angle",
       },
-    };
+      };
+    }
   } else if (teacher.verdict === "stop") {
     decision = {
       action_type: "stop_hypothesis",

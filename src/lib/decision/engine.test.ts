@@ -289,3 +289,46 @@ test("unknown metrics remain unknown and do not become zero", () => {
   assert.ok(!d.evidence.some((x) => x.source === "post_metrics" && x.key === "clicks" && x.value === 0));
   assert.ok(!d.evidence.some((x) => x.source === "post_metrics" && x.key === "conversions" && x.value === 0));
 });
+
+
+test("missing decision inputs never fall back to generic business claims", () => {
+  const e = evidence({
+    customer: { target: null, pain: null, desire: null, valueProposition: null, buyingTriggers: [], stage: null },
+    hypothesis: {
+      socialPostId: "post-1",
+      network: "linkedin",
+      caption: null,
+      hook: null,
+      angle: null,
+      hypothesis: null,
+      primaryMetric: null,
+      publishedAt: "2026-09-29T00:00:00.000Z",
+      lineageVerdicts: [],
+    },
+    current: metric({ impressions: 6000, clicks: 10 }),
+  });
+  const d = buildDecision(e);
+  assert.equal(d.verdict, "wait");
+  assert.equal(d.teacher.ruleId, "evidence_quality");
+  assert.equal(d.next_action.generate_creative, false);
+  assert.ok(d.teacher.missingData.includes("customer.target_missing"));
+  assert.ok(d.teacher.missingData.includes("hypothesis.statement_missing"));
+});
+
+test("stale EC-Pulse pain is never used to invent a pivot", () => {
+  const e = evidence({
+    asOf: "2026-10-20T00:00:00.000Z",
+    market: {
+      status: "ok",
+      capturedAt: "2026-09-01T00:00:00.000Z",
+      topPains: [{ pain: "古い市場課題", count: 100, sharePercent: 20 }],
+      emergingPains: [],
+    },
+    current: metric({ impressions: 6000, clicks: 10 }),
+  });
+  const d = buildDecision(e);
+  assert.equal(d.verdict, "wait");
+  assert.equal(d.teacher.ruleId, "no_new_hypothesis_evidence");
+  assert.equal(d.next_action.generate_creative, false);
+  assert.ok(d.teacher.missingData.includes("new_hypothesis_evidence"));
+});

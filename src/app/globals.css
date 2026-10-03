@@ -133,6 +133,16 @@ body:before{
 }
 .search button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 12px 34px rgba(155,140,255,.22);filter:brightness(1.02)}
 .search button:active:not(:disabled){transform:translateY(0)}
+.hero-contract{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;
+  padding:10px 12px;border:1px solid var(--line);border-radius:15px;
+  background:rgba(255,255,255,.018);width:fit-content;max-width:100%;
+}
+.hero-contract>div{display:flex;align-items:baseline;gap:7px;padding:5px 7px}
+.hero-contract span{font-size:8px;letter-spacing:.14em;color:#666b76}
+.hero-contract strong{font-size:10px;color:#c8cbd2;font-weight:600}
+.hero-contract i{font-style:normal;color:#424751;font-size:11px}
+.hero .lead strong{color:#d8d9df;font-weight:600}
 .hero-proof{gap:12px;margin-top:42px}
 .hero-proof>div{
   min-height:126px;padding:18px;border-color:var(--line);background:rgba(255,255,255,.025);
@@ -216,4 +226,90 @@ textarea[readonly]{cursor:default;color:#c5c8d0}
   .topbar nav{display:none!important}
   .topbar>div:last-child{gap:8px!important}
   .topbar .status{font-size:8px;padding:7px 9px}
+}
+
+
+/* AWARD PASS 03 — decision as the product's visual command center */
+.decision-command{
+  position:relative;
+  overflow:hidden;
+  padding:32px;
+  margin-bottom:16px;
+  border:1px solid rgba(155,140,255,.22);
+  border-radius:24px;
+  background:
+    radial-gradient(700px 260px at 100% 0%,rgba(155,140,255,.11),transparent 62%),
+    linear-gradient(135deg,rgba(155,140,255,.055),rgba(255,255,255,.018));
+  box-shadow:0 28px 90px rgba(0,0,0,.25),inset 0 1px rgba(255,255,255,.055);
+}
+.decision-command:before{
+  content:"";
+  position:absolute;
+  top:0;left:0;bottom:0;width:2px;
+  background:linear-gradient(180deg,#aaa0ff,rgba(102,227,255,.2),transparent);
+}
+.decision-command-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.decision-command-head h2{margin:0;font-size:clamp(28px,4vw,46px);letter-spacing:-.055em;font-weight:600}
+.decision-command-badge{
+  flex:none;padding:8px 10px;border:1px solid rgba(155,140,255,.25);border-radius:999px;
+  color:#c9c2ff;background:rgba(155,140,255,.06);font-size:9px;letter-spacing:.14em;
+}
+.decision-command-grid{
+  display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);
+  gap:28px;margin-top:30px;
+}
+.decision-command-main{
+  min-height:190px;display:flex;flex-direction:column;justify-content:center;
+  padding:28px;border-radius:18px;background:rgba(0,0,0,.2);
+  border:1px solid rgba(255,255,255,.08);
+}
+.decision-label,.decision-evidence>span{
+  color:#858091;font-size:9px;letter-spacing:.16em
+}
+.decision-command-main>strong{
+  display:block;margin-top:12px;max-width:760px;
+  font-size:clamp(25px,3.3vw,43px);line-height:1.08;letter-spacing:-.045em;font-weight:600;
+}
+.decision-command-main>p{max-width:650px;margin:15px 0 0;color:#898e99;font-size:12px;line-height:1.75}
+.decision-command-side{display:grid;gap:1px;border:1px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;background:rgba(255,255,255,.025)}
+.decision-command-side>div{padding:18px;background:rgba(0,0,0,.16)}
+.decision-command-side span{display:block;color:#606570;font-size:8px;letter-spacing:.15em}
+.decision-command-side strong{display:block;margin-top:6px;color:#d8dae0;font-size:12px;line-height:1.5;font-weight:500}
+.decision-evidence{margin-top:14px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)}
+.decision-evidence>div{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.decision-evidence>div span{
+  max-width:100%;padding:7px 9px;border-radius:9px;background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.065);color:#777d88;font-size:10px;line-height:1.45;
+}
+.decision-experiment{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-top:16px;
+  border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.025);
+}
+.decision-experiment>div{padding:15px 16px;background:rgba(0,0,0,.14)}
+.decision-experiment span{display:block;color:#606570;font-size:8px;letter-spacing:.15em}
+.decision-experiment strong{display:block;margin-top:7px;color:#d8dae0;font-size:11px;line-height:1.5;font-weight:500}
+
+@media(max-width:700px){
+  .decision-command{padding:22px;border-radius:20px}
+  .decision-command-head{gap:12px}
+  .decision-command-badge{font-size:7px;padding:7px 8px}
+  .decision-command-grid{grid-template-columns:1fr;gap:10px;margin-top:22px}
+  .decision-command-main{min-height:170px;padding:22px}
+  .decision-command-main>strong{font-size:28px}
+  .decision-command-side{border-radius:14px}
+  .decision-experiment{grid-template-columns:1fr}
+  .decision-experiment>div{padding:13px 14px}
+}
+
+.loop-steps{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 4px;padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:999px;background:rgba(255,255,255,.025);font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.48)}
+.loop-steps span{white-space:nowrap}
+.loop-steps .active{color:#fff}
+.loop-steps i{font-style:normal;color:rgba(255,255,255,.2)}
+@media(max-width:640px){.loop-steps{border-radius:16px;gap:7px 9px;line-height:1.4}}
+
+@media(max-width:700px){
+  .hero-contract{display:grid;grid-template-columns:1fr 18px 1fr;gap:3px;width:auto;padding:9px}
+  .hero-contract>div{display:block;padding:6px}
+  .hero-contract i{text-align:center;align-self:center}
+  .hero-contract strong{display:block;margin-top:3px;line-height:1.35}
 }

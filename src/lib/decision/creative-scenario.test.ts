@@ -15,18 +15,25 @@ const evidence = {
 
 const decision = {
   action_type: "reinforce_hypothesis", verdict: "continue", target_customer: "共働き世帯", hypothesis: "時短に反応する", reason: "ok", expected_outcome: "CTR", primary_metric: "CTR", learning_objective: "Hookを検証", priority: "high", evidence: [], confidence: 0.8,
-  next_action: { generate_creative: true, description: "Hook変更", hook: "5分で終わる", angle: "時短", change_variable: "hook" },
+  next_action: { generate_creative: true, description: "Hook変更", hook: "5分で終わる", angle: "時短", change_variable: "hook" }, 
   teacher: {} as StructuredDecision["teacher"], logic_version: "v", prompt_version: "v", model_version: "deterministic", generated_at: "2026-10-03T00:00:00.000Z", input_hash: "x",
 } satisfies StructuredDecision;
 
-test("scenario uses exact requested duration and contiguous scenes", () => {
-  const scenario = buildCreativeScenario(decision, evidence, 45);
+test("scenario uses exact supported duration and contiguous scenes", () => {
+  const scenario = buildCreativeScenario(decision, evidence, 30);
   assert.ok(scenario);
-  assert.equal(scenario.durationSeconds, 45);
+  assert.equal(scenario.durationSeconds, 30);
   assert.equal(scenario.scenes[0].startSecond, 0);
-  assert.equal(scenario.scenes.at(-1)?.endSecond, 45);
+  assert.equal(scenario.scenes.at(-1)?.endSecond, 30);
   for (let i = 1; i < scenario.scenes.length; i++) assert.equal(scenario.scenes[i].startSecond, scenario.scenes[i - 1].endSecond);
   assert.equal(scenario.changeVariable, "hook");
+  assert.equal(scenario.scenarioVersion, "creative-scenario-1");
+  assert.equal(scenario.targetCustomer, "共働き世帯");
+  assert.equal(scenario.productName, "Test商品");
+  assert.equal(scenario.hypothesis, "時短に反応する");
+  assert.equal(scenario.primaryMetric, "CTR");
+  assert.equal(scenario.learningObjective, "Hookを検証");
+  assert.deepEqual(scenario.continuity.keep, ["target customer", "product facts", "primary metric", "learning objective"]);
   assert.deepEqual(scenario.continuity.change, ["冒頭Hook"]);
 });
 
@@ -35,8 +42,28 @@ test("scenario refuses to generate when decision says wait or stop", () => {
   assert.equal(buildCreativeScenario(blocked, evidence, 30), null);
 });
 
-test("invalid duration falls back to deterministic default", () => {
-  const scenario = buildCreativeScenario(decision, evidence, 31);
+test("unsupported explicit duration is rejected instead of silently converted", () => {
+  assert.equal(buildCreativeScenario(decision, evidence, 31), null);
+  assert.equal(buildCreativeScenario(decision, evidence, 45), null);
+  assert.equal(buildCreativeScenario(decision, evidence, 60), null);
+});
+
+test("scenario is rejected when the decision requests an uncontrolled variable", () => {
+  const invalid = {
+    ...decision,
+    next_action: { ...decision.next_action, change_variable: "target" as const },
+  } as unknown as StructuredDecision;
+  assert.equal(buildCreativeScenario(invalid, evidence, 30), null);
+});
+
+test("scenario exposes one causal chain from hook through CTA", () => {
+  const scenario = buildCreativeScenario(decision, evidence, 30);
   assert.ok(scenario);
-  assert.equal(scenario.durationSeconds, 15);
+  assert.deepEqual(scenario.scenes.map((scene) => scene.purpose), ["hook", "problem", "proof", "solution", "cta"]);
+  assert.equal(scenario.scenes.reduce((sum, scene) => sum + (scene.endSecond - scene.startSecond), 0), scenario.durationSeconds);
+});
+
+test("MVP single-video contract rejects unsupported long requests", () => {
+  assert.equal(buildCreativeScenario(decision, evidence, 45), null);
+  assert.equal(buildCreativeScenario(decision, evidence, 60), null);
 });
