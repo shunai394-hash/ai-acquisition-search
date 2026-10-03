@@ -79,7 +79,7 @@ function facebookMetric(raw: unknown): NormalizedMetrics {
   const shares = sharesObject.count ?? m.share_count;
   return {
     impressions: 0,
-    views: num(raw?.views ?? raw?.view_count),
+    views: num(m.views ?? m.view_count),
     likes: num(likes),
     comments: num(comments),
     shares: num(shares),
