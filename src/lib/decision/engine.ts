@@ -9,10 +9,12 @@ function evidenceQuality(evidence: DecisionEvidence): { ok: boolean; issues: str
   const issues: string[] = [];
   const asOf = Date.parse(evidence.asOf);
   if (!Number.isFinite(asOf)) issues.push("decision_as_of_invalid");
-  const metricAt = evidence.current?.measuredAt ? Date.parse(evidence.current.measuredAt) : null;
-  if (metricAt != null && Number.isFinite(asOf) && metricAt > asOf) issues.push("metric_after_decision_time");
+  const metricAt = evidence.current ? Date.parse(evidence.current.measuredAt) : null;
+  if (metricAt != null && !Number.isFinite(metricAt)) issues.push("metric_measured_at_invalid");
+  if (metricAt != null && Number.isFinite(asOf) && Number.isFinite(metricAt) && metricAt > asOf) issues.push("metric_after_decision_time");
   const marketAt = evidence.market.capturedAt ? Date.parse(evidence.market.capturedAt) : null;
-  if (marketAt != null && Number.isFinite(asOf) && marketAt > asOf) issues.push("market_evidence_after_decision_time");
+  if (marketAt != null && !Number.isFinite(marketAt)) issues.push("market_evidence_captured_at_invalid");
+  if (marketAt != null && Number.isFinite(asOf) && Number.isFinite(marketAt) && marketAt > asOf) issues.push("market_evidence_after_decision_time");
   const m = evidence.current;
   if (m) {
     const keys = ["impressions","views","likes","comments","shares","saves","clicks","conversions","revenue","grossProfit","adSpend"] as const;
