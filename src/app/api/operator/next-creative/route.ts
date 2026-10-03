@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     const storedScenario = storedNextAction?.scenario && typeof storedNextAction.scenario === "object"
       ? storedNextAction.scenario as Record<string, unknown>
       : null;
-    const storedVerdict = String(storedOutput?.verdict || "");
+    const storedVerdict = String(storedOutput?.verdict || storedDecision?.verdict || "");
     const storedGenerateCreative = storedNextAction?.generate_creative;
     if (storedGenerateCreative === false) {
       return NextResponse.json({ error: "最新のDecisionがクリエイティブ生成を許可していません。", code: "creative_generation_not_allowed" }, { status: 409 });
