@@ -62,6 +62,31 @@ export async function POST(request: Request) {
     const firstPost = analysis.nextPosts?.[0];
     const firstScenario = analysis.scenarios?.[0];
     const scenarioId = firstScenario?.id || null;
+
+    // 同じ商品・同じScenarioを再分析しても、同一実験を二重登録しない。
+    // これにより「自動化」と「実験履歴の正確性」を両立する。
+    if (scenarioId) {
+      const { data: existingPost, error: existingPostError } = await db.from("social_posts")
+        .select("id,metadata,status")
+        .eq("user_id", user.id)
+        .eq("network", firstPost?.channel || decision.channel)
+        .eq("metadata->>scenario_id", scenarioId)
+        .in("status", ["planned", "scheduled"])
+        .maybeSingle();
+      if (existingPostError) throw existingPostError;
+      if (existingPost) {
+        const metadata = existingPost.metadata && typeof existingPost.metadata === "object"
+          ? existingPost.metadata as Record<string, unknown>
+          : {};
+        return NextResponse.json({
+          ok: true,
+          reused: true,
+          planId: typeof metadata.plan_id === "string" ? metadata.plan_id : null,
+          socialPostId: existingPost.id,
+          message: "既存のテスト計画を再利用しました。"
+        });
+      }
+    }
     const { data: creative, error: creativeError } = await db.from("creatives").insert({
       product_id: productId,
       plan_id: plan.id,
