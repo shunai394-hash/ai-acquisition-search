@@ -668,7 +668,7 @@ export default function Home() {
               <article><span>最初に試す</span><strong>{result.analysis.nextPosts[0]?.hook || "次の投稿仮説"}</strong><p>{result.analysis.nextPosts[0]?.channel} · {result.analysis.nextPosts[0]?.format}</p></article>
               <article><span>見る数字</span><strong>{result.analysis.nextPosts[0]?.testMetric || "CTR / CVR / CPA"}</strong><p>結果を取得したら、次の訴求・クリエイティブを変更します。</p></article>
             </div>
-            <button type="button" onClick={saveTestPlan} disabled={testSaving}>
+            <button type="button" onClick={() => void saveTestPlan()} disabled={testSaving}>
               {testSaving ? "保存中..." : "このテスト計画を保存"}
             </button>
             {testSaved && <p className="success">{testSaved}</p>}
