@@ -62,3 +62,13 @@ test("scenario exposes one causal chain from hook through CTA", () => {
   assert.deepEqual(scenario.scenes.map((scene) => scene.purpose), ["hook", "problem", "proof", "solution", "cta"]);
   assert.equal(scenario.scenes.reduce((sum, scene) => sum + (scene.endSecond - scene.startSecond), 0), scenario.durationSeconds);
 });
+
+
+describe("single-video production contract", () => {
+  it("never creates a scenario longer than the current production contract", () => {
+    const evidence = makeEvidence();
+    const decision = makeDecision();
+    const scenario = buildCreativeScenario(decision, evidence, 60);
+    expect(scenario?.durationSeconds).toBe(15);
+  });
+});
