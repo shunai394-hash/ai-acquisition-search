@@ -144,6 +144,7 @@ export type StructuredDecision = {
     hook: string | null;
     angle: string | null;
     change_variable: "none" | "hook" | "angle" | "target" | "offer" | null;
+    scenario?: CreativeScenario | null;
   };
   teacher: TeacherResult;
   logic_version: string;
