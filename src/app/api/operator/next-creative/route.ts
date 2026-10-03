@@ -90,9 +90,19 @@ export async function POST(request: Request) {
         decisionRunId: pending.id,
       }, { status: 409, headers: { "Retry-After": "5" } });
     }
-    const storedOutput = latestVerdict?.output && typeof latestVerdict.output === "object"
-      ? latestVerdict.output as Record<string, unknown>
-      : null;
+    const storedOutput = (() => {
+      const raw = latestVerdict?.output;
+      if (raw && typeof raw === "object") return raw as Record<string, unknown>;
+      if (typeof raw === "string") {
+        try {
+          const parsed: unknown = JSON.parse(raw);
+          return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    })();
     const storedDecision = storedOutput?.decision && typeof storedOutput.decision === "object"
       ? storedOutput.decision as Record<string, unknown>
       : null;
