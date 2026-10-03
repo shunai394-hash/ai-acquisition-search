@@ -186,14 +186,18 @@ export async function POST(request: Request) {
         ? storedNextAction.change_variable
         : verdict === "continue" ? "hook" : "angle"
     );
+    const scenarioScenes = lockedScenario && Array.isArray(lockedScenario.scenes)
+      ? lockedScenario.scenes.filter((scene): scene is Record<string, unknown> => !!scene && typeof scene === "object")
+      : [];
+    const scenarioScene = (purpose: string) => scenarioScenes.find((scene) => scene.purpose === purpose);
     const nextAction = typeof storedNextAction?.description === "string"
       ? storedNextAction.description
       : body.nextAction || "前回と異なる条件を1つだけ変更して再テストする";
     const hook = lockedScenario
-      ? String(lockedScenario.scenes?.find((scene) => scene && typeof scene === "object" && (scene as Record<string, unknown>).purpose === "hook")?.instruction || storedNextAction?.hook || creative.hook || "")
+      ? String(scenarioScene("hook")?.instruction || storedNextAction?.hook || creative.hook || "")
       : body.changedHook || String(storedNextAction?.hook || (verdict === "continue" ? creative.hook || "冒頭で顧客課題を明確に提示する" : "前回とは異なる顧客課題の視点を提示する"));
     const angle = lockedScenario
-      ? String(storedNextAction?.angle || lockedScenario.scenes?.find((scene) => scene && typeof scene === "object" && (scene as Record<string, unknown>).purpose === "solution")?.instruction || "")
+      ? String(storedNextAction?.angle || scenarioScene("solution")?.instruction || "")
       : body.changedAngle || String(storedNextAction?.angle || (verdict === "continue" ? "同一訴求の別Hook" : "前回と異なる顧客課題・訴求"));
     const scenario = storedScenario || (creative.scenario && typeof creative.scenario === "object"
       ? creative.scenario as Record<string, unknown>
