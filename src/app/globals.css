@@ -202,3 +202,18 @@ body:before{
   html{scroll-behavior:auto}
   *,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
+
+
+/* AWARD PASS 02 — interaction discipline */
+body{isolation:isolate}
+:where(a,button,input,textarea):focus-visible{
+  outline:2px solid rgba(170,160,255,.78);
+  outline-offset:3px;
+}
+button{font:inherit}
+textarea[readonly]{cursor:default;color:#c5c8d0}
+@media(max-width:700px){
+  .topbar nav{display:none!important}
+  .topbar>div:last-child{gap:8px!important}
+  .topbar .status{font-size:8px;padding:7px 9px}
+}
