@@ -269,7 +269,8 @@ export default function Home() {
           <span>次に売るための一手を決める。</span>
         </h1>
         <p className="lead">
-          商品URLから市場・レビュー・顧客の痛点を調査。頻出する不満から商品候補と広告訴求を作り、次のテストまでつなげます。
+          あなたは商品URLを1つ貼るだけ。AIが市場・レビュー・顧客の痛点を読み、
+          <strong>「次に何を試すか」まで決め、15秒 / 30秒の広告テストにつなげます。</strong>
         </p>
 
         <form onSubmit={analyze} className="search">
@@ -281,9 +282,19 @@ export default function Home() {
             required
           />
           <button disabled={loading}>
-            {loading ? "集客分析中..." : "集客分析を開始"}
+            {loading ? "次の一手を分析中..." : "次の一手を決める →"}
           </button>
         </form>
+
+        <div className="hero-contract" aria-label="AIがつなぐ工程">
+          <div><span>INPUT</span><strong>商品URL 1つ</strong></div>
+          <i>→</i>
+          <div><span>DECISION</span><strong>AIが次の一手を決定</strong></div>
+          <i>→</i>
+          <div><span>CREATIVE</span><strong>15s / 30s</strong></div>
+          <i>→</i>
+          <div><span>LEARN</span><strong>結果から次を再判断</strong></div>
+        </div>
 
         {error && <p className="error">{error}</p>}
         <div className="hero-proof">
@@ -294,7 +305,7 @@ export default function Home() {
         <div className="hero-loop">
           <span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span>
         </div>
-        <p className="hint">URLを1つ入力するだけ。市場のシグナルを読み、次に試すべき施策まで一本のループにします。</p>
+        <p className="hint">プロンプトを書く必要はありません。AIが判断の根拠を示し、同じ実験条件を保ったまま次の判断へ循環します。</p>
       </section>
 
 
