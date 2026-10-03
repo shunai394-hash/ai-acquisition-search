@@ -280,6 +280,32 @@ export default function Home() {
             <small>{result.source.url}</small>
           </div>
 
+          <section className="decision-command" aria-labelledby="decision-command-title">
+            <div className="decision-command-head">
+              <div>
+                <p className="eyebrow">THE NEXT MOVE</p>
+                <h2 id="decision-command-title">AIが決めた、今回の一手</h2>
+              </div>
+              <span className="decision-command-badge">DECISION READY</span>
+            </div>
+            <div className="decision-command-grid">
+              <div className="decision-command-main">
+                <span className="decision-label">VALUE PROPOSITION</span>
+                <strong>{result.analysis.decision.valueProposition}</strong>
+                <p>{result.analysis.decision.testPlan}</p>
+              </div>
+              <div className="decision-command-side">
+                <div><span>WHO</span><strong>{result.analysis.decision.target}</strong></div>
+                <div><span>PROBLEM</span><strong>{result.analysis.decision.problem}</strong></div>
+                <div><span>CHANNEL</span><strong>{result.analysis.decision.channel} · {result.analysis.decision.format}</strong></div>
+              </div>
+            </div>
+            <div className="decision-evidence">
+              <span>DECISION EVIDENCE</span>
+              <div>{result.analysis.decision.evidence.slice(0,3).map((e,index)=><span key={index}>{e}</span>)}</div>
+            </div>
+          </section>
+
           <section id="research" className="research-flow">
             <div className="research-head">
               <div>
