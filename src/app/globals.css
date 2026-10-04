@@ -218,3 +218,54 @@ textarea[readonly]{cursor:default;color:#c5c8d0}
   .topbar .status{font-size:8px;padding:7px 9px}
 }
 \n.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}\n.search button[aria-busy="true"]{cursor:wait}\n
+
+/* VIDEO STUDIO — generic creation, image optional */
+.video-studio{
+  margin:16px 0;
+  padding:34px;
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:24px;
+  background:
+    radial-gradient(700px 260px at 90% 0%,rgba(155,140,255,.10),transparent 60%),
+    rgba(255,255,255,.025);
+  box-shadow:0 28px 90px rgba(0,0,0,.22);
+}
+.studio-copy{max-width:720px}
+.studio-copy h2{margin:0;font-size:clamp(30px,4vw,48px);letter-spacing:-.055em;font-weight:600}
+.studio-copy p:not(.eyebrow){margin:12px 0 0;color:#858a95;line-height:1.75;font-size:13px}
+.studio-grid{display:grid;grid-template-columns:minmax(240px,.72fr) minmax(0,1.28fr);gap:14px;margin-top:28px}
+.studio-upload,.studio-prompt{min-width:0}
+.studio-upload{
+  position:relative;min-height:330px;border:1px dashed rgba(255,255,255,.16);border-radius:18px;
+  background:rgba(0,0,0,.20);overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.studio-upload input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.studio-upload>.eyebrow{position:absolute;top:16px;left:18px;z-index:2}
+.studio-upload em{font-style:normal;color:#555b66;margin-left:5px}
+.upload-empty{text-align:center;color:#777d88;line-height:1.8;font-size:13px}
+.upload-empty small{color:#555b66}
+.studio-upload img{width:100%;height:100%;object-fit:cover;display:block}
+.studio-prompt{display:flex;flex-direction:column}
+.studio-prompt textarea{
+  width:100%;box-sizing:border-box;flex:1;min-height:260px;resize:vertical;
+  border:1px solid rgba(255,255,255,.11);border-radius:16px;background:rgba(0,0,0,.24);
+  color:#f4f5f7;padding:18px;font:inherit;font-size:13px;line-height:1.75;outline:none;
+}
+.studio-prompt textarea:focus{border-color:rgba(155,140,255,.42);box-shadow:0 0 0 4px rgba(155,140,255,.06)}
+.studio-prompt textarea::placeholder{color:#555b66}
+.studio-actions{display:flex;align-items:center;gap:12px;margin-top:12px}
+.studio-actions button{
+  border:0;border-radius:12px;padding:13px 18px;background:linear-gradient(135deg,#fff,#ddd9ff);
+  color:#07070a;font-weight:700;cursor:pointer
+}
+.studio-actions button:disabled{opacity:.45;cursor:not-allowed}
+.studio-result{margin-top:20px;border-top:1px solid rgba(255,255,255,.08);padding-top:20px}
+.studio-result video{display:block;width:min(420px,100%);max-height:620px;border-radius:14px;background:#000}
+.studio-result a{display:inline-block;margin-top:10px;color:#fff;text-decoration:none;font-size:11px}
+.studio-result a:hover{color:#bdb7ff}
+@media(max-width:700px){
+  .video-studio{padding:22px}
+  .studio-grid{grid-template-columns:1fr}
+  .studio-upload{min-height:240px}
+  .studio-prompt textarea{min-height:220px}
+}
