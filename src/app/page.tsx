@@ -253,6 +253,8 @@ export default function Home() {
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://example.com/product"
             type="url"
+            aria-label="分析する商品URL"
+            autoComplete="url"
             required
           />
           <button disabled={loading} aria-busy={loading}>
@@ -607,12 +609,12 @@ export default function Home() {
               rows={5}
               style={{ width: "100%", marginTop: 12, padding: 14, borderRadius: 12, background: "#101012", color: "#fff", border: "1px solid #29292e" }}
             />
-            <button type="button" onClick={generateVideo} disabled={videoGenerating || !videoPrompt.trim()}>
+            <button type="button" onClick={generateVideo} disabled={videoGenerating || !videoPrompt.trim()} aria-busy={videoGenerating}>
               {videoGenerating ? "動画生成中..." : "決定したシナリオから動画を生成"}
             </button>
             {videoStatus && <p className="hint">{videoStatus}</p>}
             {videoJobId && <small className="hint">Job: {videoJobId}</small>}
-            {videoError && <p className="error">{videoError}</p>}
+            {videoError && <p className="error" role="alert" aria-live="polite">{videoError}</p>}
             {videoUrl && (
               <div style={{ marginTop: 16 }}>
                 <video src={videoUrl} controls playsInline style={{ width: "100%", maxWidth: 420, borderRadius: 16, background: "#000" }} />
@@ -624,8 +626,8 @@ export default function Home() {
             <p className="eyebrow">PERFORMANCE LOOP</p>
             <h2>投稿結果を入れて、次の判断へ</h2>
             <p className="hint">投稿後の数字を保存すると、AIが継続・ピボット・停止の次アクションを判断します。</p>
-            <button type="button" onClick={()=>setMetricsOpen(!metricsOpen)}>{metricsOpen ? "入力を閉じる" : "実績を入力する"}</button>
-            {metricsOpen && <div className="metrics-form">
+            <button type="button" onClick={()=>setMetricsOpen(!metricsOpen)} aria-expanded={metricsOpen} aria-controls="metrics-form">{metricsOpen ? "入力を閉じる" : "実績を入力する"}</button>
+            {metricsOpen && <div id="metrics-form" className="metrics-form">
               {(["impressions","views","clicks","conversions","revenue","grossProfit","adSpend"] as const).map(k=><label key={k}>{k}<input type="number" value={metrics[k]} onChange={e=>setMetrics({...metrics,[k]:e.target.value})}/></label>)}
               <p className="hint">テスト計画を保存すると投稿IDが自動発行されます。投稿後の実績を入力してください。</p>
               <button type="button" onClick={saveMetrics}>実績を保存してAI判定</button>
