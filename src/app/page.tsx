@@ -270,6 +270,19 @@ export default function Home() {
           <span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span>
         </div>
         <p className="hint">URLを1つ入力するだけ。市場のシグナルを読み、次に試すべき施策まで一本のループにします。</p>
+        <div className="operator-stage" aria-hidden="true">
+          <div className="operator-orbit orbit-a"></div>
+          <div className="operator-orbit orbit-b"></div>
+          <div className="operator-core">
+            <span>AI AD</span>
+            <strong>OPERATOR</strong>
+            <small>READ · DECIDE · TEST</small>
+          </div>
+          <div className="signal-chip signal-top"><b>01</b>VOICE</div>
+          <div className="signal-chip signal-right"><b>02</b>PAIN</div>
+          <div className="signal-chip signal-bottom"><b>03</b>PROOF</div>
+          <div className="signal-chip signal-left"><b>04</b>TEST</div>
+        </div>
       </section>
 
 
@@ -282,6 +295,37 @@ export default function Home() {
             </a>
             <small>{result.source.url}</small>
           </div>
+
+          <section className="decision-snapshot" aria-labelledby="decision-snapshot-title">
+            <div className="decision-snapshot-head">
+              <div>
+                <p className="eyebrow">AI DECISION · FIRST SIGNAL</p>
+                <h2 id="decision-snapshot-title">この市場で、まず何を試すか。</h2>
+              </div>
+              <span className="decision-live">DECISION READY</span>
+            </div>
+            <div className="decision-snapshot-grid">
+              <div>
+                <span>狙う顧客</span>
+                <strong>{result.analysis.decision.target}</strong>
+              </div>
+              <div>
+                <span>最重要の訴求</span>
+                <strong>{result.analysis.decision.valueProposition}</strong>
+              </div>
+              <div>
+                <span>最初のテスト</span>
+                <strong>{result.analysis.nextPosts[0]?.hook || result.analysis.decision.testPlan}</strong>
+              </div>
+              <div>
+                <span>媒体 / 形式</span>
+                <strong>{result.analysis.decision.channel} · {result.analysis.decision.format}</strong>
+              </div>
+            </div>
+            {result.analysis.decision.evidence?.[0] && (
+              <p className="decision-evidence"><b>WHY</b>{result.analysis.decision.evidence[0]}</p>
+            )}
+          </section>
 
           <section id="research" className="research-flow">
             <div className="research-head">
