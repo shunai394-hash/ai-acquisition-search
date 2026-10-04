@@ -9,6 +9,7 @@ export type VideoGenerationRequest = {
   resolution: "480p" | "720p" | "1080p";
   aspectRatio: "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "adaptive";
   generateAudio: boolean;
+  imageUrl?: string;
 };
 
 export type VideoEngineResult = {
