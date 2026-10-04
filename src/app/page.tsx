@@ -585,6 +585,23 @@ export default function Home() {
             </div>
           </section>
 
+          <section className="decision-scorecard" aria-labelledby="decision-scorecard-title">
+            <div className="scorecard-head">
+              <div><p className="eyebrow">DECISION SCORECARD</p><h2 id="decision-scorecard-title">この判断を、実行可能な4つの変数に固定する。</h2></div>
+              <span>ONE HYPOTHESIS · ONE TEST</span>
+            </div>
+            <div className="scorecard-grid">
+              <article><span>WHO</span><strong>{result.analysis.decision.target}</strong><small>狙う顧客</small></article>
+              <article><span>WHY</span><strong>{result.analysis.decision.problem}</strong><small>解く問題</small></article>
+              <article><span>WHAT</span><strong>{result.analysis.decision.valueProposition}</strong><small>約束する価値</small></article>
+              <article><span>WHERE</span><strong>{result.analysis.decision.channel}</strong><small>最初に検証する場所</small></article>
+            </div>
+            <div className="scorecard-footer">
+              <div><span>TEST HYPOTHESIS</span><strong>{result.analysis.decision.testPlan}</strong></div>
+              <div><span>PRIMARY FORMAT</span><strong>{result.analysis.decision.format}</strong></div>
+            </div>
+          </section>
+
           <section className="next">
             <p className="eyebrow">DECISION ENGINE</p>
             <h2>次に何をすべきか</h2>
@@ -743,6 +760,9 @@ export default function Home() {
             )}
           </section>
           <section id="loop" className="next performance-loop">
+          <div className="loop-intro">
+            <span className="loop-node active">01 <b>TEST</b></span><i>→</i><span className="loop-node">02 <b>MEASURE</b></span><i>→</i><span className="loop-node">03 <b>DECIDE</b></span><i>→</i><span className="loop-node">04 <b>LEARN</b></span>
+          </div>
             <p className="eyebrow">PERFORMANCE LOOP</p>
             <h2>投稿結果を入れて、次の判断へ</h2>
             <p className="hint">投稿後の数字を保存すると、AIが継続・ピボット・停止の次アクションを判断します。</p>
