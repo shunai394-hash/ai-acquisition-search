@@ -188,7 +188,7 @@ export default function Home() {
       }
       const response = await fetch("/api/video/generate", {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ prompt: studioPrompt.trim(), imageUrl: imageUrl || undefined, duration: studioDuration, resolution: "1080p", aspectRatio: studioAspect, generateAudio: false })
+        body: JSON.stringify({ prompt: [studioPrompt.trim(), studioAudio === "off" ? "" : studioAudio === "custom" ? "Audio: spoken narration in " + studioVoice + ". Script: " + studioNarration.trim() : "Audio: natural voiceover and synchronized ambience. Voice: " + studioVoice, studioMusic ? "Music: subtle background music under dialogue." : "Music: none."].filter(Boolean).join("\n"), imageUrl: imageUrl || undefined, duration: studioDuration, resolution: studioResolution, aspectRatio: studioAspect, generateAudio: studioAudio !== "off" })
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "動画生成の開始に失敗しました。");
