@@ -167,8 +167,9 @@ export default function Home() {
       const jobId = String(body.jobId || "");
       if (!jobId) throw new Error("動画ジョブIDを取得できませんでした。");
       setVideoJobId(jobId);
-      setVideoEngine(String(body.engine || "higgsfield"));
-      setVideoStatus(`${String(body.engine || "video engine")}で生成中…`);
+      const engine = String(body.engine || "video engine");
+      setVideoEngine(engine);
+      setVideoStatus(`${engine}で生成中…`);
       for (let attempt = 0; attempt < 60; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : 5000));
         const pollToken = await getAccessToken();
@@ -183,8 +184,8 @@ export default function Home() {
           setVideoStatus("動画が完成しました。");
           return;
         }
-        if (data.job?.status === "failed") throw new Error(data.job?.error || `${videoEngine || "動画エンジン"}で動画生成に失敗しました。`);
-        setVideoStatus(`${videoEngine || "video engine"}で生成中… ${attempt + 1}/60`);
+        if (data.job?.status === "failed") throw new Error(data.job?.error || `${engine}で動画生成に失敗しました。`);
+        setVideoStatus(`${engine}で生成中… ${attempt + 1}/60`);
       }
       throw new Error("動画生成がタイムアウトしました。時間を置いてジョブを再確認してください。");
     } catch (err) {
