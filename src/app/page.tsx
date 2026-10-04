@@ -327,6 +327,22 @@ export default function Home() {
             {result.analysis.decision.evidence?.[0] && (
               <p className="decision-evidence"><b>WHY</b>{result.analysis.decision.evidence[0]}</p>
             )}
+            <div className="decision-trust">
+              <div>
+                <span className="trust-label">DECISION BASIS</span>
+                <strong>{result.analysis.decision.evidence?.length || 0}件の根拠 · {result.analysis.searchEvidence?.length || 0}件の市場シグナル</strong>
+              </div>
+              <div>
+                <span className="trust-label">AI STATUS</span>
+                <strong>{result.analysis.aiConnected ? "AI接続済み · 推論を実行" : "フォールバック分析 · 追加検証を推奨"}</strong>
+              </div>
+            </div>
+            {(result.analysis.performance?.missingData?.length || 0) > 0 && (
+              <div className="decision-boundary">
+                <span>KNOWN LIMITS</span>
+                <p>まだ確認できないデータ：{result.analysis.performance.missingData.slice(0, 2).join(" / ")}</p>
+              </div>
+            )}
           </section>
 
           <section id="research" className="research-flow">
