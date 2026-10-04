@@ -289,45 +289,35 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="hero">
-        <p className="eyebrow">AI CUSTOMER ACQUISITION · DECISION ENGINE</p>
-        <h1>
-          市場の声から、
-          <br />
-          <span>次に売るための一手を決める。</span>
-        </h1>
-        <p className="lead">
-          商品URLから市場・レビュー・顧客の痛点を調査。頻出する不満から商品候補と広告訴求を作り、次のテストまでつなげます。
-        </p>
-
-        <form onSubmit={analyze} className="search">
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://example.com/product"
-            type="url"
-            required
-          />
-          <button disabled={loading}>
-            {loading ? loadingPhase : "集客分析を開始"}
-          </button>
-        </form>
-
-        {error && <p className="error">{error}</p>}
-        {loading && <div className="analysis-progress" role="status" aria-live="polite">
-          <span className="analysis-spinner" aria-hidden="true" />
-          <div><strong>{loadingPhase}</strong><small>RESEARCH → EVIDENCE → DECISION</small></div>
-          <div className="analysis-progress-track"><i /></div>
-        </div>}
-        <div className="hero-proof">
-          <div><b>01</b><strong>市場を調査</strong><span>レビュー・コメントから顧客の声を集計</span></div>
-          <div><b>02</b><strong>痛点から商品を探す</strong><span>頻出する不満を商品候補と設計方向へ</span></div>
-          <div><b>03</b><strong>広告をテストする</strong><span>痛点をHookに変えて次の検証へ</span></div>
+      <section className="hero" aria-labelledby="hero-title">
+        <div className="hero-grid">
+          <div className="hero-copy">
+            <p className="eyebrow">AI CUSTOMER ACQUISITION · DECISION ENGINE</p>
+            <h1 id="hero-title">市場を読む。<br /><span>次の一手を決める。</span></h1>
+            <p className="lead">商品URLをひとつ。市場の声、顧客の痛点、競合シグナルを束ねて、<strong>「何を、誰に、どこで、どう試すか」</strong>まで一気に決めます。</p>
+            <form onSubmit={analyze} className="search" aria-label="商品分析">
+              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="商品URLを入力  /  https://example.com/product" type="url" required aria-label="分析する商品URL" />
+              <button disabled={loading} aria-busy={loading}>{loading ? "分析中…" : "市場を読む →"}</button>
+            </form>
+            {error && <div className="hero-error" role="alert"><span>ANALYSIS INTERRUPTED</span><strong>{error}</strong></div>}
+            {loading && <div className="analysis-progress" role="status" aria-live="polite"><span className="analysis-spinner" aria-hidden="true" /><div><strong>{loadingPhase}</strong><small>RESEARCH → EVIDENCE → DECISION</small></div><div className="analysis-progress-track"><i /></div></div>}
+            <div className="hero-proof">
+              <div><b>01</b><strong>市場を読む</strong><span>レビュー・コメントから「繰り返される声」を抽出</span></div>
+              <div><b>02</b><strong>矛盾を見つける</strong><span>痛点と競合の隙間から機会を定義</span></div>
+              <div><b>03</b><strong>次を試す</strong><span>訴求・動画・テストまで一本の仮説にする</span></div>
+            </div>
+          </div>
+          <div className="hero-instrument" aria-label="AI Acquisition Search decision loop">
+            <div className="instrument-grid" aria-hidden="true"></div>
+            <div className="signal-orbit orbit-one"></div><div className="signal-orbit orbit-two"></div><div className="signal-orbit orbit-three"></div>
+            <div className="signal-core"><span>AI</span><strong>DECIDE</strong><small>FROM SIGNAL → ACTION</small></div>
+            <div className="signal-node node-a"><b>01</b><span>RESEARCH</span></div><div className="signal-node node-b"><b>02</b><span>TENSION</span></div>
+            <div className="signal-node node-c"><b>03</b><span>DECISION</span></div><div className="signal-node node-d"><b>04</b><span>CREATIVE</span></div>
+            <div className="instrument-caption"><span>LIVE SYSTEM</span><strong>ONE INPUT → MANY SIGNALS → ONE NEXT MOVE</strong></div>
+          </div>
         </div>
-        <div className="hero-loop">
-          <span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span>
-        </div>
-        <p className="hint">URLを1つ入力するだけ。市場のシグナルを読み、次に試すべき施策まで一本のループにします。</p>
+        <div className="hero-loop" aria-label="Acquisition loop"><span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span></div>
+        <p className="hint">分析結果はレポートで終わらない。判断を、次のクリエイティブとテストへ接続します。</p>
       </section>
 
       {!result && (
@@ -363,6 +353,9 @@ export default function Home() {
 
       {result && (
         <div className="results">
+          <nav className="journey-index" aria-label="Decision journey">
+            <span className="journey-active"><b>01</b> RESEARCH</span><i>→</i><span><b>02</b> TENSION</span><i>→</i><span><b>03</b> DECISION</span><i>→</i><span><b>04</b> CREATIVE</span><i>→</i><span><b>05</b> TEST</span><i>→</i><span><b>06</b> LEARN</span>
+          </nav>
           <div className="source">
             <span>分析対象</span>
             <a href={result.source.url} target="_blank" rel="noreferrer">
@@ -732,6 +725,12 @@ export default function Home() {
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="creative-bridge" aria-labelledby="creative-bridge-title">
+            <div className="creative-bridge-index"><span>03 → 04</span><b>DECISION</b><i>→</i><b>CREATIVE</b></div>
+            <div><p className="eyebrow">DECISION → CREATIVE</p><h2 id="creative-bridge-title">判断が、そのまま映像の設計図になる。</h2><p>選んだ広告仮説は、Hook・Audience・Format・Proofへ分解され、動画生成の初稿に引き継がれます。</p></div>
+            <div className="bridge-state"><span>ARMED HYPOTHESIS</span><strong>0{selectedScenario + 1}</strong><small>{result.analysis.nextPosts?.[selectedScenario]?.testMetric || "NEXT TEST"}</small></div>
           </section>
 
           <section id="decision" className="next video-generator">
