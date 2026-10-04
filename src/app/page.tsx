@@ -499,6 +499,29 @@ export default function Home() {
             />
           </Section>
 
+          <section id="loop" className="operator-loop-panel" aria-labelledby="operator-loop-title">
+            <div className="loop-panel-head">
+              <div>
+                <p className="eyebrow">OPERATOR LOOP · FROM SIGNAL TO ACTION</p>
+                <h2 id="operator-loop-title">読むだけで終わらない。次の一手まで進む。</h2>
+              </div>
+              <span className="loop-state">01 / 04</span>
+            </div>
+            <div className="loop-steps">
+              <div className="loop-step is-complete"><span>01</span><strong>READ</strong><small>市場シグナル</small></div>
+              <div className="loop-connector">→</div>
+              <div className="loop-step is-active"><span>02</span><strong>DECIDE</strong><small>仮説を1つ選ぶ</small></div>
+              <div className="loop-connector">→</div>
+              <div className="loop-step"><span>03</span><strong>TEST</strong><small>広告を作る</small></div>
+              <div className="loop-connector">→</div>
+              <div className="loop-step"><span>04</span><strong>LEARN</strong><small>実績で更新</small></div>
+            </div>
+            <div className="loop-command">
+              <div><span>NEXT MOVE</span><strong>{result.analysis.nextPosts[0]?.hook || result.analysis.decision.testPlan}</strong></div>
+              <button type="button" onClick={saveTestPlan} disabled={testSaving || !!socialPostId}>{testSaving ? "保存中…" : socialPostId ? "テスト計画を保存済み" : "この仮説でテストを作る"}</button>
+            </div>
+          </section>
+
           <section className="next">
             <p className="eyebrow">DECISION ENGINE</p>
             <h2>次に何をすべきか</h2>
