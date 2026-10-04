@@ -9,6 +9,7 @@ export type HiggsfieldVideoInput = {
   resolution?: "480p" | "720p" | "1080p";
   aspectRatio?: "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "adaptive";
   generateAudio?: boolean;
+  imageUrl?: string;
 };
 
 function credentials() {
@@ -44,7 +45,9 @@ async function requestHiggsfield(path: string, init: RequestInit) {
 
 export async function generateHiggsfieldVideo(input: HiggsfieldVideoInput) {
   const model = input.model ?? DEFAULT_MODEL;
-  return requestHiggsfield(model, {
+  const imageModel = model.includes("/image-to-video");
+  const requestModel = imageModel && !input.imageUrl ? "alibaba/wan-3.0/text-to-video" : model;
+  return requestHiggsfield(requestModel, {
     method: "POST",
     body: JSON.stringify({
       prompt: input.prompt,
@@ -52,7 +55,8 @@ export async function generateHiggsfieldVideo(input: HiggsfieldVideoInput) {
       resolution: input.resolution ?? "1080p",
       aspect_ratio: input.aspectRatio ?? "9:16",
       generate_audio: input.generateAudio ?? false,
-      enable_thinking: false
+      enable_thinking: false,
+      ...(input.imageUrl ? { image_url: input.imageUrl } : {})
     })
   });
 }
