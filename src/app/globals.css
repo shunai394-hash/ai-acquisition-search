@@ -891,3 +891,16 @@ body{overflow-x:hidden}
   .journey-index a{padding:6px 6px}.journey-index{gap:4px}
 }
 @media(prefers-reduced-motion:reduce){.research-loading:before{animation:none}}
+
+
+/* AWARD PASS 10 — hypothesis as interaction, not decoration */
+.hypothesis-console{grid-column:1/-1;padding:34px 0 8px;border-top:1px solid rgba(255,255,255,.07)}
+.console-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin-bottom:18px}.console-head h2{margin:0;font-size:clamp(24px,3vw,42px);letter-spacing:-.05em;line-height:1}.console-head>span{font-size:7px;letter-spacing:.16em;color:#5e646f;white-space:nowrap}
+.hypothesis-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.hypothesis-card{position:relative;min-height:178px;text-align:left;padding:20px;border:1px solid rgba(255,255,255,.075);border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.032),rgba(255,255,255,.008));color:inherit;cursor:pointer;transition:transform .25s ease,border-color .25s ease,background .25s ease,box-shadow .25s ease}
+.hypothesis-card:hover{transform:translateY(-3px);border-color:rgba(184,239,255,.18);box-shadow:0 20px 55px rgba(0,0,0,.22)}
+.hypothesis-card.active{border-color:rgba(168,158,255,.45);background:linear-gradient(145deg,rgba(155,140,255,.09),rgba(102,227,255,.025));box-shadow:0 0 0 1px rgba(155,140,255,.08),0 22px 60px rgba(82,67,170,.13)}
+.hypothesis-number{display:block;font-size:8px;letter-spacing:.18em;color:#777d88}.hypothesis-card strong{display:block;margin-top:28px;font-size:18px;letter-spacing:-.035em;line-height:1.2;max-width:88%}.hypothesis-card small{display:block;margin-top:10px;color:#6b717c;font-size:8px;letter-spacing:.05em}.hypothesis-card em{display:block;margin-top:14px;color:#aaa4e9;font-size:8px;font-style:normal}.hypothesis-card i{position:absolute;right:17px;top:17px;font-size:6px;font-style:normal;letter-spacing:.14em;color:#505661}.hypothesis-card.active i{color:#b8efff}
+.hypothesis-card:focus-visible{outline:2px solid rgba(184,239,255,.65);outline-offset:3px}
+@media(max-width:700px){.console-head{align-items:flex-start;flex-direction:column;gap:8px}.hypothesis-grid{grid-template-columns:1fr}.hypothesis-card{min-height:150px}.hypothesis-card strong{margin-top:20px}}
+@media(prefers-reduced-motion:reduce){.hypothesis-card{transition:none}}
