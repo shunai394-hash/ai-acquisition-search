@@ -267,10 +267,10 @@ export default function Home() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           {result && (
-            <nav aria-label="主要メニュー" style={{ display: "flex", gap: 18, alignItems: "center" }}>
-              <a href="#research" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Research</a>
-              <a href="#decision" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Decision</a>
-              <a href="#loop" style={{ color: "#ffffff66", fontSize: 11, textDecoration: "none" }}>Loop</a>
+            <nav className="cockpit-nav" aria-label="分析ナビゲーション">
+              <a href="#research">01 <span>Research</span></a>
+              <a href="#decision">02 <span>Decision</span></a>
+              <a href="#loop">03 <span>Loop</span></a>
             </nav>
           )}
           <span className="status">AI AD OPERATOR · LIVE</span>
