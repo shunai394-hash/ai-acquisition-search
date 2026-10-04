@@ -269,3 +269,12 @@ textarea[readonly]{cursor:default;color:#c5c8d0}
   .studio-upload{min-height:240px}
   .studio-prompt textarea{min-height:220px}
 }
+
+.studio-prompt-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:9px}
+.studio-presets{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.studio-presets button{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025);color:#777d88;border-radius:999px;padding:5px 9px;font:inherit;font-size:10px;cursor:pointer}
+.studio-presets button:hover,.studio-presets button:focus-visible{color:#fff;border-color:rgba(255,255,255,.22)}
+.studio-controls{display:flex;gap:8px;margin-top:10px}
+.studio-controls label{display:flex;align-items:center;gap:6px;color:#666d78;font-size:10px}
+.studio-controls select{border:1px solid rgba(255,255,255,.1);background:#111217;color:#ddd;border-radius:8px;padding:7px 9px;font:inherit;font-size:11px}
+@media(max-width:700px){.studio-prompt-head{align-items:flex-start;flex-direction:column}.studio-presets{justify-content:flex-start}}
