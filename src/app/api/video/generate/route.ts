@@ -25,6 +25,8 @@ export async function POST(request: Request) {
     userId = user.id;
     const body = await request.json();
     const prompt = String(body.prompt || "").trim();
+    const imageUrl = body.imageUrl ? String(body.imageUrl) : undefined;
+    if (imageUrl && !/^https:\/\//i.test(imageUrl)) return NextResponse.json({ error: "imageUrl must be an HTTPS URL" }, { status: 400 });
     if (!prompt) return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     if (prompt.length > 10000) return NextResponse.json({ error: "prompt is too long" }, { status: 400 });
 
@@ -55,13 +57,14 @@ export async function POST(request: Request) {
       social_post_id: socialPostId,
       creative_id: creativeId,
       provider: process.env.VIDEO_ENGINE ?? "higgsfield",
-      model: model ?? process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video",
+      model: model ?? (imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
       status: "queued",
       prompt,
       duration,
       resolution,
       aspect_ratio: aspectRatio,
-      generate_audio: generateAudio
+      generate_audio: generateAudio,
+      image_url: imageUrl ?? null
     }).select("id").single();
 
     if (jobError || !job) throw new Error(jobError?.message || "production jobの作成に失敗しました。");
