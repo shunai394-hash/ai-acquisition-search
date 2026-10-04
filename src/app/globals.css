@@ -676,3 +676,38 @@ body{overflow-x:hidden}
 @media(prefers-reduced-motion:reduce){
   .analysis-spinner,.analysis-progress:after,.analysis-progress-track i{animation:none!important}
 }
+
+
+/* AWARD PASS 06 — signal atlas: reduce card noise, increase narrative density */
+.signal-atlas{
+  grid-column:1/-1;padding:30px;border:1px solid rgba(255,255,255,.085);border-radius:20px;
+  background:linear-gradient(120deg,rgba(255,255,255,.024),rgba(155,140,255,.025));
+}
+.signal-atlas-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px}
+.signal-atlas-head h2{margin:0;font-size:clamp(28px,3.8vw,48px);line-height:1;letter-spacing:-.055em}
+.signal-atlas-head>span{font-size:8px;letter-spacing:.14em;color:#606671}
+.signal-atlas-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:26px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden}
+.signal-atlas-grid article{min-height:250px;padding:20px;background:#0a0b0f}
+.signal-atlas-grid article:nth-child(1),.signal-atlas-grid article:nth-child(2),.signal-atlas-grid article:nth-child(3),.signal-atlas-grid article:nth-child(4){border-bottom:1px solid rgba(255,255,255,.045)}
+.signal-atlas-grid article>span{font-size:8px;letter-spacing:.14em;color:#676d78}
+.signal-atlas-grid h3{margin-top:28px;font-size:16px;line-height:1.4;letter-spacing:-.02em}
+.signal-atlas-grid .list{margin-top:18px;padding:0;display:grid;gap:8px}
+.signal-atlas-grid .list li{font-size:10px;color:#7c828d;line-height:1.55;padding-left:12px;position:relative}
+.signal-atlas-grid .list li:before{content:"";position:absolute;left:0;top:.65em;width:3px;height:3px;border-radius:50%;background:#8d87dc}
+.signal-atlas-wide{grid-column:1/-1;min-height:170px!important;display:grid;grid-template-columns:180px 1fr;column-gap:24px;align-items:start}
+.signal-atlas-wide>span{grid-column:1;grid-row:1}
+.signal-atlas-wide h3{grid-column:2;grid-row:1;margin-top:0;max-width:700px}
+.signal-atlas-wide .list{grid-column:2;grid-row:2;margin-top:14px;grid-template-columns:1fr 1fr}
+@media(max-width:900px){
+  .signal-atlas-grid{grid-template-columns:1fr 1fr}
+  .signal-atlas-wide{grid-column:1/-1}
+}
+@media(max-width:700px){
+  .signal-atlas{padding:22px}
+  .signal-atlas-head{align-items:flex-start;flex-direction:column;gap:8px}
+  .signal-atlas-grid{grid-template-columns:1fr}
+  .signal-atlas-grid article{min-height:auto}
+  .signal-atlas-wide{display:block}
+  .signal-atlas-wide h3{margin-top:20px}
+  .signal-atlas-wide .list{grid-template-columns:1fr}
+}
