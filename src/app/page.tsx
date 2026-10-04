@@ -173,7 +173,7 @@ export default function Home() {
       }
       const response = await fetch("/api/video/generate", {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ prompt: studioPrompt.trim(), imageUrl: imageUrl || undefined, duration: 5, resolution: "1080p", aspectRatio: "9:16", generateAudio: false })
+        body: JSON.stringify({ prompt: studioPrompt.trim(), imageUrl: imageUrl || undefined, duration: studioDuration, resolution: "1080p", aspectRatio: studioAspect, generateAudio: false })
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "動画生成の開始に失敗しました。");
@@ -316,6 +316,7 @@ export default function Home() {
       </section>
 
       <section className="video-studio" aria-labelledby="video-studio-title">
+        <div className="studio-kicker-row"><span className="studio-live-dot" aria-hidden="true"></span><span>CREATIVE LAB</span><span className="studio-divider">/</span><span>TEXT + IMAGE → VIDEO</span></div>
         <div className="studio-copy">
           <p className="eyebrow">VIDEO STUDIO · HIGGSFIELD</p>
           <h2 id="video-studio-title">作りたい映像を、言葉から。</h2>
@@ -334,7 +335,7 @@ export default function Home() {
             <textarea id="studio-prompt" value={studioPrompt} onChange={(e)=>setStudioPrompt(e.target.value)} rows={8}
               placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この商品画像を使って、20代女性が自然に商品を紹介するUGC風広告。最初の2秒で視線を引き、夕方の柔らかな光。縦9:16、リアルなスマホ撮影感。"} />
             <div className="studio-controls"><label>尺<select value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label></div><div className="studio-actions">
-              <button type="button" onClick={generateStudioVideo} disabled={studioGenerating || !studioPrompt.trim()}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
+              <button type="button" onClick={generateStudioVideo} disabled={studioGenerating || studioPrompt.trim().length < 8} aria-busy={studioGenerating}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
               {studioStatus && <span className="video-status">{studioStatus}</span>}
             </div>
           </div>
