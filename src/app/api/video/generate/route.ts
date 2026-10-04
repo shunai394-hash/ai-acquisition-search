@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { consumeMonthlyUsage, getUserFromBearer, refundMonthlyUsage } from "@/lib/billing";
-import { generateHiggsfieldVideo } from "@/lib/video/higgsfield";
+import { generateVideo } from "@/lib/video/router";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       user_id: user.id,
       social_post_id: socialPostId,
       creative_id: creativeId,
-      provider: "higgsfield",
+      provider: process.env.VIDEO_ENGINE ?? "higgsfield",
       model: model ?? process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video",
       status: "queued",
       prompt,
@@ -67,9 +67,8 @@ export async function POST(request: Request) {
     if (jobError || !job) throw new Error(jobError?.message || "production jobの作成に失敗しました。");
     jobId = job.id;
 
-    // オンデマンド生成はCron待ちにしない。ここでHiggsfieldの非同期生成を開始し、
-    // request_idをDBへ保存したらHTTPレスポンスを返す。完成確認はGET endpointで行う。
-    const started = await generateHiggsfieldVideo({
+    // エンジン選択はRouterに集約し、実運用エンジンを壊さず将来のMuse接続に備える。
+    const started = await generateVideo({
       prompt,
       model: model ?? process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video",
       duration,
@@ -77,13 +76,12 @@ export async function POST(request: Request) {
       aspectRatio,
       generateAudio,
     });
-    const requestId = String(started.request_id ?? started.requestId ?? started.id ?? "");
-    if (!requestId) throw new Error("Higgsfieldからrequest_idを取得できませんでした。");
+    const requestId = started.requestId;
 
     await admin.from("production_jobs").update({
       status: "running",
       request_id: requestId,
-      provider_response: { started_response: started },
+      provider_response: { engine: started.engine, started_response: started.raw },
       started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", job.id).eq("user_id", user.id);
@@ -93,7 +91,8 @@ export async function POST(request: Request) {
       jobId,
       requestId,
       status: "running",
-      message: "Higgsfieldで動画生成を開始しました。完成まで自動で確認します。"
+      engine: started.engine,
+      message: `${started.engine}で動画生成を開始しました。完成まで自動で確認します。`
     }, { status: 202 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "動画生成の開始に失敗しました。";
