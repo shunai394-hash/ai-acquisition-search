@@ -47,6 +47,13 @@ export default function Home() {
   const [videoUrl, setVideoUrl] = useState("");
   const [videoError, setVideoError] = useState("");
   const [videoEngine, setVideoEngine] = useState("");
+  const [studioPrompt, setStudioPrompt] = useState("");
+  const [studioImage, setStudioImage] = useState<File | null>(null);
+  const [studioImagePreview, setStudioImagePreview] = useState("");
+  const [studioGenerating, setStudioGenerating] = useState(false);
+  const [studioStatus, setStudioStatus] = useState("");
+  const [studioUrl, setStudioUrl] = useState("");
+  const [studioError, setStudioError] = useState("");
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -148,6 +155,40 @@ export default function Home() {
     } finally {
       setTestSaving(false);
     }
+  }
+
+  async function generateStudioVideo() {
+    setStudioGenerating(true); setStudioError(""); setStudioUrl(""); setStudioStatus("素材を準備中…");
+    try {
+      const token = await getAccessToken();
+      let imageUrl = "";
+      if (studioImage) {
+        const form = new FormData(); form.append("file", studioImage);
+        const upload = await fetch("/api/video/upload", { method: "POST", headers: { Authorization: "Bearer " + token }, body: form });
+        const body = await upload.json().catch(() => ({}));
+        if (!upload.ok) throw new Error(body.error || "画像のアップロードに失敗しました。");
+        imageUrl = String(body.url || "");
+      }
+      const response = await fetch("/api/video/generate", {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ prompt: studioPrompt.trim(), imageUrl: imageUrl || undefined, duration: 5, resolution: "1080p", aspectRatio: "9:16", generateAudio: false })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "動画生成の開始に失敗しました。");
+      const jobId = String(body.jobId || ""); if (!jobId) throw new Error("動画ジョブIDを取得できませんでした。");
+      const engine = String(body.engine || "Higgsfield"); setStudioStatus(engine + "で生成中…");
+      for (let attempt = 0; attempt < 60; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : 5000));
+        const poll = await fetch("/api/video/jobs/" + encodeURIComponent(jobId), { headers: { Authorization: "Bearer " + (await getAccessToken()) }, cache: "no-store" });
+        const data = await poll.json().catch(() => ({}));
+        if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
+        if (data.job?.status === "completed" && data.asset?.video_url) { setStudioUrl(data.asset.video_url); setStudioStatus("完成。"); return; }
+        if (data.job?.status === "failed") throw new Error(data.job?.error || "動画生成に失敗しました。");
+        setStudioStatus(engine + "で生成中… " + (attempt + 1) + "/60");
+      }
+      throw new Error("動画生成がタイムアウトしました。");
+    } catch (err) { setStudioError(err instanceof Error ? err.message : "動画生成に失敗しました。"); setStudioStatus(""); }
+    finally { setStudioGenerating(false); }
   }
 
   async function generateVideo() {
@@ -271,6 +312,35 @@ export default function Home() {
         </div>
         <p className="hint">URLを1つ入力するだけ。市場のシグナルを読み、次に試すべき施策まで一本のループにします。</p>
       </section>
+
+      <section className="video-studio" aria-labelledby="video-studio-title">
+        <div className="studio-copy">
+          <p className="eyebrow">VIDEO STUDIO · HIGGSFIELD</p>
+          <h2 id="video-studio-title">作りたい映像を、言葉から。</h2>
+          <p>商品に限りません。画像は任意。作りたい動画を自由に書くだけで生成できます。</p>
+        </div>
+        <div className="studio-grid">
+          <label className="studio-upload">
+            <span className="eyebrow">01 · IMAGE <em>OPTIONAL</em></span>
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
+              const file=e.target.files?.[0] || null; setStudioImage(file); setStudioImagePreview(file ? URL.createObjectURL(file) : "");
+            }} />
+            {studioImagePreview ? <img src={studioImagePreview} alt="動画生成に使う画像のプレビュー" /> : <span className="upload-empty">＋ 画像を追加<br /><small>商品・人物・写真・素材など</small></span>}
+          </label>
+          <div className="studio-prompt">
+            <label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label>
+            <textarea id="studio-prompt" value={studioPrompt} onChange={(e)=>setStudioPrompt(e.target.value)} rows={8}
+              placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この商品画像を使って、20代女性が自然に商品を紹介するUGC風広告。最初の2秒で視線を引き、夕方の柔らかな光。縦9:16、リアルなスマホ撮影感。"} />
+            <div className="studio-actions">
+              <button type="button" onClick={generateStudioVideo} disabled={studioGenerating || !studioPrompt.trim()}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
+              {studioStatus && <span className="video-status">{studioStatus}</span>}
+            </div>
+          </div>
+        </div>
+        {studioError && <p className="error">{studioError}</p>}
+        {studioUrl && <div className="studio-result"><video src={studioUrl} controls playsInline /><a href={studioUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></div>}
+      </section>
+
 
 
       {result && (
