@@ -255,18 +255,18 @@ export default function Home() {
             type="url"
             required
           />
-          <button disabled={loading}>
-            {loading ? "集客分析中..." : "集客分析を開始"}
+          <button disabled={loading} aria-busy={loading}>
+            {loading ? "市場を読んでいます…" : "市場を読む"}
           </button>
         </form>
 
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error" role="alert" aria-live="polite">{error}</p>}
         <div className="hero-proof">
           <div><b>01</b><strong>市場を調査</strong><span>レビュー・コメントから顧客の声を集計</span></div>
           <div><b>02</b><strong>痛点から商品を探す</strong><span>頻出する不満を商品候補と設計方向へ</span></div>
           <div><b>03</b><strong>広告をテストする</strong><span>痛点をHookに変えて次の検証へ</span></div>
         </div>
-        <div className="hero-loop">
+        <div className="hero-promise" aria-label="提供する価値"><span>市場の声を読む</span><b>→</b><span>次の仮説を決める</span><b>→</b><span>広告を試す</span></div>\n        <div className="hero-loop">
           <span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span>
         </div>
         <p className="hint">URLを1つ入力するだけ。市場のシグナルを読み、次に試すべき施策まで一本のループにします。</p>
