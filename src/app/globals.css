@@ -603,3 +603,76 @@ body{overflow-x:hidden}
   .scenario-picker{grid-template-columns:1fr}
   .scenario-picker button{min-height:110px}
 }
+
+
+/* AWARD PASS 05 — creative intelligence + live analysis choreography */
+.analysis-progress{
+  position:relative;display:flex;align-items:center;gap:12px;max-width:920px;
+  margin:16px 0 0;padding:12px 14px;border:1px solid rgba(155,140,255,.14);
+  border-radius:12px;background:rgba(155,140,255,.035);overflow:hidden;
+}
+.analysis-progress:after{
+  content:"";position:absolute;inset:0;transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.045),transparent);
+  animation:progress-sheen 1.8s infinite;
+}
+.analysis-spinner{
+  width:10px;height:10px;border-radius:50%;border:1px solid rgba(255,255,255,.2);
+  border-top-color:#b8efff;animation:spin .8s linear infinite;flex:none;
+}
+.analysis-progress div:nth-child(2){display:flex;flex-direction:column;gap:3px;min-width:190px}
+.analysis-progress strong{font-size:11px;color:#cfd2d9;font-weight:600}
+.analysis-progress small{font-size:7px;letter-spacing:.14em;color:#666c77}
+.analysis-progress-track{height:2px;flex:1;background:rgba(255,255,255,.06);overflow:hidden;border-radius:999px}
+.analysis-progress-track i{display:block;width:42%;height:100%;background:linear-gradient(90deg,#8077dd,#b8efff);animation:progress-run 1.7s ease-in-out infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes progress-sheen{to{transform:translateX(100%)}}
+@keyframes progress-run{0%{transform:translateX(-120%)}100%{transform:translateX(270%)}}
+
+.creative-intelligence{
+  grid-column:1/-1;padding:30px;border:1px solid rgba(255,255,255,.09);border-radius:20px;
+  background:rgba(255,255,255,.02);
+}
+.creative-intelligence-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px}
+.creative-intelligence-head h2{margin:0;font-size:clamp(27px,3.6vw,46px);line-height:1;letter-spacing:-.055em}
+.creative-intelligence-head>span{font-size:8px;letter-spacing:.15em;color:#666c77;white-space:nowrap}
+.appeal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:24px}
+.appeal-card{
+  position:relative;display:flex;flex-direction:column;min-height:320px;padding:20px;
+  border:1px solid rgba(255,255,255,.07);border-radius:16px;background:rgba(0,0,0,.16);
+  transition:transform .25s ease,border-color .25s ease,background .25s ease;
+}
+.appeal-card:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.025)}
+.appeal-card.featured{
+  border-color:rgba(155,140,255,.22);
+  background:linear-gradient(145deg,rgba(155,140,255,.065),rgba(0,0,0,.18));
+}
+.appeal-top{display:flex;justify-content:space-between;align-items:center}
+.appeal-top>span{font-size:9px;color:#646a75}
+.appeal-top em{font-style:normal;font-size:7px;letter-spacing:.12em;color:#9b96c9}
+.appeal-card h3{margin-top:24px;font-size:17px;letter-spacing:-.025em}
+.appeal-copy{font-size:17px;line-height:1.55;letter-spacing:-.02em;color:#eceef2;margin-top:10px}
+.appeal-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:16px}
+.appeal-meta span{font-size:8px;color:#747a85;border:1px solid rgba(255,255,255,.07);border-radius:999px;padding:5px 7px}
+.score-stack{margin-top:auto;padding-top:20px}
+.score-stack>div{display:grid;grid-template-columns:60px 1fr 24px;gap:8px;align-items:center;margin-top:8px}
+.score-stack span{font-size:7px;letter-spacing:.1em;color:#626873}
+.score-stack>div>div{height:3px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.score-stack i{display:block;height:100%;background:linear-gradient(90deg,#7770d8,#b8efff);border-radius:999px}
+.score-stack b{font-size:9px;color:#b7bbca;text-align:right}
+.appeal-card>small{margin-top:15px;color:#666c77;line-height:1.55;font-size:9px}
+.appeal-empty{grid-column:1/-1;padding:30px;border:1px dashed rgba(255,255,255,.08);border-radius:14px;color:#686e79;text-align:center}
+@media(max-width:900px){
+  .appeal-grid{grid-template-columns:1fr}
+  .appeal-card{min-height:260px}
+}
+@media(max-width:700px){
+  .analysis-progress{align-items:flex-start}
+  .analysis-progress-track{display:none}
+  .creative-intelligence{padding:22px}
+  .creative-intelligence-head{align-items:flex-start;flex-direction:column;gap:10px}
+  .creative-intelligence-head>span{white-space:normal}
+}
+@media(prefers-reduced-motion:reduce){
+  .analysis-spinner,.analysis-progress:after,.analysis-progress-track i{animation:none!important}
+}
