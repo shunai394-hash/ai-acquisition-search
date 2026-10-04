@@ -470,3 +470,10 @@ body{overflow-x:hidden}
   .results>.next{animation-delay:.05s}
 }
 @keyframes cockpit-in{from{opacity:.01;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.cockpit-nav{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.025)}
+.cockpit-nav a{display:inline-flex;align-items:center;gap:7px;padding:7px 9px;border-radius:8px;color:#777d88;font-size:9px;letter-spacing:.1em;text-decoration:none;transition:color .2s ease,background .2s ease}
+.cockpit-nav a:hover,.cockpit-nav a:focus-visible{color:#fff;background:rgba(255,255,255,.06);outline:none}
+.cockpit-nav a:first-child{color:#fff}
+.cockpit-nav span{font-size:9px;letter-spacing:.08em}
+@media(max-width:700px){.cockpit-nav span{display:none}.cockpit-nav a{padding:7px 8px}}
