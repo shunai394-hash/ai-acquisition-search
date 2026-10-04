@@ -54,6 +54,8 @@ export default function Home() {
   const [studioStatus, setStudioStatus] = useState("");
   const [studioUrl, setStudioUrl] = useState("");
   const [studioError, setStudioError] = useState("");
+  const [studioDuration, setStudioDuration] = useState(5);
+  const [studioAspect, setStudioAspect] = useState<"9:16" | "16:9" | "1:1">("9:16");
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -328,10 +330,10 @@ export default function Home() {
             {studioImagePreview ? <img src={studioImagePreview} alt="動画生成に使う画像のプレビュー" /> : <span className="upload-empty">＋ 画像を追加<br /><small>商品・人物・写真・素材など</small></span>}
           </label>
           <div className="studio-prompt">
-            <label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label>
+            <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","UGC広告","商品CM","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","UGC広告":"自然なスマホ撮影感のあるUGC動画。冒頭2秒で視線を引き、リアルな人物の動きを重視。","商品CM":"高級ブランドCMのような商品映像。質感、照明、カメラの動きを美しく見せる。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
             <textarea id="studio-prompt" value={studioPrompt} onChange={(e)=>setStudioPrompt(e.target.value)} rows={8}
               placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この商品画像を使って、20代女性が自然に商品を紹介するUGC風広告。最初の2秒で視線を引き、夕方の柔らかな光。縦9:16、リアルなスマホ撮影感。"} />
-            <div className="studio-actions">
+            <div className="studio-controls"><label>尺<select value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label></div><div className="studio-actions">
               <button type="button" onClick={generateStudioVideo} disabled={studioGenerating || !studioPrompt.trim()}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
               {studioStatus && <span className="video-status">{studioStatus}</span>}
             </div>
