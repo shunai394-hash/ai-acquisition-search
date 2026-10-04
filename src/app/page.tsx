@@ -314,6 +314,11 @@ export default function Home() {
         </form>
 
         {error && <p className="error">{error}</p>}
+        {loading && <div className="analysis-progress" role="status" aria-live="polite">
+          <span className="analysis-spinner" aria-hidden="true" />
+          <div><strong>{loadingPhase}</strong><small>RESEARCH → EVIDENCE → DECISION</small></div>
+          <div className="analysis-progress-track"><i /></div>
+        </div>}
         <div className="hero-proof">
           <div><b>01</b><strong>市場を調査</strong><span>レビュー・コメントから顧客の声を集計</span></div>
           <div><b>02</b><strong>痛点から商品を探す</strong><span>頻出する不満を商品候補と設計方向へ</span></div>
@@ -484,6 +489,34 @@ export default function Home() {
                 })}
               </div>
             )}
+          </section>
+
+          <section className="creative-intelligence" aria-labelledby="creative-intelligence-title">
+            <div className="creative-intelligence-head">
+              <div>
+                <p className="eyebrow">CREATIVE INTELLIGENCE</p>
+                <h2 id="creative-intelligence-title">「誰に・何を・どう言うか」を、比較できる形に。</h2>
+              </div>
+              <span>AI RANKING · EVIDENCE WEIGHTED</span>
+            </div>
+            <div className="appeal-grid">
+              {(result.analysis.appealCandidates || []).slice(0, 3).map((appeal, index) => (
+                <article key={appeal.name} className={index === 0 ? "appeal-card featured" : "appeal-card"}>
+                  <div className="appeal-top"><span>0{index + 1}</span><em>{appeal.funnelStage}</em></div>
+                  <h3>{appeal.name}</h3>
+                  <p className="appeal-copy">“{appeal.copy}”</p>
+                  <div className="appeal-meta"><span>{appeal.customerLabel}</span><span>{appeal.emotion}</span></div>
+                  <div className="score-stack">
+                    <div><span>STRENGTH</span><div><i style={{width: Math.min(100, Math.max(0, appeal.strengthScore)) + "%"}} /></div><b>{appeal.strengthScore}</b></div>
+                    <div><span>RISK</span><div><i style={{width: Math.min(100, Math.max(0, appeal.riskScore)) + "%"}} /></div><b>{appeal.riskScore}</b></div>
+                  </div>
+                  <small>{appeal.reason}</small>
+                </article>
+              ))}
+              {!result.analysis.appealCandidates?.length && (
+                <div className="appeal-empty">訴求候補の比較データがありません。次の分析で蓄積します。</div>
+              )}
+            </div>
           </section>
 
           <section className="research-history">
