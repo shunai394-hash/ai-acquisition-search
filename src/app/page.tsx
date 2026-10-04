@@ -354,7 +354,7 @@ export default function Home() {
       {result && (
         <div className="results">
           <nav className="journey-index" aria-label="Decision journey">
-            <span className="journey-active"><b>01</b> RESEARCH</span><i>→</i><span><b>02</b> TENSION</span><i>→</i><span><b>03</b> DECISION</span><i>→</i><span><b>04</b> CREATIVE</span><i>→</i><span><b>05</b> TEST</span><i>→</i><span><b>06</b> LEARN</span>
+            <a className="journey-active" href="#research"><b>01</b> RESEARCH</a><i>→</i><a href="#decision-map-title"><b>02</b> TENSION</a><i>→</i><a href="#decision"><b>03</b> DECISION</a><i>→</i><a href="#creative-bridge-title"><b>04</b> CREATIVE</a><i>→</i><a href="#test-loop"><b>05</b> TEST</a><i>→</i><a href="#loop"><b>06</b> LEARN</a>
           </nav>
           <div className="source">
             <span>分析対象</span>
@@ -774,7 +774,7 @@ export default function Home() {
             {verdict && <div className="verdict"><strong>{verdict.verdict}</strong><p>{verdict.reason}</p></div>}
           </section>
 
-          <section className="next test-loop">
+          <section id="test-loop" className="next test-loop">
             <p className="eyebrow">AD TEST LOOP</p>
             <h2>次の広告を「テスト」として残す</h2>
             <p className="hint">今回の判断を仮説として保存し、投稿結果をもとに次のテストへつなげます。</p>
