@@ -29,7 +29,9 @@ export default function Home() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<AcquisitionAnalyzeResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState("市場シグナルを準備しています");
   const [error, setError] = useState("");
+  const [selectedScenario, setSelectedScenario] = useState(0);
   const [ecPulse, setEcPulse] = useState<EcPulseResearchBundle | null>(null);
   const [ecPulseLoading, setEcPulseLoading] = useState(false);
   const [testSaving, setTestSaving] = useState(false);
@@ -70,8 +72,14 @@ export default function Home() {
   async function analyze(e?: FormEvent) {
     e?.preventDefault();
     setLoading(true);
+    setLoadingPhase("商品ページを読み取っています");
     setError("");
     setResult(null);
+    const phaseTimers = [
+      window.setTimeout(() => setLoadingPhase("市場の声と競合シグナルを整理しています"), 900),
+      window.setTimeout(() => setLoadingPhase("痛点と機会の因果関係を組み立てています"), 1900),
+      window.setTimeout(() => setLoadingPhase("次に試す広告仮説を決めています"), 3000),
+    ];
 
     try {
       const token = await getAccessToken();
@@ -127,7 +135,9 @@ export default function Home() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "分析に失敗しました。");
     } finally {
+      phaseTimers.forEach(window.clearTimeout);
       setLoading(false);
+      setLoadingPhase("市場シグナルを準備しています");
     }
   }
 
@@ -299,7 +309,7 @@ export default function Home() {
             required
           />
           <button disabled={loading}>
-            {loading ? "集客分析中..." : "集客分析を開始"}
+            {loading ? loadingPhase : "集客分析を開始"}
           </button>
         </form>
 
@@ -427,6 +437,51 @@ export default function Home() {
                   <p className="test-copy">「{ecPulse.research.analysis.recommended_angle || "最頻出の顧客痛点"}」を主訴求にして、短尺動画・静止画の2パターンを作成。クリック率と購入率で比較します。</p>
                   {ecPulse.research.analysis.next_action && <small>{ecPulse.research.analysis.next_action}</small>}
                 </article>
+              </div>
+            )}
+          </section>
+
+          <section className="decision-map" aria-labelledby="decision-map-title">
+            <div className="decision-map-head">
+              <div>
+                <p className="eyebrow">EVIDENCE → DECISION</p>
+                <h2 id="decision-map-title">AIの判断を、ブラックボックスにしない。</h2>
+                <p>市場シグナル、矛盾、顧客像、訴求を一本の因果線で確認できます。数字だけでなく「なぜこの一手なのか」を残します。</p>
+              </div>
+              <div className="decision-confidence" aria-label="判断の確信度">
+                <span>DECISION CONFIDENCE</span>
+                <strong>{Math.round(((result.analysis.channelRecommendation?.confidence ?? 0) * 100) || 0)}%</strong>
+              </div>
+            </div>
+            <div className="decision-rail" role="list" aria-label="意思決定の流れ">
+              <article role="listitem"><span>01</span><small>SIGNAL</small><strong>{result.analysis.market.summary}</strong></article>
+              <i aria-hidden="true">→</i>
+              <article role="listitem"><span>02</span><small>TENSION</small><strong>{result.analysis.evidenceTensions?.[0]?.topic || result.analysis.customer.needs?.[0] || "顧客の未解決課題"}</strong></article>
+              <i aria-hidden="true">→</i>
+              <article role="listitem"><span>03</span><small>OPPORTUNITY</small><strong>{result.analysis.opportunities?.[0] || result.analysis.decision.desire}</strong></article>
+              <i aria-hidden="true">→</i>
+              <article role="listitem" className="rail-decision"><span>04</span><small>DECISION</small><strong>{result.analysis.decision.valueProposition}</strong></article>
+            </div>
+            {result.analysis.evidenceTensions?.length > 0 && (
+              <div className="tension-grid">
+                {result.analysis.evidenceTensions.slice(0, 3).map((tension, index) => (
+                  <article key={tension.topic}>
+                    <div><span>0{index + 1}</span><strong>{tension.topic}</strong><em>{tension.status === "conflict" ? "CONFLICT" : "SIGNAL"}</em></div>
+                    <p><b>+</b> {tension.positiveEvidence?.[0] || "肯定的なシグナルなし"}</p>
+                    <p><b>−</b> {tension.negativeEvidence?.[0] || "反証シグナルなし"}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+            {result.analysis.channelRecommendation?.comparison?.length > 0 && (
+              <div className="channel-matrix">
+                <div className="channel-matrix-head"><span>CHANNEL FIT</span><small>視覚適性 × 購買意図 × データ適合</small></div>
+                {result.analysis.channelRecommendation.comparison.slice(0, 4).map((channel) => {
+                  const score = Math.round((channel.visualFit + channel.purchaseIntent + channel.dataFit + channel.continuity) / 4);
+                  return <div className="channel-row" key={channel.channel}>
+                    <strong>{channel.channel}</strong><div className="channel-bar"><span style={{ width: Math.min(100, Math.max(0, score)) + "%" }} /></div><b>{score}</b><small>{channel.note}</small>
+                  </div>;
+                })}
               </div>
             )}
           </section>
@@ -623,6 +678,24 @@ export default function Home() {
               <List items={result.analysis.searchEvidence.map((item) => item.title + " — " + item.url + " — " + item.snippet)} />
             </Section>
           )}
+
+          <section className="execution-command" aria-labelledby="execution-command-title">
+            <div>
+              <p className="eyebrow">EXECUTION COMMAND</p>
+              <h2 id="execution-command-title">判断で止めない。次のクリエイティブまで一気に落とす。</h2>
+              <p>AIが選んだ仮説を、そのまま動画の初稿へ。シナリオを選ぶと生成プロンプトに反映されます。</p>
+            </div>
+            <div className="scenario-picker">
+              {(result.analysis.nextPosts || []).slice(0, 3).map((scenario, index) => (
+                <button type="button" key={scenario.rank} className={selectedScenario === index ? "active" : ""} onClick={() => {
+                  setSelectedScenario(index);
+                  setVideoPrompt([result.source.title || "商品", "Hook: " + scenario.hook, scenario.concept, "Audience: " + (result.analysis.decision.target || ""), "Format: " + scenario.format, "Channel: " + scenario.channel, "Proof: " + result.analysis.decision.valueProposition, "Natural, factual, high-retention short-form creative; no unsupported claims."].join("\n"));
+                }}>
+                  <span>0{index + 1}</span><strong>{scenario.concept}</strong><small>{scenario.testMetric}</small>
+                </button>
+              ))}
+            </div>
+          </section>
 
           <section id="decision" className="next video-generator">
             <p className="eyebrow">CREATIVE EXECUTION · HIGGSFIELD</p>
