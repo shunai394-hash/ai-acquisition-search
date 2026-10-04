@@ -63,8 +63,7 @@ export async function POST(request: Request) {
       duration,
       resolution,
       aspect_ratio: aspectRatio,
-      generate_audio: generateAudio,
-      image_url: imageUrl ?? null
+      generate_audio: generateAudio
     }).select("id").single();
 
     if (jobError || !job) throw new Error(jobError?.message || "production jobの作成に失敗しました。");
@@ -73,11 +72,12 @@ export async function POST(request: Request) {
     // エンジン選択はRouterに集約する。現在の既定値はHiggsfield。
     const started = await generateVideo({
       prompt,
-      model: model ?? process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video",
+      model: model ?? (imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
       duration,
       resolution,
       aspectRatio,
       generateAudio,
+      imageUrl,
     });
     const requestId = started.requestId;
 
