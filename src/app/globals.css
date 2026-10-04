@@ -477,3 +477,129 @@ body{overflow-x:hidden}
 .cockpit-nav a:first-child{color:#fff}
 .cockpit-nav span{font-size:9px;letter-spacing:.08em}
 @media(max-width:700px){.cockpit-nav span{display:none}.cockpit-nav a{padding:7px 8px}}
+
+
+/* AWARD PASS 04 — evidence theatre + execution command */
+.decision-map{
+  grid-column:1/-1;
+  position:relative;
+  overflow:hidden;
+  padding:34px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:22px;
+  background:
+    radial-gradient(700px 300px at 0% 0%,rgba(110,225,255,.055),transparent 68%),
+    radial-gradient(600px 260px at 100% 100%,rgba(155,140,255,.055),transparent 68%),
+    rgba(255,255,255,.022);
+  box-shadow:0 28px 100px rgba(0,0,0,.24);
+}
+.decision-map:after{
+  content:"";
+  position:absolute;left:0;right:0;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);
+}
+.decision-map-head{
+  display:flex;justify-content:space-between;gap:30px;align-items:flex-end;
+}
+.decision-map-head h2{
+  margin:0;max-width:760px;font-size:clamp(30px,4.2vw,56px);
+  line-height:.98;letter-spacing:-.06em;font-weight:600;
+}
+.decision-map-head p:not(.eyebrow){max-width:700px;color:#808692;line-height:1.75;font-size:13px;margin-top:14px}
+.decision-confidence{
+  min-width:160px;padding:16px 18px;border:1px solid rgba(255,255,255,.09);
+  border-radius:14px;background:rgba(0,0,0,.18);text-align:right;
+}
+.decision-confidence span{display:block;color:#666c77;font-size:8px;letter-spacing:.14em}
+.decision-confidence strong{display:block;margin-top:5px;font-size:30px;letter-spacing:-.06em;color:#dcd9ff}
+.decision-rail{
+  display:grid;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr) 34px minmax(0,1fr) 34px minmax(0,1.08fr);
+  align-items:stretch;gap:8px;margin-top:34px;
+}
+.decision-rail article{
+  min-height:132px;padding:18px;border:1px solid rgba(255,255,255,.075);
+  border-radius:14px;background:rgba(0,0,0,.17);
+  display:flex;flex-direction:column;justify-content:space-between;
+  transition:transform .25s ease,border-color .25s ease,background .25s ease;
+}
+.decision-rail article:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.028)}
+.decision-rail article span{font-size:9px;color:#626873}
+.decision-rail article small{font-size:8px;letter-spacing:.14em;color:#8e94a0}
+.decision-rail article strong{font-size:13px;line-height:1.55;font-weight:600;color:#e8e9ed}
+.decision-rail i{display:grid;place-items:center;color:#4a4f59;font-style:normal;font-size:18px}
+.decision-rail .rail-decision{
+  border-color:rgba(155,140,255,.22);
+  background:linear-gradient(145deg,rgba(155,140,255,.07),rgba(255,255,255,.018));
+  box-shadow:inset 0 1px rgba(255,255,255,.05),0 0 50px rgba(120,100,255,.05);
+}
+.decision-rail .rail-decision span{color:#b6adff}
+.tension-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;
+}
+.tension-grid article{
+  border-top:1px solid rgba(255,255,255,.08);padding:17px 2px 4px;
+}
+.tension-grid article>div{display:grid;grid-template-columns:28px 1fr auto;gap:9px;align-items:center}
+.tension-grid article>div span{font-size:9px;color:#555b66}
+.tension-grid article strong{font-size:12px}
+.tension-grid article em{
+  font-style:normal;font-size:7px;letter-spacing:.12em;color:#a9a1ff;
+  border:1px solid rgba(155,140,255,.18);border-radius:999px;padding:4px 6px;
+}
+.tension-grid p{margin:10px 0 0;color:#7d838e;font-size:10px;line-height:1.55}
+.tension-grid p b{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.05);color:#b8bcc4;margin-right:5px}
+.channel-matrix{margin-top:28px;border-top:1px solid rgba(255,255,255,.07);padding-top:18px}
+.channel-matrix-head{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:8px}
+.channel-matrix-head span{font-size:8px;letter-spacing:.16em;color:#858b96}
+.channel-matrix-head small{color:#555b66;font-size:9px}
+.channel-row{
+  display:grid;grid-template-columns:100px minmax(100px,1fr) 38px minmax(120px,.8fr);
+  gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.045);
+}
+.channel-row strong{font-size:11px}
+.channel-row b{text-align:right;color:#bdb7ff;font-size:11px}
+.channel-row small{color:#686e79;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9px}
+.channel-bar{height:4px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.channel-bar span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7770d8,#b8efff);box-shadow:0 0 14px rgba(150,140,255,.25)}
+.execution-command{
+  grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) 1.15fr;gap:28px;
+  padding:30px;border:1px solid rgba(255,255,255,.10);border-radius:20px;
+  background:linear-gradient(110deg,rgba(155,140,255,.045),rgba(255,255,255,.018));
+}
+.execution-command h2{margin:0;font-size:clamp(27px,3.4vw,44px);line-height:1.02;letter-spacing:-.055em}
+.execution-command>div:first-child p:not(.eyebrow){color:#777d88;line-height:1.7;font-size:12px;max-width:520px;margin-top:12px}
+.scenario-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.scenario-picker button{
+  min-height:150px;text-align:left;padding:16px;border:1px solid rgba(255,255,255,.075);
+  border-radius:14px;background:rgba(0,0,0,.18);color:#fff;cursor:pointer;
+  display:flex;flex-direction:column;justify-content:space-between;
+  transition:transform .2s ease,border-color .2s ease,background .2s ease;
+}
+.scenario-picker button:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.18)}
+.scenario-picker button.active{
+  border-color:rgba(155,140,255,.42);
+  background:linear-gradient(145deg,rgba(155,140,255,.09),rgba(255,255,255,.018));
+  box-shadow:0 15px 40px rgba(100,80,255,.08);
+}
+.scenario-picker span{color:#686e79;font-size:9px}
+.scenario-picker strong{font-size:12px;line-height:1.45}
+.scenario-picker small{color:#6f7580;font-size:9px}
+.execution-command + .next{margin-top:0}
+@media(max-width:900px){
+  .decision-map{padding:24px}
+  .decision-map-head{align-items:flex-start;flex-direction:column}
+  .decision-confidence{text-align:left;min-width:0}
+  .decision-rail{grid-template-columns:1fr}
+  .decision-rail i{transform:rotate(90deg);height:20px}
+  .tension-grid{grid-template-columns:1fr}
+  .execution-command{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+  .decision-map{padding:20px;border-radius:18px}
+  .decision-map-head h2{font-size:30px}
+  .channel-matrix-head{align-items:flex-start;flex-direction:column;gap:4px}
+  .channel-row{grid-template-columns:80px minmax(60px,1fr) 28px}
+  .channel-row small{grid-column:2/-1}
+  .scenario-picker{grid-template-columns:1fr}
+  .scenario-picker button{min-height:110px}
+}
