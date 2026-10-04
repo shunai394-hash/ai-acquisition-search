@@ -727,6 +727,26 @@ export default function Home() {
             </div>
           </section>
 
+          <section className="hypothesis-console" aria-labelledby="hypothesis-console-title">
+            <div className="console-head">
+              <div><p className="eyebrow">HYPOTHESIS CONSOLE</p><h2 id="hypothesis-console-title">3つの仮説。1つだけ、次に進める。</h2></div>
+              <span>AI RANKED · HUMAN CONFIRM</span>
+            </div>
+            <div className="hypothesis-grid">
+              {(result.analysis.nextPosts || []).slice(0,3).map((scenario,index)=>{
+                const active=selectedScenario===index;
+                return <button type="button" key={scenario.rank} className={active ? "hypothesis-card active" : "hypothesis-card"} onClick={()=>{
+                  setSelectedScenario(index);
+                  setVideoPrompt([result.source.title || "商品","Hook: "+scenario.hook,scenario.concept,"Audience: "+(result.analysis.decision.target || ""),"Format: "+scenario.format,"Channel: "+scenario.channel,"Proof: "+result.analysis.decision.valueProposition,"Natural, factual, high-retention short-form creative; no unsupported claims."].join("\n"));
+                }}>
+                  <span className="hypothesis-number">0{index+1}</span><strong>{scenario.concept}</strong>
+                  <small>{scenario.channel} · {scenario.format}</small>
+                  <em>{scenario.testMetric}</em><i>{active ? "SELECTED" : "SELECT"}</i>
+                </button>
+              })}
+            </div>
+          </section>
+
           <section className="creative-bridge" aria-labelledby="creative-bridge-title">
             <div className="creative-bridge-index"><span>03 → 04</span><b>DECISION</b><i>→</i><b>CREATIVE</b></div>
             <div><p className="eyebrow">DECISION → CREATIVE</p><h2 id="creative-bridge-title">判断が、そのまま映像の設計図になる。</h2><p>選んだ広告仮説は、Hook・Audience・Format・Proofへ分解され、動画生成の初稿に引き継がれます。</p></div>
