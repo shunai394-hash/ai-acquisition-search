@@ -315,6 +315,7 @@ export default function Home() {
         <p className="hint">URLを1つ入力するだけ。市場のシグナルを読み、次に試すべき施策まで一本のループにします。</p>
       </section>
 
+      {!result && (
       <section className="video-studio" aria-labelledby="video-studio-title">
         <div className="studio-kicker-row"><span className="studio-live-dot" aria-hidden="true"></span><span>CREATIVE LAB</span><span className="studio-divider">/</span><span>TEXT + IMAGE → VIDEO</span></div>
         <div className="studio-copy">
