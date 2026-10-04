@@ -193,6 +193,13 @@ test("STOP after repeated poor results: no creative, and next-creative refuses e
     db.seed("operator_runs", [{ user_id: "u1", run_type: "ai_performance_verdict", input: { social_post_id: id }, output: { verdict: "pivot" }, completed_at: iso(-(20 - i) * 24 * HOUR) }]);
   });
   seedPost("p1", { metadata: { source_social_post_id: "pc" } });
+  // Make p1 explicitly judgeable: its metrics must not depend on beforeEach defaults.
+  stub.tweet.metrics = {
+    impression_count: 5000,
+    like_count: 10,
+    reply_count: 1,
+    retweet_count: 0,
+  };
   // Old posts already have fresh metrics so only p1 is processed.
   for (const id of chain) db.seed("post_metrics", [{ social_post_id: id, impressions: 5000, likes: 300, raw: { source: "x" }, measured_at: iso(-HOUR) }]);
 
