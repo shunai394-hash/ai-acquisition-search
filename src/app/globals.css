@@ -312,3 +312,10 @@ textarea[readonly]{cursor:default;color:#c5c8d0}
   .decision-snapshot-grid>div:last-child{border-bottom:0}
 }
 @media(prefers-reduced-motion:reduce){.orbit-b{animation:none}}
+
+/* AWARD PASS 04 — trust / provenance layer */
+.decision-trust{display:grid;grid-template-columns:1fr 1fr;margin-top:18px;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06)}
+.decision-trust>div{padding:14px 0}.decision-trust>div+div{padding-left:22px;border-left:1px solid rgba(255,255,255,.06)}
+.trust-label{display:block;font-size:7px;letter-spacing:.16em;color:#5f6570}.decision-trust strong{display:block;margin-top:6px;font-size:10px;color:#9ea3ad;font-weight:500}
+.decision-boundary{display:flex;gap:14px;align-items:baseline;margin-top:13px;font-size:9px;color:#666b75}.decision-boundary span{color:#7f83a2;letter-spacing:.14em;white-space:nowrap}.decision-boundary p{margin:0;line-height:1.6}
+@media(max-width:700px){.decision-trust{grid-template-columns:1fr}.decision-trust>div+div{padding-left:0;border-left:0;border-top:1px solid rgba(255,255,255,.06)}}
