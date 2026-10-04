@@ -344,8 +344,7 @@ export default function Home() {
         {studioError && <p className="error">{studioError}</p>}
         {studioUrl && <div className="studio-result"><video src={studioUrl} controls playsInline /><a href={studioUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></div>}
       </section>
-
-
+      )}
 
       {result && (
         <div className="results">
