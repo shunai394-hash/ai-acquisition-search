@@ -711,3 +711,55 @@ body{overflow-x:hidden}
   .signal-atlas-wide h3{margin-top:20px}
   .signal-atlas-wide .list{grid-template-columns:1fr}
 }
+
+
+/* AWARD PASS 07 — decision scorecard + performance loop as product signature */
+.decision-scorecard{
+  grid-column:1/-1;padding:32px;border:1px solid rgba(155,140,255,.13);border-radius:22px;
+  background:radial-gradient(800px 300px at 100% 0%,rgba(155,140,255,.065),transparent 70%),#090a0e;
+  box-shadow:0 30px 100px rgba(0,0,0,.22);
+}
+.scorecard-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px}
+.scorecard-head h2{margin:0;font-size:clamp(30px,4vw,50px);line-height:.98;letter-spacing:-.06em}
+.scorecard-head>span{font-size:8px;letter-spacing:.15em;color:#666c77;white-space:nowrap}
+.scorecard-grid{display:grid;grid-template-columns:repeat(4,1fr);margin-top:28px;border-top:1px solid rgba(255,255,255,.08);border-left:1px solid rgba(255,255,255,.08)}
+.scorecard-grid article{min-height:155px;padding:18px;border-right:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column}
+.scorecard-grid article>span{font-size:8px;letter-spacing:.16em;color:#777d88}
+.scorecard-grid strong{font-size:17px;line-height:1.4;letter-spacing:-.025em;margin-top:auto;color:#e8e9ed}
+.scorecard-grid small{font-size:8px;color:#626873;margin-top:9px}
+.scorecard-footer{display:grid;grid-template-columns:2fr 1fr;gap:1px;margin-top:1px;background:rgba(255,255,255,.08)}
+.scorecard-footer>div{padding:18px;background:#0b0c10}
+.scorecard-footer span{display:block;font-size:7px;letter-spacing:.14em;color:#656b76}
+.scorecard-footer strong{display:block;margin-top:9px;font-size:12px;line-height:1.55;color:#c9ccd3}
+.loop-intro{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:14px;margin:8px 0 2px}
+.loop-node{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid rgba(255,255,255,.07);border-radius:999px;color:#575d68;font-size:8px;letter-spacing:.08em}
+.loop-node b{font-weight:600;color:#777d88}
+.loop-node.active{border-color:rgba(155,140,255,.28);background:rgba(155,140,255,.05);color:#aaa4e9}
+.loop-node.active b{color:#c6c1ff}
+.loop-intro i{font-style:normal;color:#414650;font-size:12px}
+.performance-loop{
+  position:relative;
+  background:linear-gradient(145deg,rgba(255,255,255,.025),rgba(155,140,255,.035));
+}
+.performance-loop .metrics-form{
+  border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:18px;margin-top:18px;background:rgba(0,0,0,.18)
+}
+.performance-loop .verdict{
+  margin-top:18px;padding:20px;border-radius:14px;border:1px solid rgba(155,140,255,.2);
+  background:rgba(155,140,255,.055)
+}
+@media(max-width:900px){
+  .scorecard-grid{grid-template-columns:1fr 1fr}
+  .scorecard-footer{grid-template-columns:1fr}
+  .loop-intro{overflow:auto;justify-content:flex-start;padding-bottom:3px}
+}
+@media(max-width:700px){
+  .decision-scorecard{padding:22px;border-radius:18px}
+  .scorecard-head{align-items:flex-start;flex-direction:column;gap:8px}
+  .scorecard-head>span{white-space:normal}
+  .scorecard-grid{grid-template-columns:1fr}
+  .scorecard-grid article{min-height:125px}
+  .loop-intro{gap:7px}
+  .loop-node{flex:none;padding:8px 9px}
+  .loop-intro i{font-size:10px}
+}
