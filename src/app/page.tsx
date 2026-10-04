@@ -58,6 +58,11 @@ export default function Home() {
   const [studioError, setStudioError] = useState("");
   const [studioDuration, setStudioDuration] = useState(5);
   const [studioAspect, setStudioAspect] = useState<"9:16" | "16:9" | "1:1">("9:16");
+  const [studioAudio, setStudioAudio] = useState<"off" | "auto" | "custom">("off");
+  const [studioNarration, setStudioNarration] = useState("");
+  const [studioVoice, setStudioVoice] = useState("日本語 · Natural");
+  const [studioMusic, setStudioMusic] = useState(false);
+  const [studioResolution, setStudioResolution] = useState<"720p" | "1080p">("1080p");
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
