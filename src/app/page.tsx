@@ -568,35 +568,22 @@ export default function Home() {
             ) : null}
           </section>
 
-          <Section title="01 商品分析">
-            <h2>{result.analysis.product.summary}</h2>
-            <List items={result.analysis.product.valueProposition} />
-          </Section>
-
-          <Section title="02 市場分析">
-            <h2>{result.analysis.market.summary}</h2>
-            <List items={result.analysis.market.signals} />
-          </Section>
-
-          <Section title="03 顧客分析">
-            <h2>{result.analysis.customer.summary}</h2>
-            <List items={[...result.analysis.customer.likelySegments, ...result.analysis.customer.needs]} />
-          </Section>
-
-          <Section title="04 競合分析">
-            <h2>{result.analysis.competitors.summary}</h2>
-            <List items={result.analysis.competitors.signals} />
-          </Section>
-
-          <Section title="05 実績分析">
-            <h2>{result.analysis.performance.summary}</h2>
-            <List
-              items={[
-                ...result.analysis.performance.availableEvidence,
-                ...result.analysis.performance.missingData.map((item) => "不足: " + item),
-              ]}
-            />
-          </Section>
+          <section className="signal-atlas" aria-labelledby="signal-atlas-title">
+            <div className="signal-atlas-head">
+              <div>
+                <p className="eyebrow">SIGNAL ATLAS</p>
+                <h2 id="signal-atlas-title">調査結果を、5つの視点で一枚にする。</h2>
+              </div>
+              <span>RAW SIGNALS → DECISION INPUTS</span>
+            </div>
+            <div className="signal-atlas-grid">
+              <article><span>01 · PRODUCT</span><h3>{result.analysis.product.summary}</h3><List items={result.analysis.product.valueProposition.slice(0, 3)} /></article>
+              <article><span>02 · MARKET</span><h3>{result.analysis.market.summary}</h3><List items={result.analysis.market.signals.slice(0, 3)} /></article>
+              <article><span>03 · CUSTOMER</span><h3>{result.analysis.customer.summary}</h3><List items={[...result.analysis.customer.likelySegments, ...result.analysis.customer.needs].slice(0, 4)} /></article>
+              <article><span>04 · COMPETITION</span><h3>{result.analysis.competitors.summary}</h3><List items={result.analysis.competitors.signals.slice(0, 3)} /></article>
+              <article className="signal-atlas-wide"><span>05 · PERFORMANCE EVIDENCE</span><h3>{result.analysis.performance.summary}</h3><List items={[...result.analysis.performance.availableEvidence.slice(0, 2), ...result.analysis.performance.missingData.slice(0, 2).map((item) => "不足: " + item)]} /></article>
+            </div>
+          </section>
 
           <section className="next">
             <p className="eyebrow">DECISION ENGINE</p>
