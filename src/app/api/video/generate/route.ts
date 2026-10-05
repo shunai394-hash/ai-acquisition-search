@@ -54,6 +54,22 @@ export async function POST(request: Request) {
     usageEventId = usage.usage_event_id || "";
 
 
+    if (imageUrl && creativeId) {
+      const { data: creativeRecord, error: creativeReadError } = await admin.from("creatives")
+        .select("scenario")
+        .eq("id", creativeId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (creativeReadError) throw new Error(creativeReadError.message);
+      const scenario = creativeRecord?.scenario && typeof creativeRecord.scenario === "object"
+        ? creativeRecord.scenario as Record<string, unknown>
+        : {};
+      const { error: creativeImageError } = await admin.from("creatives").update({
+        scenario: { ...scenario, input_image_url: imageUrl },
+      }).eq("id", creativeId).eq("user_id", user.id);
+      if (creativeImageError) throw new Error(creativeImageError.message);
+    }
+
     const { data: job, error: jobError } = await admin.from("production_jobs").insert({
       user_id: user.id,
       social_post_id: socialPostId,
