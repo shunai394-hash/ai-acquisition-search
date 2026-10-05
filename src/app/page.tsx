@@ -871,6 +871,18 @@ export default function Home() {
               </div>
             )}
           </section>
+          {(videoUrl || studioUrl) && !socialPostId && (
+            <aside className="loop-gate" aria-label="SNS自動運用への接続">
+              <div>
+                <span className="eyebrow">NEXT · AUTOMATION GATE</span>
+                <strong>動画は完成。次はテスト計画を保存して運用ループへ。</strong>
+                <p>保存すると投稿IDが発行され、SNS投稿 → 実績取得 → AI判定 → 次のクリエイティブまで接続できます。</p>
+              </div>
+              <button type="button" onClick={() => document.getElementById("test-loop")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+                テスト計画へ →
+              </button>
+            </aside>
+          )}
           {(videoUrl || studioUrl) && socialPostId && (
             <section className="next publisher-loop" aria-labelledby="publisher-title">
               <p className="eyebrow">PUBLISH · AUTOMATION READY</p>
