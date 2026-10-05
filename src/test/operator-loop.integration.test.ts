@@ -175,6 +175,28 @@ test("video retry reuses the original reference image", async () => {
   assert.equal(db.table("production_jobs")[0].provider_response.input_image_url, "https://storage.test/product-reference.webp");
 });
 
+test("next creative carries the reference image into the queued video job", async () => {
+  seedPost("p1");
+  const creative = db.table("creatives").find((x) => x.id === "c1");
+  creative!.scenario = {
+    ...(creative!.scenario as Record<string, unknown>),
+    input_image_url: "https://storage.test/product-reference.webp",
+  };
+
+  const res = await nextCreative(internal("/api/operator/next-creative", {
+    socialPostId: "p1",
+    verdict: "pivot",
+    changedAngle: "通勤中の使い方",
+    autoGenerate: true,
+  }));
+  const body = await res.json();
+  assert.equal(res.status, 201, JSON.stringify(body));
+  const job = db.table("production_jobs")[0];
+  assert.equal(job.model, "alibaba/wan-3.0-prime/image-to-video");
+  assert.equal(job.provider_response.input_image_url, "https://storage.test/product-reference.webp");
+  assert.equal(body.video.imageReference, true);
+});
+
 test("two concurrent cron runs: one is skipped, nothing is duplicated", async () => {
   seedPost("p1");
   const [a, b] = await Promise.all([operatorLoop(cronRequest()), operatorLoop(cronRequest())]);
