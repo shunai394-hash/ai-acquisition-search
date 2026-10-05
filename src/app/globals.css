@@ -938,3 +938,15 @@ body{overflow-x:hidden}
 @media(prefers-reduced-motion:reduce){
   .studio-audio-grid button{transition:none}
 }
+
+.studio-music-prompt{width:100%;margin-top:9px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(0,0,0,.2);color:#eee;padding:10px 12px;font:inherit;font-size:11px;outline:none}
+.studio-music-prompt:focus{border-color:rgba(155,140,255,.42);box-shadow:0 0 0 3px rgba(155,140,255,.06)}
+.studio-result-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:12px}
+.studio-result-head strong{display:block;margin-top:4px;font-size:15px}
+.studio-result-state{font-size:8px;letter-spacing:.16em;color:#b9ffcf;border:1px solid rgba(185,255,207,.18);border-radius:999px;padding:6px 8px}
+.studio-result-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.studio-result-actions button,.studio-result-actions a{border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.035);color:#e9eaf0;padding:10px 12px;font:inherit;font-size:10px;text-decoration:none;cursor:pointer}
+.studio-result-actions button:first-child{background:linear-gradient(135deg,#fff,#ddd9ff);color:#07070a;border-color:transparent;font-weight:700}
+.studio-result-actions button:disabled{opacity:.45;cursor:not-allowed}
+.studio-result-actions button:hover:not(:disabled),.studio-result-actions a:hover{border-color:rgba(155,140,255,.35);transform:translateY(-1px)}
+@media(max-width:700px){.studio-result-actions{display:grid;grid-template-columns:1fr}.studio-result-actions button,.studio-result-actions a{text-align:center}}
