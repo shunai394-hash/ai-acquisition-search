@@ -202,6 +202,11 @@ export async function POST(request: Request) {
     if (nextPostError || !nextPost) throw new Error(nextPostError?.message || "次の投稿レコード作成に失敗しました。");
     nextPostId = nextPost.id;
 
+    const inputImageUrl = creative.scenario && typeof creative.scenario === "object"
+      && typeof (creative.scenario as Record<string, unknown>).input_image_url === "string"
+      ? String((creative.scenario as Record<string, unknown>).input_image_url)
+      : undefined;
+
     let video = null;
     if (body.autoGenerate !== false) {
       const prompt = makePrompt({
@@ -218,13 +223,14 @@ export async function POST(request: Request) {
         social_post_id: nextPost.id,
         creative_id: nextCreative.id,
         provider: "higgsfield",
-        model: process.env.HF_VIDEO_MODEL || "alibaba/wan-3.0/text-to-video",
+        model: inputImageUrl ? "alibaba/wan-3.0-prime/image-to-video" : (process.env.HF_VIDEO_MODEL || "alibaba/wan-3.0/text-to-video"),
         status: "queued",
         prompt,
         duration: 5,
         resolution: "1080p",
         aspect_ratio: "9:16",
-        generate_audio: false
+        generate_audio: false,
+        provider_response: inputImageUrl ? { input_image_url: inputImageUrl } : null
       }).select("id").single();
       if (jobError || !job) throw new Error(jobError?.message || "動画生成ジョブの作成に失敗しました。");
       jobId = job.id;
@@ -232,7 +238,7 @@ export async function POST(request: Request) {
       // Higgsfieldはここでは開始しない。
       // next-creativeはproduction_jobs=queuedまででHTTP処理を終了し、
       // operator-loopのWorker処理がqueued Jobを取得してHiggsfieldを開始する。
-      video = { jobId, requestId: null, status: "queued" };
+      video = { jobId, requestId: null, status: "queued", imageReference: Boolean(inputImageUrl) };
     }
 
     const { data: run, error: runError } = await db.from("operator_runs").insert({
