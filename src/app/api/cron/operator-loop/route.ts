@@ -99,9 +99,11 @@ async function publishCompletedVideo(
   });
 
   if (result.status < 200 || result.status >= 300) {
-    return { ok: false, status: result.status, error: result.payload?.error };
+    return { ok: false, status: result.status, error: result.payload?.error, manualRecoveryRequired: result.payload?.manualRecoveryRequired === true };
   }
 
+  const manualRecoveryRequired = Array.isArray(result.payload?.results)
+    && result.payload.results.some((item: { manualRecoveryRequired?: boolean } | null) => item?.manualRecoveryRequired === true);
   const published = Array.isArray(result.payload?.results)
     ? result.payload.results.filter((item: { ok?: boolean } | null) => item?.ok)
     : [];
@@ -118,7 +120,7 @@ async function publishCompletedVideo(
     }).eq("id", nextPost.id).eq("user_id", userId);
   }
 
-  return { ok: published.length > 0, status: result.status, result: result.payload };
+  return { ok: published.length > 0, status: result.status, result: result.payload, manualRecoveryRequired };
 }
 
 const LEASE_NAME = "operator-loop";
@@ -295,10 +297,21 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
           continue;
         }
         const publish = await publishCompletedVideo(db, job.user_id, job.social_post_id, asset.video_url);
+        if (publish.manualRecoveryRequired) {
+          await db.from("production_jobs").update({
+            error: "外部SNSへの投稿結果をDBへ保存できませんでした。二重投稿防止のため自動再投稿を停止し、手動復旧が必要です。",
+            provider_response: {
+              ...providerResponse,
+              manual_recovery_required: true,
+              manual_recovery_marked_at: new Date().toISOString(),
+            },
+            updated_at: new Date().toISOString(),
+          }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "completed");
+        }
         results.push({
           jobId: job.id,
           step: "video-publish-retry",
-          status: "completed",
+          status: publish.manualRecoveryRequired ? "manual-recovery-required" : "completed",
           published: publish.ok,
           publishResult: publish,
         });
@@ -389,10 +402,21 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
 
       if (polled.status >= 200 && polled.status < 300 && asset?.video_url && polled.payload?.job?.status === "completed" && job.social_post_id) {
         const publish = await publishCompletedVideo(db, job.user_id, job.social_post_id, asset.video_url);
+        if (publish.manualRecoveryRequired) {
+          await db.from("production_jobs").update({
+            error: "外部SNSへの投稿結果をDBへ保存できませんでした。二重投稿防止のため自動再投稿を停止し、手動復旧が必要です。",
+            provider_response: {
+              ...providerResponse,
+              manual_recovery_required: true,
+              manual_recovery_marked_at: new Date().toISOString(),
+            },
+            updated_at: new Date().toISOString(),
+          }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "completed");
+        }
         results.push({
           jobId: job.id,
           step: "video-publish",
-          status: polled.payload?.job?.status,
+          status: publish.manualRecoveryRequired ? "manual-recovery-required" : polled.payload?.job?.status,
           published: publish.ok,
           publishResult: publish,
         });
