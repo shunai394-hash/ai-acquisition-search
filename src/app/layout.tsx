@@ -14,7 +14,6 @@ export const metadata: Metadata = {
   description: "商品・市場・顧客・競合・実績を分析し、次に取るべき集客アクションを判断するAIシステム。",
   applicationName: "AI Acquisition Search",
   category: "business",
-  metadataBase: new URL("https://ai-acquisition-search.vercel.app"),
   icons: {
     icon: "/icon.svg",
     apple: "/icon.svg",
