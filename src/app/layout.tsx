@@ -1,9 +1,20 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#050609",
+  colorScheme: "dark",
+};
 
 export const metadata: Metadata = {
   title: "AI Acquisition Search | AI集客検索エンジン",
   description: "商品・市場・顧客・競合・実績を分析し、次に取るべき集客アクションを判断するAIシステム。",
+  applicationName: "AI Acquisition Search",
+  category: "business",
+  metadataBase: new URL("https://ai-acquisition-search.vercel.app"),
   icons: {
     icon: "/icon.svg",
     apple: "/icon.svg",
