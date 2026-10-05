@@ -6,6 +6,7 @@ import { cronSecret, unauthorizedCron, verifyCronRequest } from "@/lib/security/
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+const SOFT_DEADLINE_MS = 270_000;
 
 function baseUrl() {
   const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
@@ -144,6 +145,10 @@ export async function GET(request: Request) {
 }
 
 async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMode: string) {
+  const loopStartedAt = Date.now();
+  const softDeadline = loopStartedAt + SOFT_DEADLINE_MS;
+  let timeBudgetExceeded = false;
+  const budgetRemaining = () => Date.now() < softDeadline;
   const evaluationDelayHours = Math.max(6, Number(process.env.OPERATOR_EVALUATION_DELAY_HOURS || 12));
   const cutoff = new Date(Date.now() - evaluationDelayHours * 60 * 60 * 1000).toISOString();
   const results: unknown[] = [];
@@ -161,6 +166,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
 
   // 投稿単位で処理する。ユーザー単位で1件に制限しない。
   for (const post of posts || []) {
+    if (!budgetRemaining()) { timeBudgetExceeded = true; break; }
     if (!post.user_id) continue;
 
     try {
@@ -246,6 +252,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
     .limit(30);
 
   for (const job of jobs || []) {
+    if (!budgetRemaining()) { timeBudgetExceeded = true; break; }
     if (!job.user_id) continue;
 
     let claimed = false;
@@ -448,6 +455,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
     lease: leaseMode,
     checked: posts?.length || 0,
     processed: results.length,
+    timeBudgetExceeded,
     results,
     ranAt: new Date().toISOString(),
   });
