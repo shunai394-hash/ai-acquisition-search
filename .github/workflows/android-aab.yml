@@ -2,15 +2,6 @@ name: Android AAB
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "package.json"
-      - "package-lock.json"
-      - "capacitor.config.ts"
-      - "src/**"
-      - "public/**"
-      - ".github/workflows/android-aab.yml"
 
 jobs:
   build-aab:
