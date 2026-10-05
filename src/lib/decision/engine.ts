@@ -266,21 +266,23 @@ export async function refineNextAction(decision: StructuredDecision, evidence: D
       user,
     });
     if (!text) return decision;
-    const parsed = JSON.parse(text) as { hook?: unknown; angle?: unknown; description?: unknown };
+    const raw: unknown = JSON.parse(text);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return decision;
+    const parsed = raw as { hook?: unknown; angle?: unknown; description?: unknown };
     const clean = (v: unknown, max: number) => (typeof v === "string" && v.trim() && v.length <= max ? v.trim() : null);
-    const hook = decision.next_action.change_variable === "hook"
-      ? clean(parsed.hook, 60) ?? decision.next_action.hook
-      : decision.next_action.hook;
-    const angle = decision.next_action.change_variable === "angle"
-      ? clean(parsed.angle, 80) ?? decision.next_action.angle
-      : decision.next_action.angle;
+    const llmHook = decision.next_action.change_variable === "hook" ? clean(parsed.hook, 60) : null;
+    const llmAngle = decision.next_action.change_variable === "angle" ? clean(parsed.angle, 80) : null;
+    const llmDescription = clean(parsed.description, 120);
+    // Credit the model only when it actually contributed wording; output that was
+    // entirely rejected leaves a purely deterministic decision.
+    if (llmHook === null && llmAngle === null && llmDescription === null) return decision;
     const refined: StructuredDecision = {
       ...decision,
       next_action: {
         ...decision.next_action,
-        hook: hook ?? decision.next_action.hook,
-        angle,
-        description: clean(parsed.description, 120) ?? decision.next_action.description,
+        hook: llmHook ?? decision.next_action.hook,
+        angle: llmAngle ?? decision.next_action.angle,
+        description: llmDescription ?? decision.next_action.description,
       },
       model_version: model,
     };

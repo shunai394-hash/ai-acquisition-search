@@ -27,6 +27,7 @@ process.env.OPENAI_API_KEY = "sk-test";
 
 const route = await import("../app/api/operator/ai-decision/route");
 const { POST: nextCreative } = await import("../app/api/operator/next-creative/route");
+const legacyRoute = await import("../app/api/operator/decision/route");
 
 const HOUR = 3600_000;
 const iso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
@@ -82,6 +83,8 @@ beforeEach(() => {
 
 test("route maxDuration matches the constant the wait budget is derived from", () => {
   assert.equal(route.maxDuration * 1000, DECISION_ROUTE_MAX_DURATION_MS);
+  // The UI calls the legacy alias; it must get the same time budget.
+  assert.equal(legacyRoute.maxDuration * 1000, DECISION_ROUTE_MAX_DURATION_MS);
 });
 
 test("two simultaneous requests: one execution, one stored run, same runId and decision", async () => {
