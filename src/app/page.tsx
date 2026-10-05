@@ -307,6 +307,7 @@ export default function Home() {
       return;
     }
     setPublishGenerating(true);
+    setVideoError("");
     setPublishStatus("SNSへの投稿を準備中…");
     setPublishResults([]);
     try {
@@ -936,7 +937,7 @@ export default function Home() {
                 <button type="button" onClick={() => publishGeneratedVideo(studioUrl || videoUrl)} disabled={publishGenerating || !publishPlatforms.length || (publishPlatforms.includes("tiktok") && !tiktokConsent)}>
                   {publishGenerating ? "投稿中…" : "選択したSNSへ投稿 →"}
                 </button>
-                {publishStatus && <span className="video-status">{publishStatus}</span>}
+                {publishStatus && <span className="video-status" role="status" aria-live="polite">{publishStatus}</span>}
               </div>
               {publishResults.length > 0 && (
                 <div className="publish-results">
