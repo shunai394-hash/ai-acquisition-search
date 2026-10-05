@@ -64,6 +64,7 @@ export default function Home() {
   const [studioMusic, setStudioMusic] = useState(false);
   const [studioMusicPrompt, setStudioMusicPrompt] = useState("");
   const [studioResolution, setStudioResolution] = useState<"720p" | "1080p">("1080p");
+  const [studioStage, setStudioStage] = useState<"idle" | "prepare" | "visual" | "motion" | "audio" | "render">("idle");
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["tiktok"]);
   const [publishCaption, setPublishCaption] = useState("");
   const [tiktokConsent, setTiktokConsent] = useState(false);
@@ -181,8 +182,8 @@ export default function Home() {
     }
   }
 
-  async function generateStudioVideo() {
-    setStudioGenerating(true); setStudioError(""); setStudioUrl(""); setStudioStatus("素材を準備中…");
+  async function generateStudioVideo(remixHint = "") {
+    setStudioGenerating(true); setStudioError(""); setStudioUrl(""); setStudioStage("prepare"); setStudioStatus("素材を準備中…");
     try {
       const token = await getAccessToken();
       let imageUrl = "";
@@ -193,6 +194,8 @@ export default function Home() {
         if (!upload.ok) throw new Error(body.error || "画像のアップロードに失敗しました。");
         imageUrl = String(body.url || "");
       }
+      setStudioStage("visual");
+      setStudioStatus("映像設計を組み立て中…");
       const response = await fetch("/api/video/generate", {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
@@ -211,6 +214,7 @@ export default function Home() {
               : ""
           ].filter(Boolean).join("\n"),
           imageUrl: imageUrl || undefined,
+          socialPostId: socialPostId || undefined,
           duration: studioDuration,
           resolution: studioResolution,
           aspectRatio: studioAspect,
@@ -220,18 +224,18 @@ export default function Home() {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "動画生成の開始に失敗しました。");
       const jobId = String(body.jobId || ""); if (!jobId) throw new Error("動画ジョブIDを取得できませんでした。");
-      const engine = String(body.engine || "Higgsfield"); setStudioStatus(engine + "で生成中…");
+      const engine = String(body.engine || "Higgsfield"); setStudioStage("motion"); setStudioStatus(engine + "でモーションを生成中…");
       for (let attempt = 0; attempt < 60; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : 5000));
         const poll = await fetch("/api/video/jobs/" + encodeURIComponent(jobId), { headers: { Authorization: "Bearer " + (await getAccessToken()) }, cache: "no-store" });
         const data = await poll.json().catch(() => ({}));
         if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
-        if (data.job?.status === "completed" && data.asset?.video_url) { setStudioUrl(data.asset.video_url); setStudioStatus("完成。"); return; }
+        if (data.job?.status === "completed" && data.asset?.video_url) { setStudioStage("render"); setStudioUrl(data.asset.video_url); setStudioStatus("完成。"); return; }
         if (data.job?.status === "failed") throw new Error(data.job?.error || "動画生成に失敗しました。");
         setStudioStatus(engine + "で生成中… " + (attempt + 1) + "/60");
       }
       throw new Error("動画生成がタイムアウトしました。");
-    } catch (err) { setStudioError(err instanceof Error ? err.message : "動画生成に失敗しました。"); setStudioStatus(""); }
+    } catch (err) { setStudioStage("idle"); setStudioError(err instanceof Error ? err.message : "動画生成に失敗しました。"); setStudioStatus(""); }
     finally { setStudioGenerating(false); }
   }
 
@@ -287,8 +291,8 @@ export default function Home() {
       setVideoGenerating(false);
     }
   }
-  async function publishGeneratedVideo() {
-    if (!videoUrl) return;
+  async function publishGeneratedVideo(sourceUrl = videoUrl) {
+    if (!sourceUrl) return;
     if (!socialPostId) {
       setVideoError("先に「このテスト計画を保存」して、投稿先を紐づけてください。");
       return;
@@ -316,7 +320,7 @@ export default function Home() {
       const response = await fetch("/api/social/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ socialPostId, videoUrl, caption, platforms: publishPlatforms }),
+        body: JSON.stringify({ socialPostId, videoUrl: sourceUrl, caption, platforms: publishPlatforms }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "SNS投稿に失敗しました。");
@@ -860,11 +864,11 @@ export default function Home() {
               </div>
             )}
           </section>
-          {videoUrl && socialPostId && (
+          {(videoUrl || studioUrl) && socialPostId && (
             <section className="next publisher-loop" aria-labelledby="publisher-title">
               <p className="eyebrow">PUBLISH · AUTOMATION READY</p>
               <h2 id="publisher-title">完成した動画を、そのままSNSへ。</h2>
-              <p className="hint">投稿先を選び、本文を確認して公開。投稿後は既存のOperator Loopが実績取得 → AI判定 → 次クリエイティブまでつなぎます。</p>
+              <p className="hint">投稿先を選び、本文を確認して公開。現在選択中の完成動画を投稿し、投稿後はOperator Loopが実績取得 → AI判定 → 次クリエイティブまでつなぎます。</p>
               <div className="publisher-platforms" role="group" aria-label="投稿先">
                 {["tiktok","instagram","facebook","youtube","x","linkedin"].map((platform) => {
                   const checked = publishPlatforms.includes(platform);
@@ -884,7 +888,7 @@ export default function Home() {
                 rows={3}
               />
               <div className="video-actions">
-                <button type="button" onClick={publishGeneratedVideo} disabled={publishGenerating || !publishPlatforms.length}>
+                <button type="button" onClick={() => publishGeneratedVideo(studioUrl || videoUrl)} disabled={publishGenerating || !publishPlatforms.length}>
                   {publishGenerating ? "投稿中…" : "選択したSNSへ投稿 →"}
                 </button>
                 {publishStatus && <span className="video-status">{publishStatus}</span>}
