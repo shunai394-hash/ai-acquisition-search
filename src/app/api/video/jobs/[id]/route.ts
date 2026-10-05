@@ -32,6 +32,18 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const result = await getHiggsfieldStatus(job.request_id);
     const status = String(result.status ?? "");
 
+    const syncCreative = async (assetUrl: string) => {
+      if (!job.creative_id) return;
+      const { error: creativeError } = await admin.from("creatives").update({
+        video_url: assetUrl,
+        generation_provider: "higgsfield",
+        generation_model: job.model,
+        status: "generated",
+        updated_at: new Date().toISOString()
+      }).eq("id", job.creative_id).eq("user_id", user.id);
+      if (creativeError) throw new Error("生成動画は保存されましたが、Creativeへの反映に失敗しました: " + creativeError.message);
+    };
+
     if (status === "completed") {
       const videoUrl = extractHiggsfieldVideoUrl(result);
       if (!videoUrl) throw new Error("Higgsfield completed but video URL was not returned.");
@@ -41,12 +53,14 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         .eq("production_job_id", job.id).maybeSingle();
 
       if (existingAsset) {
-        await admin.from("production_jobs").update({
+        const { error: jobUpdateError } = await admin.from("production_jobs").update({
           status: "completed",
           provider_response: result,
           completed_at: new Date().toISOString(),
           error: null
         }).eq("id", job.id).eq("user_id", user.id);
+        if (jobUpdateError) throw new Error("動画は保存済みですが、ジョブ状態の更新に失敗しました: " + jobUpdateError.message);
+        await syncCreative(existingAsset.video_url);
         return NextResponse.json({ ok: true, job: { ...job, status: "completed" }, asset: existingAsset });
       }
 
@@ -103,22 +117,15 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         throw new Error(assetError?.message || "video assetの保存に失敗しました。");
       }
 
-      if (job.creative_id) {
-        await admin.from("creatives").update({
-          video_url: stored.url,
-          generation_provider: "higgsfield",
-          generation_model: job.model,
-          status: "generated",
-          updated_at: new Date().toISOString()
-        }).eq("id", job.creative_id).eq("user_id", user.id);
-      }
-
-      await admin.from("production_jobs").update({
+      const { error: jobUpdateError } = await admin.from("production_jobs").update({
         status: "completed",
         provider_response: result,
         completed_at: new Date().toISOString(),
         error: null
       }).eq("id", job.id).eq("user_id", user.id);
+      if (jobUpdateError) throw new Error("動画は保存されましたが、ジョブ状態の更新に失敗しました: " + jobUpdateError.message);
+
+      await syncCreative(stored.url);
 
       return NextResponse.json({ ok: true, job: { ...job, status: "completed" }, asset });
     }
