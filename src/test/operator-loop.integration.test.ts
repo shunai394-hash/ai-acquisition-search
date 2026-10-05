@@ -172,7 +172,8 @@ test("video retry reuses the original reference image", async () => {
   assert.equal(stub.higgsfieldCalls, 1);
   assert.equal(stub.higgsfieldBodies[0].image_url, "https://storage.test/product-reference.webp");
   assert.equal(stub.higgsfieldBodies[0].model, "alibaba/wan-3.0-prime/image-to-video");
-  assert.equal(db.table("production_jobs")[0].provider_response.input_image_url, "https://storage.test/product-reference.webp");
+  const retryJob = db.table("production_jobs")[0] as { provider_response: Record<string, unknown> };
+  assert.equal(retryJob.provider_response.input_image_url, "https://storage.test/product-reference.webp");
 });
 
 test("next creative carries the reference image into the queued video job", async () => {
@@ -193,7 +194,7 @@ test("next creative carries the reference image into the queued video job", asyn
   assert.equal(res.status, 201, JSON.stringify(body));
   const job = db.table("production_jobs")[0];
   assert.equal(job.model, "alibaba/wan-3.0-prime/image-to-video");
-  assert.equal(job.provider_response.input_image_url, "https://storage.test/product-reference.webp");
+  assert.equal((job.provider_response as Record<string, unknown>).input_image_url, "https://storage.test/product-reference.webp");
   assert.equal(body.video.imageReference, true);
 });
 
