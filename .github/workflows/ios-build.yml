@@ -2,17 +2,6 @@
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "package.json"
-      - "package-lock.json"
-      - "capacitor.config.ts"
-      - "src/**"
-      - "public/**"
-      - "ios/**"
-      - "scripts/**"
-      - ".github/workflows/ios-build.yml"
 
 jobs:
   build-ios:
