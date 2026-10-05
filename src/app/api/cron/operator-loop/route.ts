@@ -332,6 +332,9 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
         }
         claimed = true;
 
+        const inputImageUrl = typeof providerResponse.input_image_url === "string"
+          ? providerResponse.input_image_url
+          : undefined;
         const started = await generateHiggsfieldVideo({
           prompt: String(job.prompt || ""),
           duration: Number(job.duration || 5),
@@ -339,6 +342,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
           aspectRatio: (String(job.aspect_ratio || "9:16") as "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "adaptive"),
           model: job.model ? String(job.model) : undefined,
           generateAudio: job.generate_audio === true,
+          imageUrl: inputImageUrl,
         });
         const requestId = String(started.request_id ?? started.requestId ?? started.id ?? "");
         if (!requestId) throw new Error("Higgsfield開始からrequest_idを取得できませんでした。");
@@ -350,6 +354,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
           provider_response: {
             ...claimResponse,
             retry_count: attemptCount,
+            input_image_url: inputImageUrl,
             started_response: started,
           },
           error: null,
