@@ -302,21 +302,15 @@ export default function Home() {
       setVideoError("投稿先を1つ以上選択してください。");
       return;
     }
+    if (publishPlatforms.includes("tiktok") && !tiktokConsent) {
+      setVideoError("TikTokを選択した場合は、公開前に自動投稿への明示的な同意が必要です。");
+      return;
+    }
     setPublishGenerating(true);
     setPublishStatus("SNSへの投稿を準備中…");
     setPublishResults([]);
     try {
       const token = await getAccessToken();
-      if (publishPlatforms.includes("tiktok") && !tiktokConsent) {
-        const consent = await fetch("/api/social/tiktok-consent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-          body: JSON.stringify({ consented: true }),
-        });
-        const consentBody = await consent.json().catch(() => ({}));
-        if (!consent.ok) throw new Error(consentBody.error || "TikTok自動投稿への同意を保存できませんでした。");
-        setTiktokConsent(true);
-      }
       const caption = publishCaption.trim() || result?.analysis?.nextPosts?.[selectedScenario]?.hook || result?.analysis?.decision?.valueProposition || "AI Acquisition Search creative";
       const response = await fetch("/api/social/publish", {
         method: "POST",
@@ -906,8 +900,40 @@ export default function Home() {
                 aria-label="SNS投稿本文"
                 rows={3}
               />
+              {publishPlatforms.includes("tiktok") && (
+                <label className="publish-consent">
+                  <input
+                    type="checkbox"
+                    checked={tiktokConsent}
+                    onChange={async (e) => {
+                      if (!e.target.checked) {
+                        setTiktokConsent(false);
+                        return;
+                      }
+                      try {
+                        const token = await getAccessToken();
+                        const consent = await fetch("/api/social/tiktok-consent", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+                          body: JSON.stringify({ consented: true }),
+                        });
+                        const body = await consent.json().catch(() => ({}));
+                        if (!consent.ok) throw new Error(body.error || "TikTok自動投稿への同意を保存できませんでした。");
+                        setTiktokConsent(true);
+                      } catch (err) {
+                        setTiktokConsent(false);
+                        setVideoError(err instanceof Error ? err.message : "TikTok自動投稿への同意を保存できませんでした。");
+                      }
+                    }}
+                  />
+                  <span>
+                    <strong>TikTok自動投稿を許可する</strong>
+                    <small>チェックすると、完成動画をTikTokへ自動公開できる状態になります。</small>
+                  </span>
+                </label>
+              )}
               <div className="video-actions">
-                <button type="button" onClick={() => publishGeneratedVideo(studioUrl || videoUrl)} disabled={publishGenerating || !publishPlatforms.length}>
+                <button type="button" onClick={() => publishGeneratedVideo(studioUrl || videoUrl)} disabled={publishGenerating || !publishPlatforms.length || (publishPlatforms.includes("tiktok") && !tiktokConsent)}>
                   {publishGenerating ? "投稿中…" : "選択したSNSへ投稿 →"}
                 </button>
                 {publishStatus && <span className="video-status">{publishStatus}</span>}
