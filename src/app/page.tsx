@@ -63,6 +63,12 @@ export default function Home() {
   const [studioVoice, setStudioVoice] = useState("日本語 · Natural");
   const [studioMusic, setStudioMusic] = useState(false);
   const [studioResolution, setStudioResolution] = useState<"720p" | "1080p">("1080p");
+  const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["tiktok"]);
+  const [publishCaption, setPublishCaption] = useState("");
+  const [tiktokConsent, setTiktokConsent] = useState(false);
+  const [publishGenerating, setPublishGenerating] = useState(false);
+  const [publishStatus, setPublishStatus] = useState("");
+  const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; url?: string; error?: string }>>([]);
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -218,7 +224,14 @@ export default function Home() {
       const response = await fetch("/api/video/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ prompt: videoPrompt.trim(), duration: 5, resolution: "1080p", aspectRatio: "9:16", generateAudio: false }),
+        body: JSON.stringify({
+          prompt: videoPrompt.trim(),
+          duration: 5,
+          resolution: "1080p",
+          aspectRatio: "9:16",
+          generateAudio: false,
+          socialPostId: socialPostId || undefined,
+        }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "動画生成の開始に失敗しました。");
@@ -253,6 +266,49 @@ export default function Home() {
       setVideoGenerating(false);
     }
   }
+  async function publishGeneratedVideo() {
+    if (!videoUrl) return;
+    if (!socialPostId) {
+      setVideoError("先に「このテスト計画を保存」して、投稿先を紐づけてください。");
+      return;
+    }
+    if (!publishPlatforms.length) {
+      setVideoError("投稿先を1つ以上選択してください。");
+      return;
+    }
+    setPublishGenerating(true);
+    setPublishStatus("SNSへの投稿を準備中…");
+    setPublishResults([]);
+    try {
+      const token = await getAccessToken();
+      if (publishPlatforms.includes("tiktok") && !tiktokConsent) {
+        const consent = await fetch("/api/social/tiktok-consent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ consented: true }),
+        });
+        const consentBody = await consent.json().catch(() => ({}));
+        if (!consent.ok) throw new Error(consentBody.error || "TikTok自動投稿への同意を保存できませんでした。");
+        setTiktokConsent(true);
+      }
+      const caption = publishCaption.trim() || result?.analysis?.nextPosts?.[selectedScenario]?.hook || result?.analysis?.decision?.valueProposition || "AI Acquisition Search creative";
+      const response = await fetch("/api/social/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ socialPostId, videoUrl, caption, platforms: publishPlatforms }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "SNS投稿に失敗しました。");
+      setPublishResults(Array.isArray(body.results) ? body.results : []);
+      setPublishStatus(body.failed ? `投稿完了：${body.published || 0}件成功 / ${body.failed}件失敗` : `投稿完了：${body.published || 0}件`);
+    } catch (err) {
+      setPublishStatus("");
+      setVideoError(err instanceof Error ? err.message : "SNS投稿に失敗しました。");
+    } finally {
+      setPublishGenerating(false);
+    }
+  }
+
   async function saveMetrics() {
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -783,6 +839,48 @@ export default function Home() {
               </div>
             )}
           </section>
+          {videoUrl && socialPostId && (
+            <section className="next publisher-loop" aria-labelledby="publisher-title">
+              <p className="eyebrow">PUBLISH · AUTOMATION READY</p>
+              <h2 id="publisher-title">完成した動画を、そのままSNSへ。</h2>
+              <p className="hint">投稿先を選び、本文を確認して公開。投稿後は既存のOperator Loopが実績取得 → AI判定 → 次クリエイティブまでつなぎます。</p>
+              <div className="publisher-platforms" role="group" aria-label="投稿先">
+                {["tiktok","instagram","facebook","youtube","x","linkedin"].map((platform) => {
+                  const checked = publishPlatforms.includes(platform);
+                  return (
+                    <label key={platform}>
+                      <input type="checkbox" checked={checked} onChange={(e) => setPublishPlatforms((current) => e.target.checked ? [...new Set([...current, platform])] : current.filter((item) => item !== platform))} />
+                      {platform}
+                    </label>
+                  );
+                })}
+              </div>
+              <textarea
+                value={publishCaption}
+                onChange={(e) => setPublishCaption(e.target.value)}
+                placeholder={result?.analysis?.nextPosts?.[selectedScenario]?.hook || "投稿本文を入力"}
+                aria-label="SNS投稿本文"
+                rows={3}
+              />
+              <div className="video-actions">
+                <button type="button" onClick={publishGeneratedVideo} disabled={publishGenerating || !publishPlatforms.length}>
+                  {publishGenerating ? "投稿中…" : "選択したSNSへ投稿 →"}
+                </button>
+                {publishStatus && <span className="video-status">{publishStatus}</span>}
+              </div>
+              {publishResults.length > 0 && (
+                <div className="publish-results">
+                  {publishResults.map((item) => (
+                    <div key={item.platform} className={"publish-row " + (item.ok ? "done" : "failed")}>
+                      <span>{item.platform}</span>
+                      <strong>{item.ok ? "PUBLISHED" : item.error || "FAILED"}</strong>
+                      {item.url ? <a href={item.url} target="_blank" rel="noreferrer">開く →</a> : <span />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
           <section id="loop" className="next performance-loop">
           <div className="loop-intro">
             <span className="loop-node active">01 <b>TEST</b></span><i>→</i><span className="loop-node">02 <b>MEASURE</b></span><i>→</i><span className="loop-node">03 <b>DECIDE</b></span><i>→</i><span className="loop-node">04 <b>LEARN</b></span>
