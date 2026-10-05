@@ -19,6 +19,8 @@ export async function POST(request: Request) {
   let jobId = "";
   let userId = "";
   let usageEventId = "";
+  // Preserve the external provider request if the DB state update fails after start.
+  let providerRequestId = "";
   try {
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
@@ -80,14 +82,16 @@ export async function POST(request: Request) {
       imageUrl,
     });
     const requestId = started.requestId;
+    providerRequestId = requestId;
 
-    await admin.from("production_jobs").update({
+    const { error: runningUpdateError } = await admin.from("production_jobs").update({
       status: "running",
       request_id: requestId,
       provider_response: { engine: started.engine, started_response: started.raw },
       started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", job.id).eq("user_id", user.id);
+    if (runningUpdateError) throw new Error(`動画ジョブの状態保存に失敗しました: ${runningUpdateError.message}`);
 
     return NextResponse.json({
       ok: true,
@@ -102,10 +106,14 @@ export async function POST(request: Request) {
     if (jobId) {
       try {
         const { admin } = clients();
-        await admin.from("production_jobs").update({ status: "failed", provider_response: { error: message }, completed_at: new Date().toISOString() }).eq("id", jobId);
+        if (providerRequestId) {
+          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+        } else {
+          await admin.from("production_jobs").update({ status: "failed", provider_response: { error: message }, completed_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+        }
       } catch {}
     }
-    if (usageEventId) {
+    if (usageEventId && !providerRequestId) {
       try {
         const refund = await refundMonthlyUsage(userId, "video_generation", usageEventId);
         if (!refund.refunded) {
