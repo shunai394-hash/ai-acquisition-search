@@ -194,7 +194,24 @@ export default function Home() {
       }
       const response = await fetch("/api/video/generate", {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ prompt: [studioPrompt.trim(), studioAudio === "off" ? "" : studioAudio === "custom" ? "Audio: spoken narration in " + studioVoice + ". Script: " + studioNarration.trim() : "Audio: natural voiceover and synchronized ambience. Voice: " + studioVoice, studioMusic ? "Music: subtle background music under dialogue." : "Music: none."].filter(Boolean).join("\n"), imageUrl: imageUrl || undefined, duration: studioDuration, resolution: studioResolution, aspectRatio: studioAspect, generateAudio: studioAudio !== "off" })
+        body: JSON.stringify({
+          prompt: [
+            studioPrompt.trim(),
+            studioAudio === "custom"
+              ? "AUDIO: Japanese spoken narration. Voice: " + studioVoice + ". Narration script: " + studioNarration.trim() + ". Speak naturally, clearly, and synchronize the delivery to the scene."
+              : studioAudio === "auto"
+                ? "AUDIO: natural voiceover and synchronized ambient sound. Voice: " + studioVoice + "."
+                : "",
+            studioMusic
+              ? "BGM: generate subtle, tasteful background music that supports the scene; keep it underneath the narration and do not overpower speech."
+              : ""
+          ].filter(Boolean).join("\n"),
+          imageUrl: imageUrl || undefined,
+          duration: studioDuration,
+          resolution: studioResolution,
+          aspectRatio: studioAspect,
+          generateAudio: studioAudio !== "off" || studioMusic
+        })
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "動画生成の開始に失敗しました。");
