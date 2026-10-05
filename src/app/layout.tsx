@@ -19,6 +19,19 @@ export const metadata: Metadata = {
     apple: "/icon.svg",
   },
   manifest: "/manifest.webmanifest",
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "ja_JP",
+    title: "AI Acquisition Search | AI集客検索エンジン",
+    description: "市場の声から、次の商品と広告を決める。分析・動画・SNS運用をひとつの意思決定ループにつなぐAI集客OS。",
+    siteName: "AI Acquisition Search",
+  },
+  twitter: {
+    card: "summary",
+    title: "AI Acquisition Search | AI集客検索エンジン",
+    description: "市場の声から、次の商品と広告を決めるAI集客OS。",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
