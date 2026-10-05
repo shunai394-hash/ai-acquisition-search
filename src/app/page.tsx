@@ -434,13 +434,13 @@ export default function Home() {
                 return <div key={key} className={active ? "studio-stage active" : "studio-stage"}><span>0{index + 1}</span><strong>{label}</strong><small>{ja}</small></div>;
               })}
             </div><div className="studio-actions">
-              <button type="button" onClick={() => generateStudioVideo()} disabled={studioGenerating || studioPrompt.trim().length < 8} aria-busy={studioGenerating}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
+              <button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating || studioPrompt.trim().length < 8} aria-busy={studioGenerating}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
               {studioStatus && <span className="video-status">{studioStatus}</span>}
             </div>
           </div>
         </div>
         {studioError && <p className="error">{studioError}</p>}
-        {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline /><div className="studio-result-actions"><button type="button" onClick={() => generateStudioVideo()} disabled={studioGenerating}>↻ Regenerate</button><button type="button" onClick={() => generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message.")} disabled={studioGenerating}>✦ Remix</button><a href={studioUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></div></div>}
+        {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>↻ Regenerate</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>✦ Remix</button><a href={studioUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></div></div>}
       </section>
       )}
 
