@@ -434,7 +434,7 @@ export default function Home() {
                 return <div key={key} className={active ? "studio-stage active" : "studio-stage"}><span>0{index + 1}</span><strong>{label}</strong><small>{ja}</small></div>;
               })}
             </div><div className="studio-actions">
-              <button type="button" onClick={generateStudioVideo} disabled={studioGenerating || studioPrompt.trim().length < 8} aria-busy={studioGenerating}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
+              <button type="button" onClick={() => generateStudioVideo()} disabled={studioGenerating || studioPrompt.trim().length < 8} aria-busy={studioGenerating}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
               {studioStatus && <span className="video-status">{studioStatus}</span>}
             </div>
           </div>
