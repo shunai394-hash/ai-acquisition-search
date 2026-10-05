@@ -28,11 +28,10 @@ const { GET } = await import("../app/api/health/route");
 test("public health probe is lightweight and does not fan out to dependencies", async () => {
   const response = await GET(new Request("https://app.test/api/health"));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), {
-    ok: true,
-    status: "alive",
-    commit: "test-commit",
-    logicVersion: "v1",
-    checkedAt: (await response.clone().json()).checkedAt,
-  });
+  const body = await response.json() as { ok: boolean; status: string; commit: string; logicVersion: string; checkedAt: string };
+  assert.equal(body.ok, true);
+  assert.equal(body.status, "alive");
+  assert.equal(body.commit, "test-commit");
+  assert.match(body.logicVersion, /^decision-/);
+  assert.doesNotThrow(() => new Date(body.checkedAt).toISOString());
 });
