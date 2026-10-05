@@ -27,6 +27,15 @@ function credentials() {
   );
 }
 
+/** True when credentials() would succeed; lets callers skip work instead of failing a job. */
+export function higgsfieldConfigured() {
+  return Boolean(
+    process.env.HIGGSFIELD_API_KEY
+    || process.env.HF_API_KEY
+    || (process.env.HF_API_KEY_ID && process.env.HF_API_KEY_SECRET),
+  );
+}
+
 function modelPath(model: string) {
   return model.replace(/^\/+|\/+$/g, "");
 }
@@ -44,7 +53,8 @@ async function requestHiggsfield(path: string, init: RequestInit) {
   let data: unknown;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
   if (!response.ok) {
-    throw new Error(`Higgsfield API error ${response.status}: ${JSON.stringify(data)}`);
+    // Bounded: this message is stored on the job and returned to the UI.
+    throw new Error(`Higgsfield API error ${response.status}: ${JSON.stringify(data).slice(0, 500)}`);
   }
   return data as Record<string, unknown>;
 }

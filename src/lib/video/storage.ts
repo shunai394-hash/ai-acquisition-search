@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { fetchPublicUrl } from "@/lib/security/public-url";
 
 const bucket = "video-assets";
 
@@ -19,7 +20,8 @@ export async function saveVideoToStorage(input: {
   sourceUrl: string;
   extension?: "mp4" | "webm";
 }) {
-  const response = await fetch(input.sourceUrl);
+  // The URL comes from the provider's response; never let it reach internal hosts.
+  const response = await fetchPublicUrl(input.sourceUrl);
   if (!response.ok) {
     throw new Error(`動画取得に失敗しました: HTTP ${response.status}`);
   }

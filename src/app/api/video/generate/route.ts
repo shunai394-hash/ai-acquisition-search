@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { consumeMonthlyUsage, getUserFromBearer, refundMonthlyUsage } from "@/lib/billing";
 import { generateVideo } from "@/lib/video/router";
+import { assertPublicUrl } from "@/lib/security/public-url";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,6 +22,8 @@ export async function POST(request: Request) {
   let usageEventId = "";
   // Preserve the external provider request if the DB state update fails after start.
   let providerRequestId = "";
+  // Kept on the job in every outcome so the operator loop can retry image-to-video.
+  let referenceImageUrl: string | undefined;
   try {
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
@@ -28,7 +31,15 @@ export async function POST(request: Request) {
     const body = await request.json();
     const prompt = String(body.prompt || "").trim();
     const imageUrl = body.imageUrl ? String(body.imageUrl) : undefined;
-    if (imageUrl && !/^https:\/\//i.test(imageUrl)) return NextResponse.json({ error: "imageUrl must be an HTTPS URL" }, { status: 400 });
+    referenceImageUrl = imageUrl;
+    if (imageUrl) {
+      try {
+        // The provider fetches this URL, and it is reused on every later iteration.
+        await assertPublicUrl(imageUrl, ["https:"]);
+      } catch {
+        return NextResponse.json({ error: "imageUrl must be a public HTTPS URL" }, { status: 400 });
+      }
+    }
     if (!prompt) return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     if (prompt.length > 10000) return NextResponse.json({ error: "prompt is too long" }, { status: 400 });
 
@@ -104,7 +115,8 @@ export async function POST(request: Request) {
     const { error: runningUpdateError } = await admin.from("production_jobs").update({
       status: "running",
       request_id: requestId,
-      provider_response: { engine: started.engine, started_response: started.raw },
+      // Keep input_image_url: retries and the next iteration read it from here.
+      provider_response: { ...(imageUrl ? { input_image_url: imageUrl } : {}), engine: started.engine, started_response: started.raw },
       started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", job.id).eq("user_id", user.id);
@@ -124,9 +136,9 @@ export async function POST(request: Request) {
       try {
         const { admin } = clients();
         if (providerRequestId) {
-          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { ...(referenceImageUrl ? { input_image_url: referenceImageUrl } : {}), recovery: true, error: message }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
         } else {
-          await admin.from("production_jobs").update({ status: "failed", provider_response: { error: message }, completed_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+          await admin.from("production_jobs").update({ status: "failed", provider_response: { ...(referenceImageUrl ? { input_image_url: referenceImageUrl } : {}), error: message }, completed_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
         }
       } catch {}
     }
