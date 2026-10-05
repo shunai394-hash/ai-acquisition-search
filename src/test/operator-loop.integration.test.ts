@@ -43,6 +43,7 @@ type Stub = {
   ecPulse: { status: number } | "down";
   higgsfieldCalls: number;
   higgsfieldBodies: Array<Record<string, unknown>>;
+  higgsfieldPaths: string[];
   openai: "absent" | "down";
 };
 let stub: Stub;
@@ -80,6 +81,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     stub.higgsfieldCalls++;
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     stub.higgsfieldBodies.push(body);
+    stub.higgsfieldPaths.push(url.pathname);
     return new Response(JSON.stringify({ request_id: `hf-${stub.higgsfieldCalls}`, status: "queued" }), { status: 200 });
   }
   if (url.host === "api.openai.com") {
@@ -104,7 +106,7 @@ function seedPost(id: string, opts: { publishedAgoMs?: number; metadata?: Record
 
 beforeEach(() => {
   db = new FakeSupabase();
-  stub = { tweet: { status: 200, metrics: { impression_count: 5000, like_count: 10, reply_count: 1, retweet_count: 0 } }, ecPulse: { status: 200 }, higgsfieldCalls: 0, higgsfieldBodies: [], openai: "absent" };
+  stub = { tweet: { status: 200, metrics: { impression_count: 5000, like_count: 10, reply_count: 1, retweet_count: 0 } }, ecPulse: { status: 200 }, higgsfieldCalls: 0, higgsfieldBodies: [], higgsfieldPaths: [], openai: "absent" };
   delete process.env.OPENAI_API_KEY;
   db.seed("products", [{ id: "prod1", user_id: "u1", name: "保冷ボトル", url: "https://shop.test/bottle", price: 3000, cost: 1200 }]);
   db.seed("acquisition_plans", [{ id: "plan1", user_id: "u1", product_id: "prod1", target: "通勤する会社員", pain: "すぐぬるくなる", desire: "冷たいまま", value_proposition: "夕方まで氷が残る", angle: "すぐぬるくなる", hypothesis: "通勤者は保冷時間に反応する" }]);
@@ -171,6 +173,7 @@ test("video retry reuses the original reference image", async () => {
   assert.equal(jobResult.status, "running", JSON.stringify(body.results));
   assert.equal(stub.higgsfieldCalls, 1);
   assert.equal(stub.higgsfieldBodies[0].image_url, "https://storage.test/product-reference.webp");
+  assert.equal(stub.higgsfieldPaths[0], "/alibaba/wan-3.0-prime/image-to-video");
   const retryJob = db.table("production_jobs")[0] as { provider_response: Record<string, unknown> };
   assert.equal(retryJob.provider_response.input_image_url, "https://storage.test/product-reference.webp");
 });
