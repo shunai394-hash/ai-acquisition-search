@@ -13,12 +13,18 @@ export type HiggsfieldVideoInput = {
 };
 
 function credentials() {
+  // Higgsfield's current API console provides a single complete API key.
+  // Keep the legacy KEY_ID:KEY_SECRET pair as a backwards-compatible fallback.
+  const apiKey = process.env.HIGGSFIELD_API_KEY ?? process.env.HF_API_KEY;
+  if (apiKey) return `Key ${apiKey}`;
+
   const id = process.env.HF_API_KEY_ID;
   const secret = process.env.HF_API_KEY_SECRET;
-  if (!id || !secret) {
-    throw new Error("Higgsfield API credentials are not configured. Set HF_API_KEY_ID and HF_API_KEY_SECRET.");
-  }
-  return `Key ${id}:${secret}`;
+  if (id && secret) return `Key ${id}:${secret}`;
+
+  throw new Error(
+    "Higgsfield API credentials are not configured. Set HIGGSFIELD_API_KEY (or HF_API_KEY)."
+  );
 }
 
 function modelPath(model: string) {
