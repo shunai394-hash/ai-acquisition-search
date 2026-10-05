@@ -995,3 +995,13 @@ body{overflow-x:hidden}
   .studio-stage small{font-size:6px}
 }
 @media(prefers-reduced-motion:reduce){.studio-stage{transition:none}}
+
+
+/* AWARD PASS 03 — product loop visibility */
+.test-loop-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.auto-loop-badge{
+  display:inline-flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid rgba(120,255,180,.18);
+  border-radius:999px;background:rgba(120,255,180,.045);color:#b8ffd2;font-size:9px;letter-spacing:.12em;
+}
+.auto-loop-badge i{width:6px;height:6px;border-radius:50%;background:#8dffb7;box-shadow:0 0 14px rgba(141,255,183,.75)}
+@media(max-width:700px){.test-loop-actions{align-items:stretch;flex-direction:column}.auto-loop-badge{justify-content:center;text-align:center}}
