@@ -20,6 +20,13 @@ async function check<T>(fn: () => Promise<T>) {
 // CRON_SECRET`: configuration and dependency details for production smoke tests.
 export async function GET(request: Request) {
   const commit = process.env.VERCEL_GIT_COMMIT_SHA || null;
+  const authorized = verifyCronRequest(request).ok;
+
+  // Keep the public probe cheap: dependency checks are intentionally reserved
+  // for authenticated smoke tests so arbitrary traffic cannot fan out to DB/API calls.
+  if (!authorized) {
+    return NextResponse.json({ ok: true, status: "alive", commit, logicVersion: DECISION_LOGIC_VERSION, checkedAt: new Date().toISOString() });
+  }
 
   const database = await check(async () => {
     const { error } = await getAdminSupabase().from("operator_runs").select("id", { head: true, count: "exact" }).limit(1);
@@ -42,8 +49,6 @@ export async function GET(request: Request) {
   // availability is part of overall health rather than a diagnostic-only check.
   const ok = database.ok && leaseTable.ok && ecPulse.ok;
   const summary = { ok, commit, logicVersion: DECISION_LOGIC_VERSION, database: database.ok, operatorLeases: leaseTable.ok, ecPulse: ecPulse.ok, checkedAt: new Date().toISOString() };
-  if (!verifyCronRequest(request).ok) return NextResponse.json(summary, { status: ok ? 200 : 503 });
-
   const ec = ecPulseConfig();
   return NextResponse.json({
     ...summary,
