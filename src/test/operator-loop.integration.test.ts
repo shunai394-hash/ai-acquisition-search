@@ -43,6 +43,7 @@ type Stub = {
   ecPulse: { status: number } | "down";
   higgsfieldCalls: number;
   higgsfieldBodies: Array<Record<string, unknown>>;
+  higgsfieldPaths: string[];
   openai: "absent" | "down";
 };
 let stub: Stub;
@@ -171,7 +172,7 @@ test("video retry reuses the original reference image", async () => {
   assert.equal(jobResult.status, "running", JSON.stringify(body.results));
   assert.equal(stub.higgsfieldCalls, 1);
   assert.equal(stub.higgsfieldBodies[0].image_url, "https://storage.test/product-reference.webp");
-  assert.equal(stub.higgsfieldBodies[0].model, "alibaba/wan-3.0-prime/image-to-video");
+  assert.equal(stub.higgsfieldPaths[0], "/alibaba/wan-3.0-prime/image-to-video");
   const retryJob = db.table("production_jobs")[0] as { provider_response: Record<string, unknown> };
   assert.equal(retryJob.provider_response.input_image_url, "https://storage.test/product-reference.webp");
 });
