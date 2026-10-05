@@ -105,7 +105,7 @@ function seedPost(id: string, opts: { publishedAgoMs?: number; metadata?: Record
 
 beforeEach(() => {
   db = new FakeSupabase();
-  stub = { tweet: { status: 200, metrics: { impression_count: 5000, like_count: 10, reply_count: 1, retweet_count: 0 } }, ecPulse: { status: 200 }, higgsfieldCalls: 0, higgsfieldBodies: [], openai: "absent" };
+  stub = { tweet: { status: 200, metrics: { impression_count: 5000, like_count: 10, reply_count: 1, retweet_count: 0 } }, ecPulse: { status: 200 }, higgsfieldCalls: 0, higgsfieldBodies: [], higgsfieldPaths: [], openai: "absent" };
   delete process.env.OPENAI_API_KEY;
   db.seed("products", [{ id: "prod1", user_id: "u1", name: "保冷ボトル", url: "https://shop.test/bottle", price: 3000, cost: 1200 }]);
   db.seed("acquisition_plans", [{ id: "plan1", user_id: "u1", product_id: "prod1", target: "通勤する会社員", pain: "すぐぬるくなる", desire: "冷たいまま", value_proposition: "夕方まで氷が残る", angle: "すぐぬるくなる", hypothesis: "通勤者は保冷時間に反応する" }]);
