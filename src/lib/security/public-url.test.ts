@@ -45,3 +45,23 @@ test("rejects unsafe schemes and embedded credentials", async () => {
 test("allows ordinary public URL syntax", async () => {
   await assert.doesNotReject(() => assertPublicUrl("https://example.com/"));
 });
+
+test("blocks IPv6 forms that reach IPv4 or local hosts without the ::ffff: prefix", async () => {
+  for (const url of [
+    "http://[::]/",
+    "http://[::127.0.0.1]/",
+    "http://[::7f00:1]/",
+    "http://[64:ff9b::a9fe:a9fe]/",
+    "http://[64:ff9b::169.254.169.254]/",
+    "http://[2002:c0a8:101::1]/",
+    "http://[2001:0:4136:e378:8000:63bf:3fff:fdd2]/",
+  ]) {
+    await assert.rejects(() => assertPublicUrl(url), url);
+  }
+});
+
+test("allows public IP literals (no DNS involved)", async () => {
+  await assert.doesNotReject(() => assertPublicUrl("https://93.184.216.34/video.mp4"));
+  await assert.doesNotReject(() => assertPublicUrl("https://[2606:4700:4700::1111]/"));
+  await assert.doesNotReject(() => assertPublicUrl("https://[2001:4860:4860::8888]/"));
+});

@@ -24,7 +24,8 @@ function amazonSnapshot(inputUrl: string): PageSnapshot | null {
   const asin = url.pathname.match(/\/dp\/([A-Z0-9]{10})/i)?.[1]?.toUpperCase() ?? "";
   if (!asin) return null;
 
-  const decodedPath = decodeURIComponent(url.pathname);
+  let decodedPath = url.pathname;
+  try { decodedPath = decodeURIComponent(url.pathname); } catch { /* malformed %-escape: keep the raw path */ }
   const dpIndex = decodedPath.toLowerCase().indexOf("/dp/");
   const rawTitle = dpIndex > 0
     ? decodedPath.slice(1, dpIndex).replace(/[-_]+/g, " ").trim()
