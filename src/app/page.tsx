@@ -337,6 +337,8 @@ export default function Home() {
   }
 
   async function saveMetrics() {
+    setVerdict(null);
+    setError("");
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -973,7 +975,21 @@ export default function Home() {
             <p className="hint">投稿後の数字を保存すると、AIが継続・ピボット・停止の次アクションを判断します。</p>
             <button type="button" onClick={()=>setMetricsOpen(!metricsOpen)}>{metricsOpen ? "入力を閉じる" : "実績を入力する"}</button>
             {metricsOpen && <div className="metrics-form">
-              {(["impressions","views","clicks","conversions","revenue","grossProfit","adSpend"] as const).map(k=><label key={k}>{k}<input aria-label={k} inputMode="decimal" type="number" value={metrics[k]} onChange={e=>setMetrics({...metrics,[k]:e.target.value})}/></label>)}
+              {([
+                ["impressions","表示回数","件"],
+                ["views","再生数","件"],
+                ["clicks","クリック","件"],
+                ["conversions","コンバージョン","件"],
+                ["revenue","売上","円"],
+                ["grossProfit","粗利益","円"],
+                ["adSpend","広告費","円"],
+              ] as const).map(([k,label,unit])=>(
+                <label key={k}>
+                  <span>{label}</span>
+                  <small>{unit}</small>
+                  <input aria-label={label} inputMode="decimal" min="0" step="1" type="number" value={metrics[k]} onChange={e=>setMetrics({...metrics,[k]:e.target.value})}/>
+                </label>
+              ))}
               <p className="hint">テスト計画を保存すると投稿IDが自動発行されます。投稿後の実績を入力してください。</p>
               <button type="button" onClick={saveMetrics}>実績を保存してAI判定</button>
             </div>}
