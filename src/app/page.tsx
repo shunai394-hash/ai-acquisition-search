@@ -38,7 +38,13 @@ export default function Home() {
   const [testSaved, setTestSaved] = useState("");
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [metrics, setMetrics] = useState({ impressions:"", views:"", clicks:"", conversions:"", revenue:"", grossProfit:"", adSpend:"" });
-  const [verdict, setVerdict] = useState<{verdict:string;reason:string}|null>(null);
+  const [verdict, setVerdict] = useState<{
+    verdict: string;
+    reason: string;
+    nextAction?: string;
+    aiConnected?: boolean;
+    evidenceCount?: number;
+  } | null>(null);
   const [socialPostId, setSocialPostId] = useState("");
   const [researchHistory, setResearchHistory] = useState<EcPulseResearchRun[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -346,7 +352,13 @@ export default function Home() {
       const decision = await fetch("/api/operator/decision", { method:"POST", headers:{"Content-Type":"application/json",Authorization:`Bearer ${data.session.access_token}`}, body:JSON.stringify({socialPostId}) });
       const verdictBody = await decision.json();
       if (!decision.ok) throw new Error(verdictBody.error || "判定に失敗しました。");
-      setVerdict({verdict:verdictBody.verdict, reason:verdictBody.reason});
+      setVerdict({
+        verdict: verdictBody.verdict,
+        reason: verdictBody.reason,
+        nextAction: verdictBody.nextAction,
+        aiConnected: verdictBody.aiConnected === true,
+        evidenceCount: Array.isArray(verdictBody.decision?.evidence) ? verdictBody.decision.evidence.length : undefined,
+      });
     } catch(err) { setError(err instanceof Error ? err.message : "実績保存に失敗しました。"); }
   }
 
@@ -965,7 +977,24 @@ export default function Home() {
               <p className="hint">テスト計画を保存すると投稿IDが自動発行されます。投稿後の実績を入力してください。</p>
               <button type="button" onClick={saveMetrics}>実績を保存してAI判定</button>
             </div>}
-            {verdict && <div className="verdict"><strong>{verdict.verdict}</strong><p>{verdict.reason}</p></div>}
+            {verdict && (
+              <div className="verdict" role="status" aria-live="polite">
+                <div className="verdict-head">
+                  <div>
+                    <span className="eyebrow">TEACHER DECISION</span>
+                    <strong>{verdict.verdict}</strong>
+                  </div>
+                  <span className="verdict-source">{verdict.aiConnected ? "AI REFINED" : "DETERMINISTIC"}{typeof verdict.evidenceCount === "number" ? ` · ${verdict.evidenceCount} SIGNALS` : ""}</span>
+                </div>
+                <p>{verdict.reason}</p>
+                {verdict.nextAction && (
+                  <div className="verdict-next">
+                    <span>NEXT ACTION</span>
+                    <strong>{verdict.nextAction}</strong>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <section id="test-loop" className="next test-loop">
