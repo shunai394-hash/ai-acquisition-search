@@ -1011,3 +1011,35 @@ body{overflow-x:hidden}
 .loop-gate{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:18px 0 0;padding:20px 22px;border:1px solid rgba(255,255,255,.12);border-radius:18px;background:linear-gradient(120deg,rgba(255,255,255,.055),rgba(255,255,255,.018));box-shadow:0 18px 60px rgba(0,0,0,.18)}
 .loop-gate>div{min-width:0}.loop-gate strong{display:block;margin-top:5px;font-size:18px;letter-spacing:-.02em}.loop-gate p{max-width:720px;margin:7px 0 0;color:#ffffff88;font-size:12px;line-height:1.7}.loop-gate button{flex:0 0 auto;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:11px 16px;background:#fff;color:#080808;font-weight:700;cursor:pointer;transition:transform .2s ease,box-shadow .2s ease}.loop-gate button:hover{transform:translateY(-1px);box-shadow:0 10px 30px rgba(255,255,255,.12)}
 @media(max-width:700px){.loop-gate{align-items:stretch;flex-direction:column}.loop-gate button{width:100%}}
+
+
+/* AWARD PASS 05 — explicit publishing consent + clear risk boundary */
+.publish-consent{
+  display:flex;
+  align-items:flex-start;
+  gap:11px;
+  margin:10px 0 12px;
+  padding:13px 14px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:13px;
+  background:rgba(255,255,255,.025);
+  color:#c8cad1;
+  cursor:pointer;
+}
+.publish-consent:has(input:checked){
+  border-color:rgba(155,140,255,.32);
+  background:rgba(155,140,255,.055);
+}
+.publish-consent input{
+  width:18px;
+  height:18px;
+  margin:1px 0 0;
+  flex:0 0 auto;
+  accent-color:#aaa2ff;
+}
+.publish-consent span{display:grid;gap:4px}
+.publish-consent strong{font-size:12px;line-height:1.4}
+.publish-consent small{color:#707580;font-size:10px;line-height:1.5}
+@media(max-width:700px){
+  .publish-consent{padding:14px}
+}
