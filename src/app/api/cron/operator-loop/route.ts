@@ -69,12 +69,23 @@ async function publishCompletedVideo(
     return { ok: false, skipped: true, reason: `unsupported network: ${nextPost.network}` };
   }
 
-  const { data: existing } = await db.from("social_posts")
+  const { data: existingSnake, error: existingSnakeError } = await db.from("social_posts")
     .select("id,status,external_post_id")
     .eq("user_id", userId)
-    .or(`metadata->>sourceSocialPostId.eq.${nextPost.id},metadata->>source_social_post_id.eq.${nextPost.id}`)
     .eq("network", nextPost.network)
+    .eq("metadata->>source_social_post_id", nextPost.id)
     .limit(1);
+  if (existingSnakeError) throw existingSnakeError;
+
+  // Keep compatibility with older rows that used camelCase metadata.
+  const existing = existingSnake?.length
+    ? existingSnake
+    : (await db.from("social_posts")
+        .select("id,status,external_post_id")
+        .eq("user_id", userId)
+        .eq("network", nextPost.network)
+        .eq("metadata->>sourceSocialPostId", nextPost.id)
+        .limit(1)).data;
 
   if (existing?.[0]?.external_post_id) {
     return { ok: true, skipped: true, reason: "already published", postId: existing[0].id };
