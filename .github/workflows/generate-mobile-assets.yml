@@ -1,11 +1,7 @@
 name: Generate mobile brand assets
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "mobile/assets/icon.png"
-      - "mobile/assets/splash-icon.png"
+  workflow_dispatch:
 
 permissions:
   contents: write
