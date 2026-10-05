@@ -73,8 +73,39 @@ export async function POST(request: Request) {
     // This prevents two workers from publishing the same creative to the same network concurrently.
     // A row left in "publishing" after a process crash is deliberately not auto-retried,
     // because retrying without provider-side idempotency could create a duplicate external post.
+    const findExistingReservation = async (network: Platform) => {
+      const { data: snakeCase, error: snakeError } = await supabase.from("social_posts")
+        .select("id,status,external_post_id,post_url")
+        .eq("user_id", user.id).eq("network", network)
+        .filter("metadata->>source_social_post_id", "eq", socialPostId)
+        .maybeSingle();
+      if (snakeError) throw snakeError;
+      if (snakeCase) return snakeCase;
+
+      const { data: camelCase, error: camelError } = await supabase.from("social_posts")
+        .select("id,status,external_post_id,post_url")
+        .eq("user_id", user.id).eq("network", network)
+        .filter("metadata->>sourceSocialPostId", "eq", socialPostId)
+        .maybeSingle();
+      if (camelError) throw camelError;
+      return camelCase ?? null;
+    };
+
     const reserve = async (network: Platform) => {
       const metadata = { source_social_post_id: socialPostId };
+      const existingBeforeInsert = await findExistingReservation(network);
+      if (existingBeforeInsert) {
+        if (existingBeforeInsert.status === "published" || existingBeforeInsert.status === "publishing") {
+          return { claimed: false, row: existingBeforeInsert };
+        }
+        const { data: reclaimed, error: reclaimError } = await supabase.from("social_posts")
+          .update({ status: "publishing", published_at: null, updated_at: new Date().toISOString() })
+          .eq("id", existingBeforeInsert.id).eq("user_id", user.id).eq("status", "failed")
+          .select("id,status,external_post_id,post_url").maybeSingle();
+        if (reclaimError) throw reclaimError;
+        if (reclaimed) return { claimed: true, row: reclaimed };
+      }
+
       const { data, error } = await supabase.from("social_posts").insert({
         creative_id: source.creative_id,
         user_id: user.id,
@@ -91,13 +122,7 @@ export async function POST(request: Request) {
 
       if (error?.code !== "23505") throw error;
 
-      const { data: existing, error: existingError } = await supabase.from("social_posts")
-        .select("id,status,external_post_id,post_url")
-        .eq("user_id", user.id)
-        .eq("network", network)
-        .filter("metadata->>source_social_post_id", "eq", socialPostId)
-        .maybeSingle();
-      if (existingError) throw existingError;
+      const existing = await findExistingReservation(network);
       if (!existing) throw new Error("SNS投稿の重複予約を確認できませんでした。");
 
       if (existing.status === "published") return { claimed: false, row: existing };
