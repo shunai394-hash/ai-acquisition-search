@@ -225,6 +225,7 @@ export default function Home() {
       if (!response.ok) throw new Error(body.error || "動画生成の開始に失敗しました。");
       const jobId = String(body.jobId || ""); if (!jobId) throw new Error("動画ジョブIDを取得できませんでした。");
       const engine = String(body.engine || "Higgsfield"); setStudioStage("motion"); setStudioStatus(engine + "でモーションを生成中…");
+      if (studioAudio !== "off" || studioMusic) window.setTimeout(() => setStudioStage("audio"), 700);
       for (let attempt = 0; attempt < 60; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : 5000));
         const poll = await fetch("/api/video/jobs/" + encodeURIComponent(jobId), { headers: { Authorization: "Bearer " + (await getAccessToken()) }, cache: "no-store" });
