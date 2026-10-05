@@ -65,7 +65,8 @@ export async function POST(request: Request) {
       duration,
       resolution,
       aspect_ratio: aspectRatio,
-      generate_audio: generateAudio
+      generate_audio: generateAudio,
+      provider_response: imageUrl ? { input_image_url: imageUrl } : null,
     }).select("id").single();
 
     if (jobError || !job) throw new Error(jobError?.message || "production jobの作成に失敗しました。");
