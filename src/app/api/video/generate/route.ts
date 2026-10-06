@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       status: "running",
       request_id: requestId,
       // Keep input_image_url: retries and the next iteration read it from here.
-      provider_response: { ...(imageUrl ? { input_image_url: imageUrl } : {}), engine: started.engine, started_response: started.raw },
+      provider_response: { ...(imageUrl ? { input_image_url: imageUrl } : {}), engine: started.engine, started_response: { status: started.raw?.status ?? "queued", request_id: requestId } },
       started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", job.id).eq("user_id", user.id);
