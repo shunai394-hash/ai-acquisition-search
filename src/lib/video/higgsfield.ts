@@ -89,27 +89,32 @@ async function requestHiggsfield(path: string, init: RequestInit) {
   return data as Record<string, unknown>;
 }
 
-function firstHttpUrl(value: unknown): string | undefined {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    const objectValue = value as Record<string, unknown>;
-    const nestedOutput = objectValue.output ?? objectValue.result ?? objectValue.data;
-    if (nestedOutput && nestedOutput !== value) {
-      const nestedFound = firstHttpUrl(nestedOutput);
-      if (nestedFound) return nestedFound;
-    }
-  }
-  if (typeof value === "string" && /^https?:/i.test(value)) return value;
+function firstHttpUrl(value: unknown, seen = new Set<object>()): string | undefined {
+  if (typeof value === "string") return /^https?:/i.test(value) ? value : undefined;
+  if (!value || typeof value !== "object") return undefined;
+  if (seen.has(value)) return undefined;
+  seen.add(value);
+
   if (Array.isArray(value)) {
     for (const item of value) {
-      const found = firstHttpUrl(item);
+      const found = firstHttpUrl(item, seen);
       if (found) return found;
     }
+    return undefined;
   }
-  if (value && typeof value === "object") {
-    for (const key of ["url", "video_url", "videoUrl", "download_url", "downloadUrl", "src"]) {
-      const found = firstHttpUrl((value as Record<string, unknown>)[key]);
-      if (found) return found;
-    }
+
+  const objectValue = value as Record<string, unknown>;
+  for (const key of ["url", "video_url", "videoUrl", "download_url", "downloadUrl", "src"]) {
+    const found = firstHttpUrl(objectValue[key], seen);
+    if (found) return found;
+  }
+
+  // Higgsfield response envelopes vary by model. Traverse nested objects rather
+  // than relying on a fixed output/result/data path.
+  for (const [key, child] of Object.entries(objectValue)) {
+    if (["url", "video_url", "videoUrl", "download_url", "downloadUrl", "src"].includes(key)) continue;
+    const found = firstHttpUrl(child, seen);
+    if (found) return found;
   }
   return undefined;
 }
