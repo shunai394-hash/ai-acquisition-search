@@ -182,7 +182,8 @@ function normalizedStatus(result: Record<string, unknown>) {
 }
 
 function providerErrorMessage(result: Record<string, unknown>) {
-  const message = result.error ?? result.message ?? result.detail;
+  const nested = result.error && typeof result.error === "object" ? result.error as Record<string, unknown> : undefined;
+  const message = result.error ?? result.message ?? result.detail ?? nested?.message;
   return typeof message === "string" && message.trim()
     ? message.trim()
     : JSON.stringify(result);
