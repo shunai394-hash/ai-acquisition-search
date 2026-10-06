@@ -1228,3 +1228,7 @@ label:has(> input[type="file"]:focus-visible),label:has(> input[type="checkbox"]
 
 /* AWARD PASS 18 — hypothesis interaction */
 .hypothesis-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.035)}.hypothesis-card.active:hover{border-color:rgba(184,239,255,.32)}
+
+
+/* AWARD PASS 19 — execution command hierarchy */
+.execution-command h2{max-width:760px;font-size:clamp(28px,4vw,46px);line-height:1.05;letter-spacing:-.055em;text-wrap:balance}.execution-command>div>p:not(.eyebrow){max-width:700px;color:#858a95;line-height:1.8}
