@@ -214,4 +214,7 @@ export async function waitForHiggsfieldVideo(
 }\n\n\n/* video: robust status timeout error */\nfunction providerErrorMessage(result: Record<string, unknown>) {
   const message = result.error ?? result.message ?? result.detail;
   return typeof message === "string" && message.trim() ? message.trim() : JSON.stringify(result);
+}\n\n\n/* video: status polling jitter */\nfunction nextPollDelay(current: number) {
+  const base = Math.min(Math.round(current * 1.45), 10_000);
+  return Math.max(2_000, base + Math.floor(Math.random() * 350));
 }\n
