@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import GoogleSignIn from "@/components/GoogleSignIn";
 import BillingButton from "@/components/BillingButton";
 import OperatorAutopilot from "@/components/OperatorAutopilot";
@@ -73,6 +73,12 @@ export default function Home() {
   const [studioMusicPrompt, setStudioMusicPrompt] = useState("");
   const [studioResolution, setStudioResolution] = useState<"720p" | "1080p">("1080p");
   const [studioStage, setStudioStage] = useState<"idle" | "prepare" | "visual" | "motion" | "audio" | "render">("idle");
+  useEffect(() => {
+    return () => {
+      if (studioImagePreview) URL.revokeObjectURL(studioImagePreview);
+    };
+  }, [studioImagePreview]);
+
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["tiktok"]);
   const [publishCaption, setPublishCaption] = useState("");
   const [tiktokConsent, setTiktokConsent] = useState(false);
