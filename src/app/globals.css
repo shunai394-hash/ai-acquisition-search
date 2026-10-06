@@ -1212,3 +1212,7 @@ label:has(> input[type="file"]:focus-visible),label:has(> input[type="checkbox"]
 
 /* AWARD PASS 14 — reference image presentation */
 .studio-upload img{display:block;width:100%;max-height:420px;object-fit:contain;border-radius:14px;box-shadow:0 18px 55px rgba(0,0,0,.34);background:#020307}.studio-upload-large img{max-height:460px}
+
+
+/* AWARD PASS 15 — prompt editor hierarchy */
+.studio-prompt textarea{line-height:1.7;letter-spacing:.005em;caret-color:#bdb7ff}.studio-prompt textarea::placeholder{color:#4e545e;opacity:1}.studio-prompt textarea::selection{background:rgba(155,140,255,.3);color:#fff}
