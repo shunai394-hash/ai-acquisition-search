@@ -40,7 +40,7 @@ function modelPath(model: string) {
   return model.replace(/^\/+|\/+$/g, "");
 }
 
-// Documented base URL of the Higgsfield platform API (docs.higgsfield.ai).
+// Documented REST base URL of the Higgsfield API (docs.higgsfield.ai).
 export function higgsfieldBaseUrl() {
   return (process.env.HIGGSFIELD_API_BASE_URL || "https://api.higgsfield.ai").replace(/\/+$/, "");
 }
