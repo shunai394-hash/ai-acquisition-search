@@ -90,7 +90,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     if (!handler) return new Response(JSON.stringify({ error: "no route" }), { status: 404 });
     return handler(request);
   }
-  if (url.host === "api.higgsfield.ai") {
+  if (url.host === "platform.higgsfield.ai") {
     const status = /^\/requests\/([^/]+)\/status$/.exec(url.pathname);
     if (status) {
       stub.hfStatusCalls++;
@@ -513,4 +513,15 @@ test("posts measured within the evaluation window are skipped without calling th
   assert.equal(body.results.some((x) => x.postId === "fresh-metric"), false);
   assert.equal(body.results.find((x) => x.postId === "stale-metric")?.verdict, "pivot", JSON.stringify(body.results));
   assert.equal(db.table("post_metrics").filter((m) => m.social_post_id === "fresh-metric").length, 1, "no new fetch for the fresh post");
+});
+
+test("a canceled provider request is failed and retried instead of staying 'running'", async () => {
+  seedJob();
+  stub.hfStatus["hf-req-1"] = "canceled";
+  await runLoop();
+  assert.equal(job().status, "failed");
+  assert.equal(job().provider_response.input_image_url, IMAGE);
+  await runLoop();
+  assert.equal(stub.hfStarts.length, 1, "retried once with the same image");
+  assert.equal(stub.hfStarts[0].body.image_url, IMAGE);
 });

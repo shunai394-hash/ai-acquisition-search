@@ -40,8 +40,13 @@ function modelPath(model: string) {
   return model.replace(/^\/+|\/+$/g, "");
 }
 
+// Documented base URL of the Higgsfield platform API (docs.higgsfield.ai).
+export function higgsfieldBaseUrl() {
+  return (process.env.HIGGSFIELD_API_BASE_URL || "https://platform.higgsfield.ai").replace(/\/+$/, "");
+}
+
 async function requestHiggsfield(path: string, init: RequestInit) {
-  const response = await fetch(`https://api.higgsfield.ai/${modelPath(path)}`, {
+  const response = await fetch(`${higgsfieldBaseUrl()}/${modelPath(path)}`, {
     ...init,
     headers: {
       Authorization: credentials(),
@@ -91,6 +96,15 @@ export async function getHiggsfieldStatus(requestId: string) {
 export function extractHiggsfieldVideoUrl(result: Record<string, unknown>) {
   const direct = (result.video as Record<string, unknown> | undefined)?.url;
   if (typeof direct === "string" && /^https?:/i.test(direct)) return direct;
+  // Outputs may also come as an array ("video" / "videos": [{ url }]).
+  for (const key of ["video", "videos"]) {
+    const list = result[key];
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      const url = (item as Record<string, unknown> | null)?.url;
+      if (typeof url === "string" && /^https?:/i.test(url)) return url;
+    }
+  }
   const jobs = Array.isArray(result.jobs) ? result.jobs : [];
   for (const job of jobs) {
     const raw = (job as Record<string, unknown>).results;
@@ -113,7 +127,7 @@ export async function waitForHiggsfieldVideo(requestId: string, timeoutMs = 15 *
       if (!videoUrl) throw new Error("Higgsfield生成はcompletedですが動画URLを取得できませんでした。");
       return { ...result, videoUrl };
     }
-    if (status === "failed" || status === "nsfw") {
+    if (status === "failed" || status === "nsfw" || status === "canceled") {
       throw new Error(`Higgsfield generation ${status}: ${JSON.stringify(result)}`);
     }
     await new Promise((resolve) => setTimeout(resolve, delay));

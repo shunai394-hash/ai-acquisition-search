@@ -160,7 +160,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ ok: true, job: { ...job, status: "completed" }, asset });
     }
 
-    if (status === "failed" || status === "nsfw") {
+    // Terminal provider states (docs: completed | failed | nsfw | canceled).
+    if (status === "failed" || status === "nsfw" || status === "canceled") {
       const message = `Higgsfield generation ${status}: ${JSON.stringify(result).slice(0, 300)}`;
       const { error: failUpdateError } = await updateJob({
         status: "failed",
