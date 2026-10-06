@@ -217,4 +217,9 @@ export async function waitForHiggsfieldVideo(
 }\n\n\n/* video: status polling jitter */\nfunction nextPollDelay(current: number) {
   const base = Math.min(Math.round(current * 1.45), 10_000);
   return Math.max(2_000, base + Math.floor(Math.random() * 350));
+}\n\n\n/* video: request id aliases */\nfunction extractRequestId(result: Record<string, unknown>) {
+  for (const key of ["request_id","requestId","id","task_id","taskId"]) {
+    const value = result[key]; if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
 }\n
