@@ -166,7 +166,7 @@ export function extractHiggsfieldVideoUrl(result: Record<string, unknown>) {
   const direct = firstHttpUrl(result.video);
   if (direct) return direct;
 
-  for (const key of ["videos", "output", "result", "data", "asset", "jobs", "images"]) {
+  for (const key of ["videos", "output", "result", "data", "asset", "jobs", "images", "video_url", "videoUrl", "download_url", "downloadUrl"]) {
     const found = firstHttpUrl(result[key]);
     if (found) return found;
   }
