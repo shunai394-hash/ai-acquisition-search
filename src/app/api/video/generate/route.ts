@@ -131,16 +131,48 @@ export async function POST(request: Request) {
       message: `${started.engine}で動画生成を開始しました。完成まで自動で確認します。`
     }, { status: 202 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "動画生成の開始に失敗しました。";
+    const internalMessage = error instanceof Error ? error.message : String(error);
+    console.error("video generation request failed", {
+      userId: userId || undefined,
+      jobId: jobId || undefined,
+      providerRequestId: providerRequestId || undefined,
+      error: internalMessage.slice(0, 1_000),
+    });
+
+    const userMessage = providerRequestId
+      ? "動画生成は開始されましたが、状態の保存に問題がありました。自動復旧を継続します。"
+      : "動画生成を開始できませんでした。しばらくしてからもう一度お試しください。";
+
     if (jobId) {
       try {
         const { admin } = clients();
         if (providerRequestId) {
-          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { ...(referenceImageUrl ? { input_image_url: referenceImageUrl } : {}), recovery: true, error: message }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+          await admin.from("production_jobs").update({
+            status: "running",
+            request_id: providerRequestId,
+            provider_response: {
+              ...(referenceImageUrl ? { input_image_url: referenceImageUrl } : {}),
+              recovery: true,
+              error_code: "provider_started_state_persistence_failed",
+            },
+            updated_at: new Date().toISOString(),
+          }).eq("id", jobId).eq("user_id", userId);
         } else {
-          await admin.from("production_jobs").update({ status: "failed", provider_response: { ...(referenceImageUrl ? { input_image_url: referenceImageUrl } : {}), error: message }, completed_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+          await admin.from("production_jobs").update({
+            status: "failed",
+            provider_response: {
+              ...(referenceImageUrl ? { input_image_url: referenceImageUrl } : {}),
+              error_code: "video_generation_start_failed",
+            },
+            completed_at: new Date().toISOString(),
+          }).eq("id", jobId).eq("user_id", userId);
         }
-      } catch {}
+      } catch (persistError) {
+        console.error("video generation failure state persistence failed", {
+          jobId,
+          error: persistError instanceof Error ? persistError.message : String(persistError),
+        });
+      }
     }
     if (usageEventId && !providerRequestId) {
       try {
@@ -160,7 +192,7 @@ export async function POST(request: Request) {
         });
       }
     }
-    return NextResponse.json({ error: message, jobId: jobId || undefined }, { status: 500 });
+    return NextResponse.json({ error: userMessage, jobId: jobId || undefined }, { status: 500 });
   }
 }
 
