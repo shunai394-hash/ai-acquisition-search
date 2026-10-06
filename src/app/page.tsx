@@ -208,6 +208,39 @@ export default function Home() {
         if (!upload.ok) throw new Error(body.error || "画像のアップロードに失敗しました。");
         imageUrl = String(body.url || "");
       }
+
+      let audioUrl = "";
+      if (studioAudio !== "off") {
+        setStudioStage("audio");
+        setStudioStatus("ナレーションとBGMを仕上げ中…");
+        const narrationText = studioAudio === "custom"
+          ? studioNarration.trim()
+          : result?.analysis?.nextPosts?.[selectedScenario]?.hook
+            ? [
+                result.analysis.nextPosts[selectedScenario].hook,
+                result.analysis.decision.valueProposition,
+              ].filter(Boolean).join("。")
+            : studioPrompt.trim();
+        if (!narrationText) throw new Error("ナレーション本文を入力してください。");
+        const narration = await fetch("/api/narration", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({
+            text: narrationText.slice(0, 8000),
+            voice: studioVoice.split(" · ")[1] || undefined,
+            style: "Japanese short-form advertising narration. Natural, concise, confident, clear diction, synchronized to a vertical social video.",
+            withBgm: studioMusic,
+            bgmPrompt: studioMusicPrompt.trim(),
+            duration: studioDuration,
+            persist: true,
+          }),
+        });
+        const narrationBody = await narration.json().catch(() => ({}));
+        if (!narration.ok) throw new Error(narrationBody.error || "ナレーション生成に失敗しました。");
+        audioUrl = String(narrationBody.data?.audioUrl || "");
+        if (!audioUrl) throw new Error("生成した音声URLを取得できませんでした。");
+      }
+
       setStudioStage("visual");
       setStudioStatus("映像設計を組み立て中…");
       const response = await fetch("/api/video/generate", {
@@ -228,11 +261,12 @@ export default function Home() {
               : ""
           ].filter(Boolean).join("\n"),
           imageUrl: imageUrl || undefined,
+          audioUrl: audioUrl || undefined,
           socialPostId: socialPostId || undefined,
           duration: studioDuration,
           resolution: studioResolution,
           aspectRatio: studioAspect,
-          generateAudio: studioAudio !== "off" || studioMusic
+          generateAudio: studioAudio === "off" && studioMusic
         })
       });
       const body = await response.json().catch(() => ({}));
