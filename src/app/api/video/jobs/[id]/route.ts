@@ -92,7 +92,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     // Merge, never replace: input_image_url and retry_count drive the retry path.
     const completedPatch = () => ({
       status: "completed",
-      provider_response: mergeProviderResponse(job.provider_response, { status_response: { status: "completed", request_id: requestId, video_available: Boolean(videoUrl) } }),
+      provider_response: mergeProviderResponse(job.provider_response, { status_response: { status: "completed", request_id: requestId, video_available: true } }),
       completed_at: new Date().toISOString(),
       error: null,
     });
