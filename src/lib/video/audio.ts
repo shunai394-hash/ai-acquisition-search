@@ -58,26 +58,59 @@ export function generateBgm(durationSeconds: number, prompt = "") {
   const samples = Math.ceil(seconds * SAMPLE_RATE);
   const pcm = new Int16Array(samples);
   const lower = prompt.toLowerCase();
-  const tempo = lower.includes("energetic") || lower.includes("upbeat") ? 112 : lower.includes("lofi") ? 78 : 92;
+  const energetic = lower.includes("energetic") || lower.includes("upbeat") || lower.includes("dynamic");
+  const warm = lower.includes("warm") || lower.includes("acoustic") || lower.includes("organic");
+  const lofi = lower.includes("lofi") || lower.includes("chill");
+  const tempo = energetic ? 116 : lofi ? 82 : 96;
   const beat = 60 / tempo;
-  const chords = lower.includes("warm") || lower.includes("acoustic")
-    ? [220, 261.63, 329.63]
-    : [196, 246.94, 293.66];
+  const bars = beat * 4;
+  const chords = warm
+    ? [220, 261.63, 329.63, 293.66]
+    : [196, 246.94, 293.66, 246.94];
 
   for (let i = 0; i < samples; i++) {
     const t = i / SAMPLE_RATE;
-    const phase = (t % (beat * 4)) / (beat * 4);
-    const chordIndex = Math.min(chords.length - 1, Math.floor(phase * chords.length));
+    const beatPhase = (t % beat) / beat;
+    const barPhase = (t % bars) / bars;
+    const chordIndex = Math.floor(barPhase * chords.length) % chords.length;
     const root = chords[chordIndex];
-    const pulse = Math.pow(Math.max(0, 1 - ((t % beat) / beat) * 2), 2);
+    const intro = Math.min(1, t / 0.8);
+    const outro = Math.min(1, Math.max(0, (seconds - t) / 1.0));
+    const envelope = intro * outro;
+
     const pad =
-      Math.sin(2 * Math.PI * root * t) * 0.20 +
-      Math.sin(2 * Math.PI * root * 1.5 * t) * 0.07 +
-      Math.sin(2 * Math.PI * root * 2 * t) * 0.035;
-    const tremolo = 0.78 + 0.22 * Math.sin(2 * Math.PI * 0.18 * t);
-    pcm[i] = clamp16((pad * tremolo + pulse * 0.018) * 32767 * 0.32);
+      Math.sin(2 * Math.PI * root * t) * 0.15 +
+      Math.sin(2 * Math.PI * root * 1.5 * t) * 0.055 +
+      Math.sin(2 * Math.PI * root * 2 * t) * 0.025;
+
+    const bass = Math.sin(2 * Math.PI * (root / 2) * t) * 0.09;
+    const arpRate = beat / 2;
+    const arpIndex = Math.floor(t / arpRate) % 4;
+    const arpRatios = [1, 1.25, 1.5, 2];
+    const arp = Math.sin(2 * Math.PI * root * arpRatios[arpIndex] * t) * 0.025;
+
+    const kickPhase = t % beat;
+    const kickEnv = Math.exp(-kickPhase * 24);
+    const kick = Math.sin(2 * Math.PI * (52 - 22 * Math.min(1, kickPhase * 9)) * kickPhase) * kickEnv * (energetic ? 0.075 : 0.04);
+
+    const hatPhase = (t % (beat / 2));
+    const hatEnv = Math.exp(-hatPhase * 90);
+    const hat = Math.sin(2 * Math.PI * 7000 * t) * hatEnv * (energetic ? 0.018 : 0.009);
+
+    const pulse = Math.max(0, 1 - beatPhase * 3) ** 2;
+    const tremolo = 0.86 + 0.14 * Math.sin(2 * Math.PI * 0.2 * t);
+    pcm[i] = clamp16((pad + bass + arp + kick * pulse + hat) * tremolo * envelope * 32767 * 0.48);
   }
   return pcm;
+}
+
+function narrationPresence(pcm: Int16Array, index: number) {
+  const window = Math.max(1, Math.floor(SAMPLE_RATE * 0.018));
+  let sum = 0;
+  const from = Math.max(0, index - window);
+  const to = Math.min(pcm.length, index + window);
+  for (let i = from; i < to; i++) sum += Math.abs(pcm[i]) / 32768;
+  return Math.min(1, sum / Math.max(1, to - from) * 3.2);
 }
 
 export function mixNarrationWithBgm(narrationWav: Uint8Array, durationSeconds: number, bgmPrompt = "") {
@@ -85,9 +118,14 @@ export function mixNarrationWithBgm(narrationWav: Uint8Array, durationSeconds: n
   const bgm = generateBgm(Math.max(durationSeconds, narration.length / SAMPLE_RATE), bgmPrompt);
   const length = Math.max(narration.length, bgm.length);
   const mixed = new Int16Array(length);
+  let duck = 1;
+
   for (let i = 0; i < length; i++) {
-    const voice = i < narration.length ? narration[i] * 0.98 : 0;
-    const music = i < bgm.length ? bgm[i] * 0.22 : 0;
+    const voice = i < narration.length ? narration[i] * 0.96 : 0;
+    const presence = i < narration.length ? narrationPresence(narration, i) : 0;
+    const targetDuck = 1 - presence * 0.78;
+    duck += (targetDuck - duck) * (targetDuck < duck ? 0.035 : 0.008);
+    const music = i < bgm.length ? bgm[i] * 0.20 * duck : 0;
     mixed[i] = clamp16(voice + music);
   }
   return pcmWav(mixed);
