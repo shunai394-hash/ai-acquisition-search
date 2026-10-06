@@ -1220,3 +1220,7 @@ label:has(> input[type="file"]:focus-visible),label:has(> input[type="checkbox"]
 
 /* AWARD PASS 16 — control surface precision */
 .studio-controls select,.studio-controls input,.studio-audio-options select{min-height:42px;appearance:none;border:1px solid rgba(255,255,255,.075);border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));color:#d7d9df;padding:0 11px;outline:none}.studio-controls select:focus,.studio-controls input:focus,.studio-audio-options select:focus{border-color:rgba(155,140,255,.42);box-shadow:0 0 0 3px rgba(155,140,255,.06)}
+
+
+/* AWARD PASS 17 — scenario decision emphasis */
+.scenario-picker button.active{border-color:rgba(184,239,255,.3)!important;background:linear-gradient(145deg,rgba(155,140,255,.09),rgba(102,227,255,.025))!important;box-shadow:inset 0 1px rgba(255,255,255,.05),0 12px 36px rgba(0,0,0,.18)}.scenario-picker button:focus-visible{outline:2px solid rgba(184,239,255,.7);outline-offset:3px}
