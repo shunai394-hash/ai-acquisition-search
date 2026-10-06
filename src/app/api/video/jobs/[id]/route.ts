@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
-import { getHiggsfieldStatus, extractHiggsfieldVideoUrl } from "@/lib/video/higgsfield";
+import { cancelHiggsfieldRequest, getHiggsfieldStatus, extractHiggsfieldVideoUrl } from "@/lib/video/higgsfield";
 import { deleteVideoFromStorage, saveVideoToStorage } from "@/lib/video/storage";
 import { isVideoJobTimedOut, mergeProviderResponse } from "@/lib/video/job-state";
 
@@ -50,6 +50,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         provider_response: mergeProviderResponse(job.provider_response, {
           timed_out_request_id: requestId,
           timed_out_at: new Date().toISOString(),
+          ...(cancelError ? { cancel_error: cancelError } : { cancel_requested: true }),
         }),
       }).eq("status", job.status);
       if (timeoutError) throw new Error("タイムアウトした動画ジョブの状態保存に失敗しました: " + timeoutError.message);
