@@ -234,4 +234,7 @@ export async function waitForHiggsfieldVideo(
     catch (error) { lastError = error; await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1))); }
   }
   throw lastError instanceof Error ? lastError : new Error("Higgsfield status check failed.");
+}\n\n\n/* video: output validation */\nfunction assertVideoUrl(url: string) {
+  if (!/^https?:/i.test(url)) throw new Error("Higgsfield returned an invalid video URL.");
+  return url;
 }\n
