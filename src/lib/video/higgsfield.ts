@@ -220,7 +220,7 @@ export async function waitForHiggsfieldVideo(
     const result = await getStatusWithRetry(requestId);
     const status = normalizedStatus(result);
 
-    if (status === "completed") {
+    if (["completed", "succeeded", "success", "done"].includes(status)) {
       const videoUrl = extractHiggsfieldVideoUrl(result);
       if (!videoUrl) {
         throw new Error("Higgsfield生成はcompletedですが動画URLを取得できませんでした。");
