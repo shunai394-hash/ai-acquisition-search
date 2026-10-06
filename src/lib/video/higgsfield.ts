@@ -230,7 +230,7 @@ export async function waitForHiggsfieldVideo(
       return completionResult(result, videoUrl);
     }
 
-    if (["failed", "nsfw", "canceled", "cancelled"].includes(status)) {
+    if (["failed", "error", "nsfw", "canceled", "cancelled"].includes(status)) {
       throw new Error(
         `Higgsfield generation ${status}: ${providerErrorMessage(result)}`,
       );
