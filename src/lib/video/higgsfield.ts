@@ -90,6 +90,14 @@ async function requestHiggsfield(path: string, init: RequestInit) {
 }
 
 function firstHttpUrl(value: unknown): string | undefined {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const objectValue = value as Record<string, unknown>;
+    const nestedOutput = objectValue.output ?? objectValue.result ?? objectValue.data;
+    if (nestedOutput && nestedOutput !== value) {
+      const nestedFound = firstHttpUrl(nestedOutput);
+      if (nestedFound) return nestedFound;
+    }
+  }
   if (typeof value === "string" && /^https?:/i.test(value)) return value;
   if (Array.isArray(value)) {
     for (const item of value) {
