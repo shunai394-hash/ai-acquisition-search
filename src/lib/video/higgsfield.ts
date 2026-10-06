@@ -16,23 +16,26 @@ export type HiggsfieldVideoInput = {
 };
 
 function credentials() {
-  const apiKey = process.env.HIGGSFIELD_API_KEY ?? process.env.HF_API_KEY;
-  if (apiKey) return `Key ${apiKey}`;
+  const direct = process.env.HIGGSFIELD_API_KEY?.trim();
+  if (direct) return direct.startsWith("Key ") ? direct : `Key ${direct}`;
 
-  const id = process.env.HF_API_KEY_ID;
-  const secret = process.env.HF_API_KEY_SECRET;
+  const apiKey = process.env.HF_API_KEY?.trim();
+  if (apiKey) return apiKey.startsWith("Key ") ? apiKey : `Key ${apiKey}`;
+
+  const id = process.env.HF_API_KEY_ID?.trim();
+  const secret = process.env.HF_API_KEY_SECRET?.trim();
   if (id && secret) return `Key ${id}:${secret}`;
 
   throw new Error(
-    "Higgsfield API credentials are not configured. Set HIGGSFIELD_API_KEY (or HF_API_KEY).",
+    "Higgsfield API credentials are not configured. Set HIGGSFIELD_API_KEY or HF_API_KEY_ID/HF_API_KEY_SECRET.",
   );
 }
 
 export function higgsfieldConfigured() {
   return Boolean(
-    process.env.HIGGSFIELD_API_KEY ||
-    process.env.HF_API_KEY ||
-    (process.env.HF_API_KEY_ID && process.env.HF_API_KEY_SECRET),
+    process.env.HIGGSFIELD_API_KEY?.trim() ||
+    process.env.HF_API_KEY?.trim() ||
+    (process.env.HF_API_KEY_ID?.trim() && process.env.HF_API_KEY_SECRET?.trim()),
   );
 }
 
@@ -57,18 +60,15 @@ export function higgsfieldBaseUrl() {
 }
 
 async function requestHiggsfield(path: string, init: RequestInit) {
-  const response = await fetch(
-    `${higgsfieldBaseUrl()}/${modelPath(path)}`,
-    {
-      ...init,
-      headers: {
-        Authorization: credentials(),
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-      },
-      signal: init.signal ?? AbortSignal.timeout(HTTP_TIMEOUT_MS),
+  const response = await fetch(`${higgsfieldBaseUrl()}/${modelPath(path)}`, {
+    ...init,
+    headers: {
+      Authorization: credentials(),
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
     },
-  );
+    signal: init.signal ?? AbortSignal.timeout(HTTP_TIMEOUT_MS),
+  });
 
   const text = await response.text();
   let data: unknown;
@@ -89,14 +89,35 @@ async function requestHiggsfield(path: string, init: RequestInit) {
   return data as Record<string, unknown>;
 }
 
+function firstHttpUrl(value: unknown): string | undefined {
+  if (typeof value === "string" && /^https?:/i.test(value)) return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = firstHttpUrl(item);
+      if (found) return found;
+    }
+  }
+  if (value && typeof value === "object") {
+    for (const key of ["url", "video_url", "videoUrl", "download_url", "downloadUrl", "src"]) {
+      const found = firstHttpUrl((value as Record<string, unknown>)[key]);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
 export async function generateHiggsfieldVideo(input: HiggsfieldVideoInput) {
-  const model = input.model ?? DEFAULT_MODEL;
-  const imageModel = model.includes("/image-to-video");
-  const requestModel = input.audioUrl && input.imageUrl
-    ? "wan/v2.7/image-to-video"
-    : imageModel && !input.imageUrl
-      ? "alibaba/wan-3.0/text-to-video"
-      : model;
+  const requestedModel = input.model ?? DEFAULT_MODEL;
+  const requestModel =
+    input.imageUrl && input.audioUrl
+      ? "wan/v2.7/image-to-video"
+      : input.imageUrl
+        ? requestedModel.includes("/image-to-video")
+          ? requestedModel
+          : "alibaba/wan-3.0-prime/image-to-video"
+        : requestedModel.includes("/image-to-video")
+          ? "alibaba/wan-3.0/text-to-video"
+          : requestedModel;
 
   return requestHiggsfield(requestModel, {
     method: "POST",
@@ -142,25 +163,50 @@ export async function cancelHiggsfieldRequest(requestId: string) {
 }
 
 export function extractHiggsfieldVideoUrl(result: Record<string, unknown>) {
-  const direct = (result.video as Record<string, unknown> | undefined)?.url;
-  if (typeof direct === "string" && /^https?:/i.test(direct)) return direct;
+  const direct = firstHttpUrl(result.video);
+  if (direct) return direct;
 
-  for (const key of ["video", "videos"]) {
-    const list = result[key];
-    if (!Array.isArray(list)) continue;
-    for (const item of list) {
-      const url = (item as Record<string, unknown> | null)?.url;
-      if (typeof url === "string" && /^https?:/i.test(url)) return url;
-    }
-  }
-
-  const images = Array.isArray(result.images) ? result.images : [];
-  for (const item of images) {
-    const url = (item as Record<string, unknown> | null)?.url;
-    if (typeof url === "string" && /^https?:/i.test(url)) return url;
+  for (const key of ["videos", "output", "result", "data", "asset", "jobs", "images"]) {
+    const found = firstHttpUrl(result[key]);
+    if (found) return found;
   }
 
   return undefined;
+}
+
+function normalizedStatus(result: Record<string, unknown>) {
+  return String(
+    result.status ?? result.state ?? result.request_status ?? "",
+  ).toLowerCase().replace(/[-_\s]/g, "");
+}
+
+function providerErrorMessage(result: Record<string, unknown>) {
+  const message = result.error ?? result.message ?? result.detail;
+  return typeof message === "string" && message.trim()
+    ? message.trim()
+    : JSON.stringify(result);
+}
+
+function nextPollDelay(current: number) {
+  const base = Math.min(Math.round(current * 1.45), 10_000);
+  return Math.max(2_000, base + Math.floor(Math.random() * 350));
+}
+
+async function getStatusWithRetry(requestId: string) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await getHiggsfieldStatus(requestId);
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Higgsfield status check failed.");
 }
 
 export async function waitForHiggsfieldVideo(
@@ -171,27 +217,25 @@ export async function waitForHiggsfieldVideo(
   let delay = 2_000;
 
   while (Date.now() - started < timeoutMs) {
-    const result = await getHiggsfieldStatus(requestId);
-    const status = String(result.status ?? "");
+    const result = await getStatusWithRetry(requestId);
+    const status = normalizedStatus(result);
 
     if (status === "completed") {
       const videoUrl = extractHiggsfieldVideoUrl(result);
       if (!videoUrl) {
-        throw new Error(
-          "Higgsfield生成はcompletedですが動画URLを取得できませんでした。",
-        );
+        throw new Error("Higgsfield生成はcompletedですが動画URLを取得できませんでした。");
       }
-      return { ...result, videoUrl };
+      return completionResult(result, videoUrl);
     }
 
-    if (status === "failed" || status === "nsfw" || status === "canceled") {
+    if (["failed", "nsfw", "canceled", "cancelled"].includes(status)) {
       throw new Error(
-        `Higgsfield generation ${status}: ${JSON.stringify(result)}`,
+        `Higgsfield generation ${status}: ${providerErrorMessage(result)}`,
       );
     }
 
     await new Promise((resolve) => setTimeout(resolve, delay));
-    delay = Math.min(Math.round(delay * 1.5), 10_000);
+    delay = nextPollDelay(delay);
   }
 
   throw new Error(
@@ -199,83 +243,9 @@ export async function waitForHiggsfieldVideo(
   );
 }
 
-
-/* video: harden provider response parsing */
-function firstHttpUrl(value: unknown): string | undefined {
-  if (typeof value === "string" && /^https?:/i.test(value)) return value;
-  if (Array.isArray(value)) for (const item of value) { const found = firstHttpUrl(item); if (found) return found; }
-  if (value && typeof value === "object") for (const key of ["url","video_url","download_url","src"]) { const found = firstHttpUrl((value as Record<string, unknown>)[key]); if (found) return found; }
-  return undefined;
-}
-
-
-/* video: accept provider success states */
-function normalizedStatus(result: Record<string, unknown>) {
-  return String(result.status ?? result.state ?? result.request_status ?? "").toLowerCase().replace(/[-_\s]/g, "");
-}
-
-
-/* video: broaden completed URL extraction */
-function extractNestedVideoUrl(result: Record<string, unknown>) {
-  for (const key of ["output","result","data","asset"]) {
-    const value = result[key]; const found = firstHttpUrl(value);
-    if (found && /\.(mp4|webm|mov)(\?|$)/i.test(found)) return found;
-  }
-  return undefined;
-}
-
-
-/* video: robust status timeout error */
-function providerErrorMessage(result: Record<string, unknown>) {
-  const message = result.error ?? result.message ?? result.detail;
-  return typeof message === "string" && message.trim() ? message.trim() : JSON.stringify(result);
-}
-
-
-/* video: status polling jitter */
-function nextPollDelay(current: number) {
-  const base = Math.min(Math.round(current * 1.45), 10_000);
-  return Math.max(2_000, base + Math.floor(Math.random() * 350));
-}
-
-
-/* video: request id aliases */
-function extractRequestId(result: Record<string, unknown>) {
-  for (const key of ["request_id","requestId","id","task_id","taskId"]) {
-    const value = result[key]; if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return "";
-}
-
-
-/* video: direct URL aliases */
-function extractDirectVideoUrl(result: Record<string, unknown>) {
-  for (const key of ["video_url","videoUrl","download_url","downloadUrl"]) {
-    const found = firstHttpUrl(result[key]); if (found) return found;
-  }
-  return undefined;
-}
-
-
-/* video: protect polling against transient provider errors */
-async function getStatusWithRetry(requestId: string) {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try { return await getHiggsfieldStatus(requestId); }
-    catch (error) { lastError = error; await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1))); }
-  }
-  throw lastError instanceof Error ? lastError : new Error("Higgsfield status check failed.");
-}
-
-
-/* video: output validation */
-function assertVideoUrl(url: string) {
-  if (!/^https?:/i.test(url)) throw new Error("Higgsfield returned an invalid video URL.");
-  return url;
-}
-
-
-/* video: completion result wrapper */
 function completionResult(result: Record<string, unknown>, videoUrl: string) {
-  return { ...result, videoUrl: assertVideoUrl(videoUrl) };
+  if (!/^https?:/i.test(videoUrl)) {
+    throw new Error("Higgsfield returned an invalid video URL.");
+  }
+  return { ...result, videoUrl };
 }
