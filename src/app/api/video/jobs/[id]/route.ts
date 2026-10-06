@@ -41,6 +41,13 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       .eq("id", job.id).eq("user_id", user.id).eq("request_id", requestId);
 
     const markTimedOut = async (detail: string) => {
+      let cancelError = "";
+      try {
+        await cancelHiggsfieldRequest(requestId);
+      } catch (error) {
+        cancelError = error instanceof Error ? error.message.slice(0, 160) : "cancel failed";
+        console.error("Higgsfield timeout cancel failed", { jobId: job.id, requestId, error });
+      }
       const minutes = Math.round((Date.now() - Date.parse(String(job.started_at))) / 60_000);
       const message = `動画生成が${minutes}分経っても完了しないため打ち切りました (${detail})。次回の巡回で再生成します。`;
       const { error: timeoutError } = await updateJob({
