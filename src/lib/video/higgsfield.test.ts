@@ -65,12 +65,12 @@ test("provider errors are safe for user-facing storage", async () => {
 
 test("narrated image generation routes to Wan 2.7 image-to-video and sends audio_url", async () => {
   process.env.HF_API_KEY = "k:s";
-  let request: { url: string; body: Record<string, unknown> } | null = null;
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    request = {
+    requests.push({
       url: String(input),
       body: JSON.parse(String(init?.body || "{}")) as Record<string, unknown>,
-    };
+    });
     return Response.json({ request_id: "r-audio", status: "queued" });
   }) as typeof fetch;
 
@@ -81,9 +81,9 @@ test("narrated image generation routes to Wan 2.7 image-to-video and sends audio
     audioUrl: "https://storage.test/narration.wav",
   });
 
-  assert.equal(request?.url, "https://api.higgsfield.ai/wan/v2.7/image-to-video");
-  assert.equal(request?.body.image_url, "https://img.test/product.webp");
-  assert.equal(request?.body.audio_url, "https://storage.test/narration.wav");
-  assert.equal(request?.body.generate_audio, false);
+  assert.equal(requests[0]?.url, "https://api.higgsfield.ai/wan/v2.7/image-to-video");
+  assert.equal(requests[0]?.body.image_url, "https://img.test/product.webp");
+  assert.equal(requests[0]?.body.audio_url, "https://storage.test/narration.wav");
+  assert.equal(requests[0]?.body.generate_audio, false);
   delete process.env.HF_API_KEY;
 });
