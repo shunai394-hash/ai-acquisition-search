@@ -125,7 +125,6 @@ export async function generateHiggsfieldVideo(input: HiggsfieldVideoInput) {
       prompt: input.prompt,
       duration: input.duration ?? 5,
       resolution: input.resolution ?? "1080p",
-      fps: 24,
       aspect_ratio: input.aspectRatio ?? "9:16",
       generate_audio: input.generateAudio ?? false,
       enable_thinking: false,
