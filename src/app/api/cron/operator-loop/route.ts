@@ -99,13 +99,17 @@ async function publishCompletedVideo(
   videoUrl: string,
 ) {
   const { data: nextPost, error: nextPostError } = await db.from("social_posts")
-    .select("id,network,caption,status,metadata")
+    .select("id,network,caption,status,external_post_id,metadata")
     .eq("id", socialPostId)
     .eq("user_id", userId)
     .maybeSingle();
   if (nextPostError) throw nextPostError;
 
   if (!nextPost) return { ok: false, skipped: true, reason: "next social post not found" };
+  if (nextPost.status === "published" && nextPost.external_post_id) {
+    return { ok: true, skipped: true, reason: "target post is already published", postId: nextPost.id };
+  }
+
   if (!["tiktok","instagram","facebook","youtube","x","linkedin"].includes(nextPost.network)) {
     return { ok: false, skipped: true, reason: `unsupported network: ${nextPost.network}` };
   }
