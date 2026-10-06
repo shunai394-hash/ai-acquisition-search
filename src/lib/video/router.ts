@@ -43,9 +43,10 @@ export async function generateVideo(
   }
 
   const started = await generateHiggsfieldVideo(input);
+  const nested = started.request && typeof started.request === "object" ? started.request as Record<string, unknown> : undefined;
   const requestId = String(
-    started.request_id ?? started.requestId ?? started.id ?? "",
-  );
+    started.request_id ?? started.requestId ?? started.id ?? nested?.request_id ?? nested?.requestId ?? nested?.id ?? "",
+  ).trim();
 
   if (!requestId) {
     throw new Error("動画エンジンからrequest_idを取得できませんでした。");
