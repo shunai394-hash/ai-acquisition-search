@@ -408,8 +408,8 @@ async function runOperatorLoop(db: Db, leaseMode: string) {
     if (!job.user_id) continue;
 
     let claimed = false;
+    const providerResponse = asRecord(job.provider_response);
     try {
-      const providerResponse = asRecord(job.provider_response);
       const retryCount = Number(providerResponse.retry_count || 0);
 
       // 外部API呼び出し後にWorkerがDB更新前で落ちると、Higgsfield側では
