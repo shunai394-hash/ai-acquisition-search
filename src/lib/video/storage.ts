@@ -92,3 +92,24 @@ export async function deleteVideoFromStorage(path: string) {
     throw new Error(`Supabase Storage cleanup failed: ${error.message}`);
   }
 }
+
+
+export async function saveAudioToStorage(input: {
+  userId: string;
+  assetId: string;
+  bytes: Uint8Array;
+  contentType?: "audio/wav" | "audio/mpeg";
+}) {
+  if (!input.bytes.byteLength) throw new Error("音声ファイルが空です。");
+  const supabase = adminClient();
+  const contentType = input.contentType ?? "audio/wav";
+  const path = `${input.userId}/${input.assetId}.wav`;
+  const { error } = await supabase.storage.from(bucket).upload(path, input.bytes, {
+    contentType,
+    upsert: true,
+    cacheControl: "3600",
+  });
+  if (error) throw new Error(`Supabase Storage audio upload failed: ${error.message}`);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return { bucket, path, url: data.publicUrl, bytes: input.bytes.byteLength, contentType };
+}
