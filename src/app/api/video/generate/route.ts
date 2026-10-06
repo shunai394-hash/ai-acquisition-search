@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const prompt = String(body.prompt || "").trim();
     const imageUrl = body.imageUrl ? String(body.imageUrl) : undefined;
+    const audioUrl = body.audioUrl ? String(body.audioUrl) : undefined;
     referenceImageUrl = imageUrl;
     if (imageUrl) {
       try {
@@ -40,6 +41,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "imageUrl must be a public HTTPS URL" }, { status: 400 });
       }
     }
+    if (audioUrl) {
+      try {
+        await assertPublicUrl(audioUrl, ["https:"]);
+      } catch {
+        return NextResponse.json({ error: "audioUrl must be a public HTTPS URL" }, { status: 400 });
+      }
+    }
+    if (audioUrl && !imageUrl) return NextResponse.json({ error: "audioUrl requires imageUrl for the narrated image-video pipeline" }, { status: 400 });
     if (!prompt) return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     if (prompt.length > 10000) return NextResponse.json({ error: "prompt is too long" }, { status: 400 });
 
@@ -86,14 +95,14 @@ export async function POST(request: Request) {
       social_post_id: socialPostId,
       creative_id: creativeId,
       provider: process.env.VIDEO_ENGINE ?? "higgsfield",
-      model: model ?? (imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
+      model: model ?? (audioUrl && imageUrl ? "wan/v2.7/image-to-video" : imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
       status: "queued",
       prompt,
       duration,
       resolution,
       aspect_ratio: aspectRatio,
       generate_audio: generateAudio,
-      provider_response: imageUrl ? { input_image_url: imageUrl } : null,
+      provider_response: { ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(audioUrl ? { audio_url: audioUrl } : {}) },
     }).select("id").single();
 
     if (jobError || !job) throw new Error(jobError?.message || "production jobの作成に失敗しました。");
@@ -102,12 +111,13 @@ export async function POST(request: Request) {
     // エンジン選択はRouterに集約する。現在の既定値はHiggsfield。
     const started = await generateVideo({
       prompt,
-      model: model ?? (imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
+      model: model ?? (audioUrl && imageUrl ? "wan/v2.7/image-to-video" : imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
       duration,
       resolution,
       aspectRatio,
       generateAudio,
       imageUrl,
+      audioUrl,
     });
     const requestId = started.requestId;
     providerRequestId = requestId;
@@ -116,7 +126,7 @@ export async function POST(request: Request) {
       status: "running",
       request_id: requestId,
       // Keep input_image_url: retries and the next iteration read it from here.
-      provider_response: { ...(imageUrl ? { input_image_url: imageUrl } : {}), engine: started.engine, started_response: { status: started.raw?.status ?? "queued", request_id: requestId } },
+      provider_response: { ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(audioUrl ? { audio_url: audioUrl } : {}), engine: started.engine, started_response: { status: started.raw?.status ?? "queued", request_id: requestId } },
       started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", job.id).eq("user_id", user.id);
