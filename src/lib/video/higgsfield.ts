@@ -211,4 +211,7 @@ export async function waitForHiggsfieldVideo(
     if (found && /\.(mp4|webm|mov)(\?|$)/i.test(found)) return found;
   }
   return undefined;
+}\n\n\n/* video: robust status timeout error */\nfunction providerErrorMessage(result: Record<string, unknown>) {
+  const message = result.error ?? result.message ?? result.detail;
+  return typeof message === "string" && message.trim() ? message.trim() : JSON.stringify(result);
 }\n
