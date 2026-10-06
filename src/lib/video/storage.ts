@@ -27,7 +27,11 @@ export async function saveVideoToStorage(input: {
     throw new Error(`動画取得に失敗しました: HTTP ${response.status}`);
   }
 
-  const contentType = response.headers.get("content-type") || "video/mp4";
+  const contentType = (response.headers.get("content-type") || "video/mp4").split(";", 1)[0].trim().toLowerCase();
+  if (!contentType.startsWith("video/") && contentType !== "application/octet-stream") {
+    await response.body?.cancel().catch(() => {});
+    throw new Error("動画ではないレスポンスは保存できません。");
+  }
   const declaredLength = Number(response.headers.get("content-length") || "0");
   if (declaredLength > MAX_VIDEO_BYTES) {
     await response.body?.cancel().catch(() => {});
