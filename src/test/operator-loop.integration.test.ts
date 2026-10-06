@@ -77,7 +77,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     if (stub.ecPulse.status !== 200) return new Response(JSON.stringify({ detail: "db unavailable" }), { status: stub.ecPulse.status });
     return new Response(JSON.stringify({ runs: [{ run_id: "r1", captured_at: "2026-09-30T00:00:00.000Z", comments_count: 200, top_pain: { pain: "すぐぬるくなる", count: 50, share_percent: 25 }, trend: { signal: "emerging_pain_detected", emerging_pains: [{ pain: "結露でカバンが濡れる", status: "rising", share_delta_percent: 4, current_count: 20, current_share_percent: 10 }] } }] }), { status: 200 });
   }
-  if (url.host === "platform.higgsfield.ai") {
+  if (url.host === "api.higgsfield.ai") {
     stub.higgsfieldCalls++;
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     stub.higgsfieldBodies.push(body);
