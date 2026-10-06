@@ -351,7 +351,7 @@ test("timeout also applies when the provider status endpoint keeps erroring", as
   assert.equal(job().status, "failed");
   assert.equal(job().provider_response.cancel_requested, true);
   assert.deepEqual(stub.hfCancels, ["hf-req-1"]);
-  assert.match(String(job().error), /upstream unavailable/);
+  assert.match(String(job().error), /Higgsfield API error 503/);
 });
 
 test("a provider error before the timeout leaves the job running for the next poll", async () => {
