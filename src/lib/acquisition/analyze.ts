@@ -5,6 +5,33 @@ import type { WebSearchResult } from "./search-web";
 import type { SocialSignal } from "./social-search";
 import type { ShopSignal } from "./shop-search";
 
+function normalizeEvidenceText(value: string) {
+  return value.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("ja-JP");
+}
+
+function evidenceMatchesCorpus(value: string, corpus: string[]) {
+  const candidate = normalizeEvidenceText(value);
+  if (!candidate || candidate.length < 6) return false;
+  return corpus.some((item) => {
+    const source = normalizeEvidenceText(item);
+    return source === candidate || source.includes(candidate);
+  });
+}
+
+function groundedEvidence(value: unknown, corpus: string[], limit = 6) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+    .filter((v) => evidenceMatchesCorpus(v, corpus))
+    .slice(0, limit);
+}
+
+function evidenceConfidence(raw: unknown, evidenceCount: number) {
+  const requested = typeof raw === "number" && Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 0.2;
+  const evidenceCap = evidenceCount >= 3 ? 0.85 : evidenceCount === 2 ? 0.7 : evidenceCount === 1 ? 0.5 : 0.2;
+  return Math.min(requested, evidenceCap);
+}
+
 function detectEvidenceTensions(results: WebSearchResult[]) {
   const rules: { topic: string; positive: RegExp; negative: RegExp }[] = [
     { topic: "価格", positive: /安い|コスパ|お買い得|価格に満足|値段.*満足/i, negative: /高い|割高|価格.*不満|値段.*高/i },
@@ -256,7 +283,7 @@ function fallback(
   };
 }
 
-export function normalizeAcquisitionScenarios(value: unknown): PostScenario[] {
+export function normalizeAcquisitionScenarios(value: unknown, evidenceCorpus: string[] = []): PostScenario[] {
     const items = Array.isArray(value) ? value : [];
     const archetypes = new Set<PostScenario["archetype"]>([
       "empathy",
@@ -275,12 +302,8 @@ export function normalizeAcquisitionScenarios(value: unknown): PostScenario[] {
       const beats = Array.isArray(x.beats)
         ? x.beats.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 6)
         : [];
-      const proof = Array.isArray(x.proof)
-        ? x.proof.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 6)
-        : [];
-      const evidence = Array.isArray(x.evidence)
-        ? x.evidence.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 6)
-        : [];
+      const proof = groundedEvidence(x.proof, evidenceCorpus, 6);
+      const evidence = groundedEvidence(x.evidence, evidenceCorpus, 6);
       const hypothesis = typeof x.hypothesis === "string" ? x.hypothesis.trim() : "";
       const hook = typeof x.hook === "string" ? x.hook.trim() : "";
       const variableToChange = typeof x.variableToChange === "string" ? x.variableToChange.trim() : "";
@@ -356,6 +379,17 @@ export async function analyzePage(
     return fallback(source, webResults, socialSignals, shopSignals);
   }
   const base = fallback(source, webResults, socialSignals, shopSignals);
+  const evidenceCorpus = [
+    source.productName,
+    source.title,
+    source.description,
+    source.text,
+    ...source.headings,
+    ...source.productSignals,
+    ...webResults.results.flatMap((item) => [item.title, item.snippet]),
+    ...socialSignals.flatMap((item) => [item.title, item.description]),
+    ...shopSignals.map((item) => item.title),
+  ].filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 
   const arr = <T,>(value: unknown, fallbackValue: T[]): T[] =>
     Array.isArray(value) ? (value as T[]) : fallbackValue;
@@ -378,8 +412,8 @@ export async function analyzePage(
       .map((x) => ({
         type: x.type as SellingPoint["type"],
         statement: x.statement as string,
-        evidence: Array.isArray(x.evidence) ? x.evidence.filter((v): v is string => typeof v === "string").slice(0, 5) : [],
-        confidence: clampScore(x.confidence, 0.2),
+        evidence: groundedEvidence(x.evidence, evidenceCorpus, 5),
+        confidence: evidenceConfidence(x.confidence, groundedEvidence(x.evidence, evidenceCorpus, 5).length),
       }));
   };
 
@@ -465,7 +499,7 @@ export async function analyzePage(
   const customerCandidates = normalizeCustomerCandidates(parsed.customerCandidates);
   const appealCandidates = normalizeAppealCandidates(parsed.appealCandidates);
   const channelRecommendation = normalizeChannelRecommendation(parsed.channelRecommendation, base.channelRecommendation);
-  const scenarios = normalizeAcquisitionScenarios(parsed.scenarios).map((scenario) => ({
+  const scenarios = normalizeAcquisitionScenarios(parsed.scenarios, evidenceCorpus).map((scenario) => ({
     ...scenario,
     channel:
       channelRecommendation.recommended && channelRecommendation.recommended !== "未確定"
