@@ -94,6 +94,7 @@ class Query implements PromiseLike<Result> {
   eq(col: string, v: unknown) { this.filters.push((r) => get(r, col) != null && String(get(r, col)) === String(v)); return this; }
   neq(col: string, v: unknown) { this.filters.push((r) => String(get(r, col)) !== String(v)); return this; }
   lt(col: string, v: unknown) { this.filters.push((r) => get(r, col) != null && cmp(get(r, col), v) < 0); return this; }
+  gte(col: string, v: unknown) { this.filters.push((r) => get(r, col) != null && cmp(get(r, col), v) >= 0); return this; }
   lte(col: string, v: unknown) { this.filters.push((r) => get(r, col) != null && cmp(get(r, col), v) <= 0); return this; }
   in(col: string, vs: unknown[]) { const set = new Set(vs.map(String)); this.filters.push((r) => set.has(String(get(r, col)))); return this; }
   is(col: string, v: null) { this.filters.push((r) => get(r, col) === v); return this; }

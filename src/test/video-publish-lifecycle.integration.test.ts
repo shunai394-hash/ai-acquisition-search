@@ -499,3 +499,18 @@ test("activity API: a database outage returns a retryable message without intern
   const body = await res.json();
   assert.doesNotMatch(body.error, /08006|simulated|production_jobs/);
 });
+
+test("posts measured within the evaluation window are skipped without calling the SNS API", async () => {
+  db.tables.social_posts = [
+    { id: "fresh-metric", user_id: "u1", creative_id: "c1", network: "x", status: "published", external_post_id: "tw-a", published_at: iso(-48 * HOUR), metadata: {}, created_at: iso(-48 * HOUR) },
+    { id: "stale-metric", user_id: "u1", creative_id: "c1", network: "x", status: "published", external_post_id: "tw-b", published_at: iso(-48 * HOUR), metadata: {}, created_at: iso(-48 * HOUR) },
+  ];
+  db.seed("post_metrics", [
+    { social_post_id: "fresh-metric", impressions: 5000, raw: { source: "x" }, measured_at: iso(-HOUR) },
+    { social_post_id: "stale-metric", impressions: 5000, raw: { source: "x" }, measured_at: iso(-24 * HOUR) },
+  ]);
+  const body = await runLoop();
+  assert.equal(body.results.some((x) => x.postId === "fresh-metric"), false);
+  assert.equal(body.results.find((x) => x.postId === "stale-metric")?.verdict, "pivot", JSON.stringify(body.results));
+  assert.equal(db.table("post_metrics").filter((m) => m.social_post_id === "fresh-metric").length, 1, "no new fetch for the fresh post");
+});

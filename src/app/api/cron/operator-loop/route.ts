@@ -218,23 +218,26 @@ async function runOperatorLoop(db: Db, leaseMode: string) {
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
+  // One query instead of one per post: which posts were measured too recently to re-evaluate.
+  const recentCutoff = new Date(Date.now() - Math.max(6, evaluationDelayHours - 1) * 60 * 60 * 1000).toISOString();
+  const postIds = (posts || []).map((post) => post.id);
+  const recentlyMeasured = new Set<string>();
+  if (postIds.length) {
+    const { data: recentMetrics, error: recentError } = await db.from("post_metrics")
+      .select("social_post_id")
+      .in("social_post_id", postIds)
+      .gte("measured_at", recentCutoff);
+    if (recentError) return NextResponse.json({ ok: false, error: recentError.message }, { status: 500 });
+    for (const metric of recentMetrics || []) recentlyMeasured.add(String(metric.social_post_id));
+  }
+
   // 投稿単位で処理する。ユーザー単位で1件に制限しない。
   for (const post of posts || []) {
     if (!budgetRemaining()) { timeBudgetExceeded = true; break; }
     if (!post.user_id) continue;
 
     try {
-      const { data: latestMetric } = await db
-        .from("post_metrics")
-        .select("measured_at")
-        .eq("social_post_id", post.id)
-        .order("measured_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (latestMetric?.measured_at && new Date(latestMetric.measured_at).getTime() > Date.now() - Math.max(6, evaluationDelayHours - 1) * 60 * 60 * 1000) {
-        continue;
-      }
+      if (recentlyMeasured.has(post.id)) continue;
 
       const failuresSoFar = Number(asRecord(post.metadata).operator_metrics_failures || 0);
       const metrics = await request("POST", "/api/social/metrics", post.user_id, {
