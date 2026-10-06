@@ -251,7 +251,7 @@ export default function Home() {
             "Deliver a coherent visual story, not a collection of disconnected generations.",
             "PRODUCT LOCK: preserve the exact product identity, proportions, materials, colors, packaging, logo placement, geometry, texture, and functional details from the reference image. The reference image is the source of truth. Do not invent product features, alter proportions, recolor materials, replace packaging, or introduce competitor-like details.",
             "BRAND INTEGRATION: make the product recognizable through distinctive physical details and usage context rather than oversized branding. The creative idea must feel native to this product; it should not be a generic ad template with the product swapped in.",
-            "PROOF OVER PROMISE: demonstrate benefits visually whenever possible. If a benefit cannot be truthfully demonstrated from the provided product information, use a restrained lifestyle visualization instead of inventing measurable performance."
+            "PROOF OVER PROMISE: demonstrate benefits visually whenever possible. If a benefit cannot be truthfully demonstrated from the provided product information, use a restrained lifestyle visualization instead of inventing measurable performance.",
             "FORMAT: 9:16 vertical premium social advertising. Establish the focal subject immediately, keep critical product details inside a conservative center-safe region, and preserve clean negative space for captions and CTA without covering the product.",
             "MOBILE LEGIBILITY: prioritize silhouette, contrast, scale, and gesture over fine detail that disappears on small screens. Avoid visual clutter, tiny UI, dense copy, and backgrounds that compete with the product.",
             "SHOT DESIGN: use a deliberate 4-beat arc — 0–2s pattern interrupt/hook, 2–5s problem or desire, 5–10s product proof/use, final beat hero + one CTA. Adapt timing to the selected duration rather than forcing fixed timestamps.",
@@ -268,7 +268,7 @@ export default function Home() {
             "PERFORMANCE: if people appear, give them one clear motivation and one believable action at a time. Use natural gaze, weight shift, hand contact, facial reaction, and object handling. Avoid model-like posing, frozen smiles, duplicated limbs, finger artifacts, rubbery motion, or unexplained gestures.",
             "PHYSICAL REALISM: products must obey gravity, contact, friction, scale, reflections, shadows, and material behavior. Hands must actually grip or touch the product rather than float beside it. Prefer simple physically plausible actions over spectacular but unstable transformations.",
             "COMPOSITION: use a strong focal hierarchy, controlled depth, deliberate negative space, and motivated foreground/background layers. Keep the product legible at phone scale while preserving enough environmental context to communicate the story.",
-            "REALISM: natural human motion and product interaction, correct hands/fingers, stable geometry, consistent wardrobe/background, no unsupported claims."
+            "REALISM: natural human motion and product interaction, correct hands/fingers, stable geometry, consistent wardrobe/background, no unsupported claims.",
             studioPrompt.trim(),
             remixHint ? "REMIX DIRECTION: " + remixHint + ". Preserve the product identity and core concept while materially improving the visual execution." : "",
             studioAudio === "custom"
@@ -277,9 +277,11 @@ export default function Home() {
                 ? "AUDIO: natural voiceover with synchronized ambient sound. Voice: " + studioVoice + ". Prioritize intelligibility and emotional timing."
                 : "",
             studioMusic
-              ? "AUDIO DIRECTION: treat sound as part of the narrative, not decoration. Use a clear sonic hierarchy: narration > product/action SFX > BGM. Keep narration intelligible, use intentional micro-pauses before the key benefit, and place subtle transitions or impacts only where they reinforce an edit point.",
-            "BGM: subtle premium background score with a distinctive motif, rhythmically aligned to the edit and automatically ducked beneath speech. Build or release energy with the story; avoid generic stock-music energy and avoid masking the product benefit.",
-            "SOUND DESIGN: prioritize believable tactile/product sounds where appropriate (fabric, click, spray, package, movement, environment). Never add a sound merely because a visual exists; every audible element should strengthen realism, emotion, or comprehension." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
+              ? [
+                  "AUDIO DIRECTION: treat sound as part of the narrative, not decoration. Use a clear sonic hierarchy: narration > product/action SFX > BGM. Keep narration intelligible, use intentional micro-pauses before the key benefit, and place subtle transitions or impacts only where they reinforce an edit point.",
+                  "BGM: subtle premium background score with a distinctive motif, rhythmically aligned to the edit and automatically ducked beneath speech. Build or release energy with the story; avoid generic stock-music energy and avoid masking the product benefit.",
+                  "SOUND DESIGN: prioritize believable tactile/product sounds where appropriate (fabric, click, spray, package, movement, environment). Every audible element should strengthen realism, emotion, or comprehension." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
+                ].join("\n")
               : "",
             "CREATIVE DIFFERENTIATION: avoid interchangeable stock-ad compositions. Find one memorable visual metaphor, interaction, reveal, or contrast that is specific to the product and audience, then build the film around it. Novelty must improve comprehension, not obscure it.",
             "FINAL QUALITY GATE: score the concept mentally before rendering across concept originality, storytelling clarity, visual craft, sound integration, product truth, brand fit, mobile legibility, and emotional memorability. If any critical dimension is weak, simplify or redesign the shot rather than adding effects. Every shot must reinforce the same product, story, audience, and promise.",
