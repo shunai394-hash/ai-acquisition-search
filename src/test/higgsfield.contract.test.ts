@@ -43,14 +43,14 @@ test("rejects an invalid Higgsfield base URL before making a request", () => {
 });
 
 test("submits Wan 3.0 Prime image-to-video with the reference image and auth contract", async () => {
-  let captured: { url: string; body: Record<string, unknown>; auth: string | null } | null = null;
+  const captured: Array<{ url: string; body: Record<string, unknown>; auth: string | null }> = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
-    captured = {
+    captured.push({
       url: url.href,
       body: JSON.parse(String(init?.body)),
       auth: new Headers(init?.headers).get("Authorization"),
-    };
+    });
     return new Response(JSON.stringify({ request_id: "req-1", status: "queued" }), { status: 200 });
   }) as typeof fetch;
 
@@ -64,13 +64,13 @@ test("submits Wan 3.0 Prime image-to-video with the reference image and auth con
     generateAudio: false,
   });
 
-  assert.equal(captured?.url, "https://api.higgsfield.ai/alibaba/wan-3.0-prime/image-to-video");
-  assert.equal(captured?.auth, "Key test-id:test-secret");
-  assert.equal(captured?.body.image_url, "https://storage.test/product.webp");
-  assert.equal(captured?.body.duration, 5);
-  assert.equal(captured?.body.resolution, "1080p");
-  assert.equal(captured?.body.aspect_ratio, "9:16");
-  assert.equal(captured?.body.generate_audio, false);
+  assert.equal(captured[0]?.url, "https://api.higgsfield.ai/alibaba/wan-3.0-prime/image-to-video");
+  assert.equal(captured[0]?.auth, "Key test-id:test-secret");
+  assert.equal(captured[0]?.body.image_url, "https://storage.test/product.webp");
+  assert.equal(captured[0]?.body.duration, 5);
+  assert.equal(captured[0]?.body.resolution, "1080p");
+  assert.equal(captured[0]?.body.aspect_ratio, "9:16");
+  assert.equal(captured[0]?.body.generate_audio, false);
 });
 
 test("falls back from image-to-video to text-to-video when no image exists", async () => {
