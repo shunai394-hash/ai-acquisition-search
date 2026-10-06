@@ -43,3 +43,21 @@ test("video URL is found in object, array and job-result shapes, and only http(s
   assert.equal(extractHiggsfieldVideoUrl({ video: { url: "file:///etc/passwd" } }), undefined);
   assert.equal(extractHiggsfieldVideoUrl({}), undefined);
 });
+
+test("provider errors are safe for user-facing storage", async () => {
+  process.env.HF_API_KEY = "k:s";
+  globalThis.fetch = (async () => Response.json(
+    { detail: "internal provider detail", secret: "should-not-leak" },
+    { status: 502 },
+  )) as typeof fetch;
+  await assert.rejects(
+    () => generateHiggsfieldVideo({ prompt: "p" }),
+    (error: unknown) => {
+      assert.equal(error instanceof Error, true);
+      assert.equal((error as Error).message, "Higgsfield API error 502");
+      assert.equal((error as Error).message.includes("should-not-leak"), false);
+      return true;
+    },
+  );
+  delete process.env.HF_API_KEY;
+});
