@@ -90,7 +90,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     if (!handler) return new Response(JSON.stringify({ error: "no route" }), { status: 404 });
     return handler(request);
   }
-  if (url.host === "platform.higgsfield.ai") {
+  if (url.host === "api.higgsfield.ai") {
     const status = /^\/requests\/([^/]+)\/status$/.exec(url.pathname);
     if (status) {
       stub.hfStatusCalls++;
