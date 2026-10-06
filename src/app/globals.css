@@ -1204,3 +1204,7 @@ label:has(> input[type="file"]:focus-visible),label:has(> input[type="checkbox"]
 
 /* AWARD PASS 12 — tactile feedback without visual noise */
 .studio-upload-large,.studio-upload{transition:border-color .25s ease,background .25s ease,transform .25s ease}.studio-upload:hover{border-color:rgba(184,239,255,.2);background:rgba(184,239,255,.018)}.studio-upload:focus-within{border-color:rgba(155,140,255,.38);box-shadow:0 0 0 3px rgba(155,140,255,.06)}.studio-prompt textarea:focus{border-color:rgba(155,140,255,.38)!important;box-shadow:0 0 0 3px rgba(155,140,255,.05),inset 0 1px rgba(255,255,255,.03)!important}.studio-actions{display:flex;align-items:center;gap:10px;min-height:48px}.studio-actions button{min-height:48px}.studio-stage.active{box-shadow:inset 0 1px rgba(255,255,255,.035)}@media(prefers-reduced-motion:reduce){.studio-upload{transition:none}}
+
+
+/* AWARD PASS 13 — cinematic output framing */
+.studio-result video,.video-result video{box-shadow:0 28px 90px rgba(0,0,0,.48),0 0 0 1px rgba(255,255,255,.08);outline:1px solid rgba(155,140,255,.08);outline-offset:4px}
