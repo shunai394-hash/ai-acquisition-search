@@ -156,6 +156,13 @@ export async function POST(request: Request) {
       verdict === "continue" ? "同一訴求の別Hook" : "前回と異なる顧客課題・訴求"
     );
 
+    // The product reference image must survive every iteration, not only the
+    // first: the next creative inherits it so its own successor can use it too.
+    const inputImageUrl = creative.scenario && typeof creative.scenario === "object"
+      && typeof (creative.scenario as Record<string, unknown>).input_image_url === "string"
+      ? String((creative.scenario as Record<string, unknown>).input_image_url)
+      : undefined;
+
     const { data: nextCreative, error: nextCreativeError } = await db.from("creatives").insert({
       product_id: creative.product_id,
       plan_id: creative.plan_id,
@@ -170,6 +177,7 @@ export async function POST(request: Request) {
         angle,
         next_action: nextAction,
         test_metric: body.testMetric || "CTR / CVR / ROAS",
+        ...(inputImageUrl ? { input_image_url: inputImageUrl } : {}),
         scenes: [
           { order: 1, role: "hook", text: hook },
           { order: 2, role: "problem", text: verdict === "continue" ? "前回と同じ顧客課題を、別の切り口で具体化する" : "前回と異なる顧客課題を具体化する" },
@@ -201,11 +209,6 @@ export async function POST(request: Request) {
     }).select("id,network,status,caption,metadata").single();
     if (nextPostError || !nextPost) throw new Error(nextPostError?.message || "次の投稿レコード作成に失敗しました。");
     nextPostId = nextPost.id;
-
-    const inputImageUrl = creative.scenario && typeof creative.scenario === "object"
-      && typeof (creative.scenario as Record<string, unknown>).input_image_url === "string"
-      ? String((creative.scenario as Record<string, unknown>).input_image_url)
-      : undefined;
 
     let video = null;
     if (body.autoGenerate !== false) {

@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit -p .",
-    "test": "node --import tsx --experimental-test-module-mocks --test \"src/**/*.test.ts\"",
+    "test": "node --import tsx --experimental-test-module-mocks --test-concurrency=1 --test \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
     "backtest:decision": "tsx scripts/decision-backtest.ts",
     "mcp": "tsx src/mcp/server.ts",
     "mobile:android:add": "cap add android",
@@ -40,5 +40,10 @@
     "tsx": "^4",
     "typescript": "^5",
     "@capacitor/android": "8.5.2"
+  },
+  "overrides": {
+    "xcode": {
+      "uuid": "^11.1.1"
+    }
   }
 }

@@ -18,7 +18,13 @@ function blockedIp(address: string) {
       [a, b, c, d].some((part) => !Number.isInteger(part) || part < 0 || part > 255);
   }
   if (isIP(normalized) === 6) {
-    if (normalized === "::" || normalized.startsWith("::ffff:")) {
+    // Unspecified (::), loopback and IPv4-compatible (::a.b.c.d, e.g. ::7f00:1)
+    // addresses: no public IPv6 address starts with "::".
+    if (normalized.startsWith("::") && !normalized.startsWith("::ffff:")) return true;
+    // Prefixes that embed an arbitrary IPv4 address: NAT64 (64:ff9b::/96),
+    // 6to4 (2002::/16) and Teredo (2001:0::/32).
+    if (normalized.startsWith("64:ff9b:") || normalized.startsWith("2002:") || /^2001:0?:/.test(normalized) || normalized.startsWith("2001::")) return true;
+    if (normalized.startsWith("::ffff:")) {
       const mapped = normalized.slice("::ffff:".length);
       if (isIP(mapped) === 4) return blockedIp(mapped);
       const parts = mapped.split(":");

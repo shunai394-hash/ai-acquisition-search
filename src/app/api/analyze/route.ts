@@ -24,7 +24,8 @@ function amazonSnapshot(inputUrl: string): PageSnapshot | null {
   const asin = url.pathname.match(/\/dp\/([A-Z0-9]{10})/i)?.[1]?.toUpperCase() ?? "";
   if (!asin) return null;
 
-  const decodedPath = decodeURIComponent(url.pathname);
+  let decodedPath = url.pathname;
+  try { decodedPath = decodeURIComponent(url.pathname); } catch { /* malformed %-escape: keep the raw path */ }
   const dpIndex = decodedPath.toLowerCase().indexOf("/dp/");
   const rawTitle = dpIndex > 0
     ? decodedPath.slice(1, dpIndex).replace(/[-_]+/g, " ").trim()
@@ -109,7 +110,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: { source, analysis } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "分析に失敗しました。";
-    return NextResponse.json({ error: message }, { status: 502 });
+    // Keep provider/database details out of the browser response; they belong in
+    // server logs, not in a public error payload.
+    console.error("acquisition analysis error", error);
+    return NextResponse.json({ error: "分析中に外部情報の取得または解析に失敗しました。時間を置いてもう一度お試しください。" }, { status: 502 });
   }
 }

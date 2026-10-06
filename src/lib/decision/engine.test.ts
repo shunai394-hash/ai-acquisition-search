@@ -74,6 +74,24 @@ test("LLM refinement cannot change the verdict and ignores invalid output", asyn
   assert.deepEqual(failed, d);
 });
 
+test("malformed or fully rejected LLM output is not credited to the model", async () => {
+  const e = evidence({ current: metric({ impressions: 4000, clicks: 120 }) });
+  const d = buildDecision(e);
+  const outputs = [
+    "null",
+    "[]",
+    "42",
+    JSON.stringify({ hook: "", description: 7 }),
+    JSON.stringify({ hook: "x".repeat(61), description: "y".repeat(121) }),
+    JSON.stringify({ verdict: "stop", generate_creative: false }),
+  ];
+  for (const output of outputs) {
+    const refined = await refineNextAction(d, e, async () => output, "test-model");
+    assert.deepEqual(refined, d, output);
+    assert.equal(refined.model_version, "deterministic", output);
+  }
+});
+
 test("refinement is skipped for STOP", async () => {
   const e = evidence({ current: metric({ impressions: 6000, clicks: 10 }) }, { lineageVerdicts: ["pivot", "pivot"] });
   const d = buildDecision(e);

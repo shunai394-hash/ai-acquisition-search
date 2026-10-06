@@ -23,7 +23,4 @@ jobs:
       - run: npm test
       - run: npm run backtest:decision
       - run: npm run build
-      # The repository has pre-existing lint errors outside the decision loop;
-      # report them without blocking until they are cleaned up.
       - run: npm run lint
-        continue-on-error: true

@@ -47,6 +47,11 @@ export class FakeSupabase {
   private seq = 0;
   /** Simulated outage: table name -> error code returned for any operation. */
   failures: Record<string, string> = {};
+  /**
+   * Targeted outage: return an error code to fail one specific operation
+   * (e.g. only the update that stores an SNS result), or null to let it run.
+   */
+  failWhen: ((table: string, op: "select" | "insert" | "update" | "delete", payload: Row | Row[] | null) => string | null) | null = null;
 
   table(name: string) {
     return (this.tables[name] ||= []);
@@ -89,6 +94,7 @@ class Query implements PromiseLike<Result> {
   eq(col: string, v: unknown) { this.filters.push((r) => get(r, col) != null && String(get(r, col)) === String(v)); return this; }
   neq(col: string, v: unknown) { this.filters.push((r) => String(get(r, col)) !== String(v)); return this; }
   lt(col: string, v: unknown) { this.filters.push((r) => get(r, col) != null && cmp(get(r, col), v) < 0); return this; }
+  gte(col: string, v: unknown) { this.filters.push((r) => get(r, col) != null && cmp(get(r, col), v) >= 0); return this; }
   lte(col: string, v: unknown) { this.filters.push((r) => get(r, col) != null && cmp(get(r, col), v) <= 0); return this; }
   in(col: string, vs: unknown[]) { const set = new Set(vs.map(String)); this.filters.push((r) => set.has(String(get(r, col)))); return this; }
   is(col: string, v: null) { this.filters.push((r) => get(r, col) === v); return this; }
@@ -96,6 +102,10 @@ class Query implements PromiseLike<Result> {
     if (op !== "is" || v !== null) throw new Error("unsupported not()");
     this.filters.push((r) => get(r, col) != null);
     return this;
+  }
+  filter(col: string, op: string, v: unknown) {
+    if (op !== "eq") throw new Error(`unsupported filter(): ${op}`);
+    return this.eq(col, v);
   }
   or(expr: string) { this.filters.push(parseOr(expr)); return this; }
   order(col: string, opts?: { ascending?: boolean }) { this.orderBy.push({ col, asc: opts?.ascending !== false }); return this; }
@@ -127,6 +137,8 @@ class Query implements PromiseLike<Result> {
   private run(): Result {
     const failure = this.db.failures[this.name];
     if (failure) return { data: null, error: { code: failure, message: `simulated ${failure} on ${this.name}` } };
+    const targeted = this.db.failWhen?.(this.name, this.op, this.payload) ?? null;
+    if (targeted) return { data: null, error: { code: targeted, message: `simulated ${targeted} on ${this.op} ${this.name}` } };
     const table = this.db.table(this.name);
     if (this.op === "insert") {
       const rows = (Array.isArray(this.payload) ? this.payload : [this.payload]).map((r) => ({ ...this.db.defaults(this.name), ...(r as Row) }));

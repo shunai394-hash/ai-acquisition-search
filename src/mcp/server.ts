@@ -148,6 +148,9 @@ function createServer(): McpServer {
               else if (post.platform === "instagram") previousPerformance.push(await normalizeInstagramPerformance(await getInstagramReelMetrics(post.postId)));
               else if (post.platform === "facebook") previousPerformance.push(await normalizeFacebookPerformance(await getFacebookReelMetrics(post.postId)));
             } catch (error) {
+              // stdout carries the MCP protocol; diagnostics go to stderr. The empty
+              // metrics stay "unknown" for the decision instead of failing the call.
+              console.error("previous performance unavailable", post.platform, post.postId, error instanceof Error ? error.message : String(error));
               previousPerformance.push({ platform: post.platform, postId: post.postId, metrics: {} });
             }
           }

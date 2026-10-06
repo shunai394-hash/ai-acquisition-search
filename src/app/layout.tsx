@@ -26,11 +26,13 @@ export const metadata: Metadata = {
     title: "AI Acquisition Search | AI集客検索エンジン",
     description: "市場の声から、次の商品と広告を決める。分析・動画・SNS運用をひとつの意思決定ループにつなぐAI集客OS。",
     siteName: "AI Acquisition Search",
+    images: [{ url: "/og.svg", width: 1200, height: 630, alt: "AI Acquisition Search — 市場を読む。次の一手を決める。" }],
   },
   twitter: {
     card: "summary",
     title: "AI Acquisition Search | AI集客検索エンジン",
     description: "市場の声から、次の商品と広告を決めるAI集客OS。",
+    images: ["/og.svg"],
   },
 };
 

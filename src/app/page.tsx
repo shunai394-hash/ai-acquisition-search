@@ -1,8 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import GoogleSignIn from "@/components/GoogleSignIn";
 import BillingButton from "@/components/BillingButton";
+import OperatorAutopilot from "@/components/OperatorAutopilot";
+import { VERDICT_COPY, type Verdict } from "@/lib/operator/activity";
 import Link from "next/link";
 import type { AcquisitionAnalyzeResult, EcPulseResearchBundle, EcPulseResearchRun } from "@/lib/acquisition/types";
 
@@ -37,6 +39,7 @@ export default function Home() {
   const [testSaving, setTestSaving] = useState(false);
   const [testSaved, setTestSaved] = useState("");
   const [metricsOpen, setMetricsOpen] = useState(false);
+  const [metricsSaving, setMetricsSaving] = useState(false);
   const [metrics, setMetrics] = useState({ impressions:"", views:"", clicks:"", conversions:"", revenue:"", grossProfit:"", adSpend:"" });
   const [verdict, setVerdict] = useState<{
     verdict: string;
@@ -54,7 +57,6 @@ export default function Home() {
   const [videoStatus, setVideoStatus] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [videoError, setVideoError] = useState("");
-  const [videoEngine, setVideoEngine] = useState("");
   const [studioPrompt, setStudioPrompt] = useState("");
   const [studioImage, setStudioImage] = useState<File | null>(null);
   const [studioImagePreview, setStudioImagePreview] = useState("");
@@ -71,6 +73,12 @@ export default function Home() {
   const [studioMusicPrompt, setStudioMusicPrompt] = useState("");
   const [studioResolution, setStudioResolution] = useState<"720p" | "1080p">("1080p");
   const [studioStage, setStudioStage] = useState<"idle" | "prepare" | "visual" | "motion" | "audio" | "render">("idle");
+  useEffect(() => {
+    return () => {
+      if (studioImagePreview) URL.revokeObjectURL(studioImagePreview);
+    };
+  }, [studioImagePreview]);
+
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["tiktok"]);
   const [publishCaption, setPublishCaption] = useState("");
   const [tiktokConsent, setTiktokConsent] = useState(false);
@@ -200,31 +208,89 @@ export default function Home() {
         if (!upload.ok) throw new Error(body.error || "画像のアップロードに失敗しました。");
         imageUrl = String(body.url || "");
       }
+
+      let audioUrl = "";
+      if (studioAudio !== "off") {
+        setStudioStage("audio");
+        setStudioStatus("ナレーションとBGMを仕上げ中…");
+        const narrationText = studioAudio === "custom"
+          ? studioNarration.trim()
+          : result?.analysis?.nextPosts?.[selectedScenario]?.hook
+            ? [
+                result.analysis.nextPosts[selectedScenario].hook,
+                result.analysis.decision.valueProposition,
+              ].filter(Boolean).join("。")
+            : studioPrompt.trim();
+        if (!narrationText) throw new Error("ナレーション本文を入力してください。");
+        const narration = await fetch("/api/narration", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({
+            text: narrationText.slice(0, 8000),
+            voice: studioVoice.split(" · ")[1] || undefined,
+            style: "Japanese short-form advertising narration. Natural, concise, confident, clear diction, synchronized to a vertical social video.",
+            withBgm: studioMusic,
+            bgmPrompt: studioMusicPrompt.trim(),
+            duration: studioDuration,
+            persist: true,
+          }),
+        });
+        const narrationBody = await narration.json().catch(() => ({}));
+        if (!narration.ok) throw new Error(narrationBody.error || "ナレーション生成に失敗しました。");
+        audioUrl = String(narrationBody.data?.audioUrl || "");
+        if (!audioUrl) throw new Error("生成した音声URLを取得できませんでした。");
+      }
+
       setStudioStage("visual");
       setStudioStatus("映像設計を組み立て中…");
       const response = await fetch("/api/video/generate", {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
           prompt: [
-            [
-              studioPrompt.trim(),
-              remixHint ? "REMIX DIRECTION: " + remixHint + ". Preserve the product identity and core concept while changing the visual execution." : ""
-            ].filter(Boolean).join("\n"),
+            "DIRECTOR BLUEPRINT — award-level short-form product film.",
+            "Deliver a coherent visual story, not a collection of disconnected generations.",
+            "PRODUCT LOCK: preserve the exact product identity, proportions, materials, colors, packaging, logo placement, geometry, texture, and functional details from the reference image. The reference image is the source of truth. Do not invent product features, alter proportions, recolor materials, replace packaging, or introduce competitor-like details.",
+            "BRAND INTEGRATION: make the product recognizable through distinctive physical details and usage context rather than oversized branding. The creative idea must feel native to this product; it should not be a generic ad template with the product swapped in.",
+            "PROOF OVER PROMISE: demonstrate benefits visually whenever possible. If a benefit cannot be truthfully demonstrated from the provided product information, use a restrained lifestyle visualization instead of inventing measurable performance."
+            "FORMAT: 9:16 vertical premium social advertising. Establish the focal subject immediately, keep critical product details inside a conservative center-safe region, and preserve clean negative space for captions and CTA without covering the product.",
+            "MOBILE LEGIBILITY: prioritize silhouette, contrast, scale, and gesture over fine detail that disappears on small screens. Avoid visual clutter, tiny UI, dense copy, and backgrounds that compete with the product.",
+            "SHOT DESIGN: use a deliberate 4-beat arc — 0–2s pattern interrupt/hook, 2–5s problem or desire, 5–10s product proof/use, final beat hero + one CTA. Adapt timing to the selected duration rather than forcing fixed timestamps.",
+            "SHOT CONTINUITY: define one visual grammar for the whole film (lens feel, camera height, movement language, lighting direction, palette, environment). Every cut must have a reason: reveal, proof, contrast, escalation, or payoff.",
+            "ATTENTION DESIGN: front-load the strongest visual information; create a readable focal point within the first second; alternate wide/context, medium/action, and macro/detail shots without gratuitous montage.",
+            "TEXT SAFETY: reserve clean negative space for captions and CTA; never ask the model to render long Japanese copy, logos, prices, or UI text inside the generated footage. Let the product remain the hero.",
+            "CAMERA: choose movement that communicates meaning — push-in for realization, lateral reveal for discovery, orbit for dimensional proof, macro for material/detail, motivated handheld for intimacy. Keep movement physically achievable and consistent with lens perspective. Avoid random motion, morphing, jitter, impossible physics, and excessive depth-of-field blur.",
+            "VISUAL NOVELTY WITH CONTROL: introduce at most one high-risk generative flourish per beat. Surround it with stable, simple shots so the viewer always has an anchor. If the flourish would threaten product fidelity, replace it with a practical-looking reveal or camera move.",
+            "LIGHTING: motivated, physically coherent light with premium commercial contrast, believable reflections, realistic skin/material response, and continuity between shots.",
+            "EDITING: cut on meaning, motion, sound, or emotional change — never just for variety. Use contrast and escalation to create rhythm. Preserve screen direction, eyelines, object position, wardrobe, lighting direction, and spatial continuity wherever a cut implies continuous time.",
+            "STORY PAYOFF: introduce a clear visual question early, answer it with product proof, then finish with a satisfying benefit-focused hero moment. Every shot should make the next shot feel necessary.",
+            "TRANSITIONS: prefer clean hard cuts, motivated match cuts, or restrained dissolves. Avoid trendy transitions that distract from the product. Never use glitch, excessive speed ramps, whip transitions, or effects unless the creative concept explicitly demands them.",
+            "ENDING: earn the final hero frame. Hold long enough for recognition and CTA comprehension; make the product the clearest and most desirable object in the frame.",
+            "PERFORMANCE: if people appear, give them one clear motivation and one believable action at a time. Use natural gaze, weight shift, hand contact, facial reaction, and object handling. Avoid model-like posing, frozen smiles, duplicated limbs, finger artifacts, rubbery motion, or unexplained gestures.",
+            "PHYSICAL REALISM: products must obey gravity, contact, friction, scale, reflections, shadows, and material behavior. Hands must actually grip or touch the product rather than float beside it. Prefer simple physically plausible actions over spectacular but unstable transformations.",
+            "COMPOSITION: use a strong focal hierarchy, controlled depth, deliberate negative space, and motivated foreground/background layers. Keep the product legible at phone scale while preserving enough environmental context to communicate the story.",
+            "REALISM: natural human motion and product interaction, correct hands/fingers, stable geometry, consistent wardrobe/background, no unsupported claims."
+            studioPrompt.trim(),
+            remixHint ? "REMIX DIRECTION: " + remixHint + ". Preserve the product identity and core concept while materially improving the visual execution." : "",
             studioAudio === "custom"
-              ? "AUDIO: Japanese spoken narration. Voice: " + studioVoice + ". Narration script: " + studioNarration.trim() + ". Speak naturally, clearly, and synchronize the delivery to the scene."
+              ? "AUDIO: Japanese spoken narration. Voice: " + studioVoice + ". Narration script: " + studioNarration.trim() + ". Natural pacing, clean diction, intentional pauses, and scene-synchronized delivery."
               : studioAudio === "auto"
-                ? "AUDIO: natural voiceover and synchronized ambient sound. Voice: " + studioVoice + "."
+                ? "AUDIO: natural voiceover with synchronized ambient sound. Voice: " + studioVoice + ". Prioritize intelligibility and emotional timing."
                 : "",
             studioMusic
-              ? "BGM: generate subtle, tasteful background music that supports the scene; keep it underneath the narration and do not overpower speech." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
-              : ""
+              ? "AUDIO DIRECTION: treat sound as part of the narrative, not decoration. Use a clear sonic hierarchy: narration > product/action SFX > BGM. Keep narration intelligible, use intentional micro-pauses before the key benefit, and place subtle transitions or impacts only where they reinforce an edit point.",
+            "BGM: subtle premium background score with a distinctive motif, rhythmically aligned to the edit and automatically ducked beneath speech. Build or release energy with the story; avoid generic stock-music energy and avoid masking the product benefit.",
+            "SOUND DESIGN: prioritize believable tactile/product sounds where appropriate (fabric, click, spray, package, movement, environment). Never add a sound merely because a visual exists; every audible element should strengthen realism, emotion, or comprehension." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
+              : "",
+            "CREATIVE DIFFERENTIATION: avoid interchangeable stock-ad compositions. Find one memorable visual metaphor, interaction, reveal, or contrast that is specific to the product and audience, then build the film around it. Novelty must improve comprehension, not obscure it.",
+            "FINAL QUALITY GATE: score the concept mentally before rendering across concept originality, storytelling clarity, visual craft, sound integration, product truth, brand fit, mobile legibility, and emotional memorability. If any critical dimension is weak, simplify or redesign the shot rather than adding effects. Every shot must reinforce the same product, story, audience, and promise.",
           ].filter(Boolean).join("\n"),
           imageUrl: imageUrl || undefined,
+          audioUrl: audioUrl || undefined,
           socialPostId: socialPostId || undefined,
           duration: studioDuration,
           resolution: studioResolution,
           aspectRatio: studioAspect,
-          generateAudio: studioAudio !== "off" || studioMusic
+          generateAudio: studioAudio === "off" && studioMusic
         })
       });
       const body = await response.json().catch(() => ({}));
@@ -271,7 +337,6 @@ export default function Home() {
       if (!jobId) throw new Error("動画ジョブIDを取得できませんでした。");
       setVideoJobId(jobId);
       const engine = String(body.engine || "video engine");
-      setVideoEngine(engine);
       setVideoStatus(`${engine}で生成中…`);
       for (let attempt = 0; attempt < 60; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : 5000));
@@ -337,6 +402,8 @@ export default function Home() {
   }
 
   async function saveMetrics() {
+    if (metricsSaving) return;
+    setMetricsSaving(true);
     setVerdict(null);
     setError("");
     try {
@@ -362,6 +429,7 @@ export default function Home() {
         evidenceCount: Array.isArray(verdictBody.decision?.evidence) ? verdictBody.decision.evidence.length : undefined,
       });
     } catch(err) { setError(err instanceof Error ? err.message : "実績保存に失敗しました。"); }
+    finally { setMetricsSaving(false); }
   }
 
   return (
@@ -381,7 +449,7 @@ export default function Home() {
           )}
           <span className="status">AI AD OPERATOR · LIVE</span>
           <GoogleSignIn />
-          <Link href="/billing" style={{ color: "#ffffff70", fontSize: 11 }}>契約管理</Link>
+          <Link href="/billing" style={{ color: "#c5c8d0", fontSize: 12 }}>契約管理</Link>
         </div>
       </header>
 
@@ -403,7 +471,7 @@ export default function Home() {
               <div><b>03</b><strong>次を試す</strong><span>訴求・動画・テストまで一本の仮説にする</span></div>
             </div>
           </div>
-          <div className="hero-instrument" aria-label="AI Acquisition Search decision loop">
+          <div className="hero-instrument" role="img" aria-label="AIが市場シグナルから次の一手を決めるループ: 調査 → 矛盾 → 判断 → クリエイティブ">
             <div className="instrument-grid" aria-hidden="true"></div>
             <div className="signal-orbit orbit-one"></div><div className="signal-orbit orbit-two"></div><div className="signal-orbit orbit-three"></div>
             <div className="signal-core"><span>AI</span><strong>DECIDE</strong><small>FROM SIGNAL → ACTION</small></div>
@@ -415,6 +483,8 @@ export default function Home() {
         <div className="hero-loop" aria-label="Acquisition loop"><span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span></div>
         <p className="hint">分析結果はレポートで終わらない。判断を、次のクリエイティブとテストへ接続します。</p>
       </section>
+
+      <OperatorAutopilot />
 
       {!result && (
       <section className="video-studio" aria-labelledby="video-studio-title">
@@ -430,13 +500,14 @@ export default function Home() {
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
               const file=e.target.files?.[0] || null; setStudioImage(file); setStudioImagePreview(file ? URL.createObjectURL(file) : "");
             }} />
+            {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview, next/image cannot optimize it */}
             {studioImagePreview ? <img src={studioImagePreview} alt="動画生成に使う画像のプレビュー" /> : <span className="upload-empty">＋ 画像・商品写真を追加<br /><small>人物 / 商品 / 写真 / イラスト / 参照素材</small></span>}
           </label>
           <div className="studio-prompt">
             <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","UGC広告","商品CM","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","UGC広告":"自然なスマホ撮影感のあるUGC動画。冒頭2秒で視線を引き、リアルな人物の動きを重視。","商品CM":"高級ブランドCMのような商品映像。質感、照明、カメラの動きを美しく見せる。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
             <textarea id="studio-prompt" value={studioPrompt} onChange={(e)=>setStudioPrompt(e.target.value)} rows={8}
               placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この商品画像を使って、20代女性が自然に商品を紹介するUGC風広告。最初の2秒で視線を引き、夕方の柔らかな光。縦9:16、リアルなスマホ撮影感。"} />
-            <div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · AUDIO</span><div className="studio-audio-grid">{([["off","OFF"],["auto","AUTO"],["custom","CUSTOM"]] as const).map(([value,label]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} onClick={()=>setStudioAudio(value)}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option>日本語 · Natural</option><option>日本語 · Deep</option><option>English · Natural</option><option>English · Deep</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> BGMを自動生成</label>{studioMusic && <input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="BGMの雰囲気（例：minimal electronic / warm acoustic）" aria-label="BGMの雰囲気" />}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
+            <div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · AUDIO</span><div className="studio-audio-grid">{([["off","OFF"],["auto","AUTO"],["custom","CUSTOM"]] as const).map(([value,label]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} aria-pressed={studioAudio===value} onClick={()=>setStudioAudio(value)}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option>日本語 · Natural</option><option>日本語 · Deep</option><option>English · Natural</option><option>English · Deep</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> BGMを自動生成</label>{studioMusic && <input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="BGMの雰囲気（例：minimal electronic / warm acoustic）" aria-label="BGMの雰囲気" />}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
               {([["prepare","PREPARE","素材"],["visual","VISUAL","映像設計"],["motion","MOTION","モーション"],["audio","AUDIO","音"],["render","RENDER","仕上げ"]] as const).map(([key,label,ja], index) => {
                 const order = ["idle","prepare","visual","motion","audio","render"] as const;
                 const active = order.indexOf(studioStage) >= order.indexOf(key);
@@ -444,11 +515,11 @@ export default function Home() {
               })}
             </div><div className="studio-actions">
               <button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating || studioPrompt.trim().length < 8} aria-busy={studioGenerating}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
-              {studioStatus && <span className="video-status">{studioStatus}</span>}
+              {studioStatus && <span className="video-status" role="status" aria-live="polite">{studioStatus}</span>}
             </div>
           </div>
         </div>
-        {studioError && <p className="error">{studioError}</p>}
+        {studioError && <p className="error" role="alert">{studioError}</p>}
         {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>↻ Regenerate</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>✦ Remix</button><a href={studioUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></div></div>}
       </section>
       )}
@@ -872,7 +943,7 @@ export default function Home() {
             </button>
             {videoStatus && <p className="hint">{videoStatus}</p>}
             {videoJobId && <small className="hint">Job: {videoJobId}</small>}
-            {videoError && <p className="error">{videoError}</p>}
+            {videoError && <p className="error" role="alert">{videoError}</p>}
             {videoUrl && (
               <div style={{ marginTop: 16 }}>
                 <video src={videoUrl} controls playsInline style={{ width: "100%", maxWidth: 420, borderRadius: 16, background: "#000" }} />
@@ -991,14 +1062,14 @@ export default function Home() {
                 </label>
               ))}
               <p className="hint">テスト計画を保存すると投稿IDが自動発行されます。投稿後の実績を入力してください。</p>
-              <button type="button" onClick={saveMetrics}>実績を保存してAI判定</button>
+              <button type="button" onClick={saveMetrics} disabled={metricsSaving} aria-busy={metricsSaving}>{metricsSaving ? "判定中…" : "実績を保存してAI判定"}</button>
             </div>}
             {verdict && (
               <div className="verdict" role="status" aria-live="polite">
                 <div className="verdict-head">
                   <div>
                     <span className="eyebrow">TEACHER DECISION</span>
-                    <strong>{verdict.verdict}</strong>
+                    <strong>{VERDICT_COPY[verdict.verdict as Verdict]?.label ?? verdict.verdict}{VERDICT_COPY[verdict.verdict as Verdict] ? ` · ${VERDICT_COPY[verdict.verdict as Verdict].meaning}` : ""}</strong>
                   </div>
                   <span className="verdict-source">{verdict.aiConnected ? "AI REFINED" : "DETERMINISTIC"}{typeof verdict.evidenceCount === "number" ? ` · ${verdict.evidenceCount} SIGNALS` : ""}</span>
                 </div>
@@ -1009,6 +1080,7 @@ export default function Home() {
                     <strong>{verdict.nextAction}</strong>
                   </div>
                 )}
+                {VERDICT_COPY[verdict.verdict as Verdict] && <p className="hint">{VERDICT_COPY[verdict.verdict as Verdict].next} 自動運用中の投稿は、毎日の巡回でAIがこの判断を実行します。</p>}
               </div>
             )}
           </section>
