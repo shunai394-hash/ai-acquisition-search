@@ -305,11 +305,11 @@ export default function Home() {
         const poll = await fetch("/api/video/jobs/" + encodeURIComponent(jobId), { headers: { Authorization: "Bearer " + (await getAccessToken()) }, cache: "no-store" });
         const data = await poll.json().catch(() => ({}));
         if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
-        if (data.job?.status === "completed" && data.asset?.video_url) { setStudioStage("render"); setStudioUrl(data.asset.video_url); setStudioStatus("完成。"); return; }
+        if (data.job?.status === "completed" && data.asset?.video_url) { setStudioStage("render"); setStudioUrl(data.asset.video_url); setStudioStatus("完成。"); setStudioStage("render"); return; }
         if (data.job?.status === "failed") throw new Error(data.job?.error || "動画生成に失敗しました。");
         setStudioStatus(engine + "で生成中… " + (attempt + 1) + "/60");
       }
-      throw new Error("動画生成がタイムアウトしました。");
+      throw new Error("動画生成がタイムアウトしました。ジョブはサーバー側で継続している可能性があります。時間を置いて再確認してください。");
     } catch (err) { setStudioStage("idle"); setStudioError(err instanceof Error ? err.message : "動画生成に失敗しました。"); setStudioStatus(""); }
     finally { setStudioGenerating(false); }
   }
