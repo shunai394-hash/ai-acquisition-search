@@ -164,7 +164,11 @@ async function runPatrol(db: ReturnType<typeof getAdminSupabase>) {
     skipped: loop.payload.skipped === true,
     timeBudgetExceeded: loop.payload.timeBudgetExceeded === true,
   };
-  const reportInput = { checkedAt, operatorLoop: loopSummary, patrolCounts: counts, staleJobs: staleJobs?.length || 0, repairs, usersChecked: users.length };
+  // The supervisor does not need tenant identifiers. Keep IDs out of the LLM prompt
+  // and out of the global cron response; user-scoped reports below may retain only
+  // that user's own job/post identifiers for actionable recovery.
+  const supervisorRepairs = repairs.map(({ id: _id, userId: _userId, ...repair }) => repair);
+  const reportInput = { checkedAt, operatorLoop: loopSummary, patrolCounts: counts, staleJobs: staleJobs?.length || 0, repairs: supervisorRepairs, usersChecked: users.length };
   const ai = await supervisorDecision(reportInput);
   // The supervisor may escalate severity, never downgrade what was observed.
   const finalSeverity: Severity = ai?.severity && SEVERITY_RANK[ai.severity] > SEVERITY_RANK[severity] ? ai.severity : severity;
@@ -178,7 +182,7 @@ async function runPatrol(db: ReturnType<typeof getAdminSupabase>) {
     summary: ai?.summary || fallbackSummary,
     summarySource: ai?.summary ? "ai" : "deterministic",
     nextCheck: ai?.next_check || "次回定期巡回",
-    operatorLoop: { ...loopSummary, payload: loop.payload }, patrolCounts: counts, repairs, usersChecked: users.length,
+    operatorLoop: loopSummary, patrolCounts: counts, repairs: supervisorRepairs, usersChecked: users.length,
   };
 
   // Each user's stored report holds only that user's own data. The global
