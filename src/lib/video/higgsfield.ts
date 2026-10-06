@@ -205,4 +205,10 @@ export async function waitForHiggsfieldVideo(
   return undefined;
 }\n\n\n/* video: accept provider success states */\nfunction normalizedStatus(result: Record<string, unknown>) {
   return String(result.status ?? result.state ?? result.request_status ?? "").toLowerCase().replace(/[-_\s]/g, "");
+}\n\n\n/* video: broaden completed URL extraction */\nfunction extractNestedVideoUrl(result: Record<string, unknown>) {
+  for (const key of ["output","result","data","asset"]) {
+    const value = result[key]; const found = firstHttpUrl(value);
+    if (found && /\.(mp4|webm|mov)(\?|$)/i.test(found)) return found;
+  }
+  return undefined;
 }\n
