@@ -1118,3 +1118,83 @@ label:has(> input[type="file"]:focus-visible),label:has(> input[type="checkbox"]
   outline:2px solid rgba(170,160,255,.85)!important;
   outline-offset:3px!important;
 }
+
+
+/* Resilient route states / PASS 05 */
+.error-screen{
+  min-height:100svh;
+  display:grid;
+  place-content:center;
+  justify-items:start;
+  gap:14px;
+  max-width:760px;
+  margin:auto;
+  padding:40px 28px;
+}
+.error-screen h1{
+  margin:0;
+  font-size:clamp(42px,7vw,76px);
+  line-height:.98;
+  letter-spacing:-.06em;
+  text-wrap:balance;
+}
+.error-screen p:not(.eyebrow){
+  max-width:560px;
+  margin:0;
+  color:#8b8f99;
+  line-height:1.8;
+}
+.error-screen button,.error-screen a{
+  display:inline-flex;
+  align-items:center;
+  min-height:46px;
+  margin-top:8px;
+  padding:0 17px;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:12px;
+  background:rgba(255,255,255,.06);
+  color:#fff;
+  font:inherit;
+  font-weight:650;
+  text-decoration:none;
+  cursor:pointer;
+  transition:transform .2s ease,border-color .2s ease,background .2s ease;
+}
+.error-screen button:hover,.error-screen a:hover{
+  transform:translateY(-1px);
+  border-color:rgba(155,140,255,.42);
+  background:rgba(155,140,255,.08);
+}
+.error-screen button:focus-visible,.error-screen a:focus-visible{
+  outline:2px solid #bdb7ff;
+  outline-offset:3px;
+}
+@media(max-width:700px){
+  .error-screen{padding:28px 18px}
+  .error-screen h1{font-size:clamp(38px,12vw,58px)}
+}
+
+/* Route loading should preserve the same visual language instead of flashing blank. */
+.route-loading{
+  min-height:100svh;
+  display:grid;
+  place-content:center;
+  gap:14px;
+  padding:28px;
+}
+.route-loading-mark{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  border:1px solid rgba(155,140,255,.3);
+  background:linear-gradient(135deg,rgba(155,140,255,.16),rgba(102,227,255,.07));
+  box-shadow:0 0 40px rgba(130,105,255,.1);
+  animation:route-pulse 1.5s ease-in-out infinite;
+}
+.route-loading-label{
+  color:#6e737e;
+  font-size:11px;
+  letter-spacing:.12em;
+}
+@keyframes route-pulse{50%{transform:scale(.94);opacity:.62}}
+@media(prefers-reduced-motion:reduce){.route-loading-mark{animation:none}}
