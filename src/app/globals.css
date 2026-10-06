@@ -1208,3 +1208,7 @@ label:has(> input[type="file"]:focus-visible),label:has(> input[type="checkbox"]
 
 /* AWARD PASS 13 — cinematic output framing */
 .studio-result video,.video-result video{box-shadow:0 28px 90px rgba(0,0,0,.48),0 0 0 1px rgba(255,255,255,.08);outline:1px solid rgba(155,140,255,.08);outline-offset:4px}
+
+
+/* AWARD PASS 14 — reference image presentation */
+.studio-upload img{display:block;width:100%;max-height:420px;object-fit:contain;border-radius:14px;box-shadow:0 18px 55px rgba(0,0,0,.34);background:#020307}.studio-upload-large img{max-height:460px}
