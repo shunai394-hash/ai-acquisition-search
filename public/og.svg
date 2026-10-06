@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#050609"/>
+      <stop offset=".55" stop-color="#0b0c12"/>
+      <stop offset="1" stop-color="#10101a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".78" cy=".12" r=".7">
+      <stop offset="0" stop-color="#9b8cff" stop-opacity=".34"/>
+      <stop offset=".55" stop-color="#66e3ff" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#050609" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <g fill="none" stroke="#fff" stroke-opacity=".055">
+    <path d="M0 110H1200M0 220H1200M0 330H1200M0 440H1200M0 550H1200"/>
+    <path d="M110 0V630M220 0V630M330 0V630M440 0V630M550 0V630M660 0V630M770 0V630M880 0V630M990 0V630M1100 0V630"/>
+  </g>
+  <text x="82" y="112" fill="#a9a1ff" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="5">AI ACQUISITION SEARCH</text>
+  <text x="82" y="258" fill="#f4f5f7" font-family="Arial, sans-serif" font-size="72" font-weight="700" letter-spacing="-3">市場を読む。</text>
+  <text x="82" y="340" fill="#f4f5f7" font-family="Arial, sans-serif" font-size="72" font-weight="700" letter-spacing="-3">次の一手を決める。</text>
+  <text x="86" y="410" fill="#8b8f99" font-family="Arial, sans-serif" font-size="22">商品・市場・広告・SNSを、ひとつの自律ループへ。</text>
+  <rect x="82" y="500" width="220" height="44" rx="22" fill="#fff" fill-opacity=".08" stroke="#fff" stroke-opacity=".14"/>
+  <text x="108" y="529" fill="#d7d9df" font-family="Arial, sans-serif" font-size="14" letter-spacing="2">AUTOPILOT · OPERATOR LOOP</text>
+</svg>
