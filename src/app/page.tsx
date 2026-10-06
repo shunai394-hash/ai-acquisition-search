@@ -249,7 +249,9 @@ export default function Home() {
           prompt: [
             "DIRECTOR BLUEPRINT — award-level short-form product film.",
             "Deliver a coherent visual story, not a collection of disconnected generations.",
-            "PRODUCT LOCK: preserve the exact product identity, proportions, materials, colors, packaging, logo placement, and functional details from the reference image. Do not invent product features.",
+            "PRODUCT LOCK: preserve the exact product identity, proportions, materials, colors, packaging, logo placement, geometry, texture, and functional details from the reference image. The reference image is the source of truth. Do not invent product features, alter proportions, recolor materials, replace packaging, or introduce competitor-like details.",
+            "BRAND INTEGRATION: make the product recognizable through distinctive physical details and usage context rather than oversized branding. The creative idea must feel native to this product; it should not be a generic ad template with the product swapped in.",
+            "PROOF OVER PROMISE: demonstrate benefits visually whenever possible. If a benefit cannot be truthfully demonstrated from the provided product information, use a restrained lifestyle visualization instead of inventing measurable performance."
             "FORMAT: 9:16 vertical, premium social advertising, subject readable on a phone screen, strong visual hierarchy and clean negative space for captions.",
             "SHOT DESIGN: use a deliberate 4-beat arc — 0–2s pattern interrupt/hook, 2–5s problem or desire, 5–10s product proof/use, final beat hero + one CTA. Adapt timing to the selected duration rather than forcing fixed timestamps.",
             "SHOT CONTINUITY: define one visual grammar for the whole film (lens feel, camera height, movement language, lighting direction, palette, environment). Every cut must have a reason: reveal, proof, contrast, escalation, or payoff.",
