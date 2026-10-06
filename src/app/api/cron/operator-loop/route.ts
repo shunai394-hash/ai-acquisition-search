@@ -547,7 +547,7 @@ async function runOperatorLoop(db: Db, leaseMode: string) {
           provider_response: {
             ...claimResponse,
             input_image_url: inputImageUrl,
-            started_response: started,
+            started_response: { status: started.status ?? "queued", request_id: requestId },
           },
           error: null,
           started_at: now,
@@ -597,7 +597,8 @@ async function runOperatorLoop(db: Db, leaseMode: string) {
         // The provider call itself failed: nothing was started, so a later retry is safe.
         await db.from("production_jobs").update({
           status: "failed",
-          error: error instanceof Error ? error.message : String(error),
+          error: "動画生成プロバイダへのリクエストに失敗しました。次回の巡回で再試行します。",
+          provider_response: mergeProviderResponse(providerResponse, { last_start_error: true }),
           updated_at: new Date().toISOString(),
         }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "running").is("request_id", null);
       }
