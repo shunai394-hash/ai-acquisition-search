@@ -1236,3 +1236,7 @@ label:has(> input[type="file"]:focus-visible),label:has(> input[type="checkbox"]
 
 /* AWARD PASS 20 — publishing confidence */
 .publisher-platforms label{transition:transform .18s ease,border-color .18s ease,background .18s ease}.publisher-platforms label:hover{transform:translateY(-1px);border-color:rgba(184,239,255,.22);background:rgba(255,255,255,.035)}.publish-consent:hover{border-color:rgba(155,140,255,.24);background:rgba(155,140,255,.045)}
+
+
+/* AWARD PASS 21 — result actions as finishing tools */
+.studio-result-actions button,.studio-result-actions a{min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:6px}.studio-result-actions button:first-child{box-shadow:0 10px 30px rgba(155,140,255,.12)}.studio-result-actions a:hover{background:rgba(255,255,255,.055)}
