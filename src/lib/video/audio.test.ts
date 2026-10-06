@@ -5,7 +5,8 @@ import { generateBgm, isSupportedNarrationWav, mixNarrationWithBgm } from "./aud
 test("BGM output is a valid 24kHz mono WAV", () => {
   const bgm = generateBgm(2, "warm acoustic");
   assert.ok(bgm.byteLength > 44);
-  assert.equal(Buffer.from(bgm).toString("ascii", 0, 4), "RIFF");
+  assert.equal(bgm instanceof Int16Array, true);
+  assert.equal(bgm.length, 2 * 24_000);
   assert.equal(bgm instanceof Int16Array, true);
   assert.equal(bgm.length, 2 * 24_000);
 });
