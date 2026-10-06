@@ -267,7 +267,9 @@ export default function Home() {
                 ? "AUDIO: natural voiceover with synchronized ambient sound. Voice: " + studioVoice + ". Prioritize intelligibility and emotional timing."
                 : "",
             studioMusic
-              ? "BGM: subtle premium background score, rhythmically aligned to the edit and ducked beneath speech. Avoid generic stock-music energy." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
+              ? "AUDIO DIRECTION: treat sound as part of the narrative, not decoration. Use a clear sonic hierarchy: narration > product/action SFX > BGM. Keep narration intelligible, use intentional micro-pauses before the key benefit, and place subtle transitions or impacts only where they reinforce an edit point.",
+            "BGM: subtle premium background score with a distinctive motif, rhythmically aligned to the edit and automatically ducked beneath speech. Build or release energy with the story; avoid generic stock-music energy and avoid masking the product benefit.",
+            "SOUND DESIGN: prioritize believable tactile/product sounds where appropriate (fabric, click, spray, package, movement, environment). Never add a sound merely because a visual exists; every audible element should strengthen realism, emotion, or comprehension." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
               : "",
             "FINAL QUALITY GATE: every shot must reinforce the same product, story, audience, and promise. If a visual idea conflicts with product truth or continuity, simplify it rather than hallucinate detail."
           ].filter(Boolean).join("\n"),
