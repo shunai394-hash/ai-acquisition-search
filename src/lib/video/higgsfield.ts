@@ -12,6 +12,7 @@ export type HiggsfieldVideoInput = {
   aspectRatio?: "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "adaptive";
   generateAudio?: boolean;
   imageUrl?: string;
+  audioUrl?: string;
 };
 
 function credentials() {
@@ -91,8 +92,9 @@ async function requestHiggsfield(path: string, init: RequestInit) {
 export async function generateHiggsfieldVideo(input: HiggsfieldVideoInput) {
   const model = input.model ?? DEFAULT_MODEL;
   const imageModel = model.includes("/image-to-video");
-  const requestModel =
-    imageModel && !input.imageUrl
+  const requestModel = input.audioUrl && input.imageUrl
+    ? "wan/v2.7/image-to-video"
+    : imageModel && !input.imageUrl
       ? "alibaba/wan-3.0/text-to-video"
       : model;
 
@@ -106,6 +108,7 @@ export async function generateHiggsfieldVideo(input: HiggsfieldVideoInput) {
       generate_audio: input.generateAudio ?? false,
       enable_thinking: false,
       ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
+      ...(input.audioUrl ? { audio_url: input.audioUrl, generate_audio: false } : {}),
     }),
   });
 }
