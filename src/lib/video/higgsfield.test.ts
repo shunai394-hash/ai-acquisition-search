@@ -61,3 +61,29 @@ test("provider errors are safe for user-facing storage", async () => {
   );
   delete process.env.HF_API_KEY;
 });
+
+
+test("narrated image generation routes to Wan 2.7 image-to-video and sends audio_url", async () => {
+  process.env.HF_API_KEY = "k:s";
+  let request: { url: string; body: Record<string, unknown> } | null = null;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    request = {
+      url: String(input),
+      body: JSON.parse(String(init?.body || "{}")) as Record<string, unknown>,
+    };
+    return Response.json({ request_id: "r-audio", status: "queued" });
+  }) as typeof fetch;
+
+  await generateHiggsfieldVideo({
+    prompt: "product close-up",
+    model: "alibaba/wan-3.0-prime/image-to-video",
+    imageUrl: "https://img.test/product.webp",
+    audioUrl: "https://storage.test/narration.wav",
+  });
+
+  assert.equal(request?.url, "https://api.higgsfield.ai/wan/v2.7/image-to-video");
+  assert.equal(request?.body.image_url, "https://img.test/product.webp");
+  assert.equal(request?.body.audio_url, "https://storage.test/narration.wav");
+  assert.equal(request?.body.generate_audio, false);
+  delete process.env.HF_API_KEY;
+});
