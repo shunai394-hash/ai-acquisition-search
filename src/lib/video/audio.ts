@@ -104,13 +104,31 @@ export function generateBgm(durationSeconds: number, prompt = "") {
   return pcm;
 }
 
-function narrationPresence(pcm: Int16Array, index: number) {
-  const window = Math.max(1, Math.floor(SAMPLE_RATE * 0.018));
+function createNarrationPresence(pcm: Int16Array) {
+  const radius = Math.max(1, Math.floor(SAMPLE_RATE * 0.018));
+  const absolute = new Float64Array(pcm.length);
+  for (let i = 0; i < pcm.length; i++) absolute[i] = Math.abs(pcm[i]) / 32768;
+
   let sum = 0;
-  const from = Math.max(0, index - window);
-  const to = Math.min(pcm.length, index + window);
-  for (let i = from; i < to; i++) sum += Math.abs(pcm[i]) / 32768;
-  return Math.min(1, sum / Math.max(1, to - from) * 3.2);
+  let count = 0;
+  for (let i = 0; i <= Math.min(radius, pcm.length - 1); i++) {
+    sum += absolute[i];
+    count++;
+  }
+
+  return (index: number) => {
+    const addIndex = index + radius;
+    if (addIndex < pcm.length) {
+      sum += absolute[addIndex];
+      count++;
+    }
+    const removeIndex = index - radius - 1;
+    if (removeIndex >= 0) {
+      sum -= absolute[removeIndex];
+      count--;
+    }
+    return Math.min(1, (sum / Math.max(1, count)) * 3.2);
+  };
 }
 
 export function mixNarrationWithBgm(narrationWav: Uint8Array, durationSeconds: number, bgmPrompt = "") {
@@ -119,10 +137,11 @@ export function mixNarrationWithBgm(narrationWav: Uint8Array, durationSeconds: n
   const length = Math.max(narration.length, bgm.length);
   const mixed = new Int16Array(length);
   let duck = 1;
+  const presenceAt = createNarrationPresence(narration);
 
   for (let i = 0; i < length; i++) {
     const voice = i < narration.length ? narration[i] * 0.96 : 0;
-    const presence = i < narration.length ? narrationPresence(narration, i) : 0;
+    const presence = i < narration.length ? presenceAt(i) : 0;
     const targetDuck = 1 - presence * 0.78;
     duck += (targetDuck - duck) * (targetDuck < duck ? 0.035 : 0.008);
     const music = i < bgm.length ? bgm[i] * 0.20 * duck : 0;
