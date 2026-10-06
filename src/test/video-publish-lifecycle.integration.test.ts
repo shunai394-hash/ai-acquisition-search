@@ -61,6 +61,7 @@ type Stub = {
   /** request_id -> provider status answer (string status or a thrown error). */
   hfStatus: Record<string, string | "error">;
   hfStarts: Array<{ path: string; body: Record<string, unknown> }>;
+  hfCancels: string[];
   hfStatusCalls: number;
   /** Called while a status request is in flight (to interleave a concurrent writer). */
   onStatus: ((requestId: string) => void) | null;
@@ -91,6 +92,11 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return handler(request);
   }
   if (url.host === "api.higgsfield.ai") {
+    const cancel = /^\/requests\/([^/]+)\/cancel$/.exec(url.pathname);
+    if (cancel) {
+      stub.hfCancels.push(decodeURIComponent(cancel[1]));
+      return Response.json({ request_id: decodeURIComponent(cancel[1]), status: "canceled" });
+    }
     const status = /^\/requests\/([^/]+)\/status$/.exec(url.pathname);
     if (status) {
       stub.hfStatusCalls++;
@@ -141,7 +147,7 @@ const publishedRows = () => db.table("social_posts").filter((row) => (row.metada
 
 beforeEach(() => {
   db = new FakeSupabase();
-  stub = { hfStatus: {}, hfStarts: [], hfStatusCalls: 0, onStatus: null, tweets: 0, tweetStatus: 200, metricsStatus: 200 };
+  stub = { hfStatus: {}, hfStarts: [], hfCancels: [], hfStatusCalls: 0, onStatus: null, tweets: 0, tweetStatus: 200, metricsStatus: 200 };
   process.env.HF_API_KEY_ID = "hf-id";
   process.env.HF_API_KEY_SECRET = "hf-secret";
   db.seed("products", [{ id: "prod1", user_id: "u1", name: "保冷ボトル", url: "https://shop.test/bottle", price: 3000, cost: 1200 }]);
@@ -328,6 +334,8 @@ test("timeout: a job the provider never finishes is failed and retried with its 
   await runLoop();
   assert.equal(job().status, "failed");
   assert.equal(job().provider_response.timed_out_request_id, "hf-req-1");
+  assert.equal(job().provider_response.cancel_requested, true);
+  assert.deepEqual(stub.hfCancels, ["hf-req-1"]);
   assert.match(String(job().error), /打ち切りました/);
 
   await runLoop();
@@ -341,6 +349,8 @@ test("timeout also applies when the provider status endpoint keeps erroring", as
   stub.hfStatus["hf-req-1"] = "error";
   await runLoop();
   assert.equal(job().status, "failed");
+  assert.equal(job().provider_response.cancel_requested, true);
+  assert.deepEqual(stub.hfCancels, ["hf-req-1"]);
   assert.match(String(job().error), /upstream unavailable/);
 });
 
