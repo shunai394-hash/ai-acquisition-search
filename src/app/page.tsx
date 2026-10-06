@@ -260,7 +260,10 @@ export default function Home() {
             "CAMERA: deliberate cinematic movement only (push-in, controlled orbit, lateral reveal, macro detail, or motivated handheld). Avoid random camera motion, morphing, jitter, impossible physics, and excessive depth-of-field blur.",
             "LIGHTING: motivated, physically coherent light with premium commercial contrast, believable reflections, realistic skin/material response, and continuity between shots.",
             "EDITING: rhythmic cuts motivated by the story; visual variety without chaos; preserve temporal continuity; no flash frames, accidental jump cuts, warped text, fake UI, or watermarks.",
-            "REALISM: natural human motion and product interaction, correct hands/fingers, stable geometry, consistent wardrobe/background, no unsupported claims.",
+            "PERFORMANCE: if people appear, give them one clear motivation and one believable action at a time. Use natural gaze, weight shift, hand contact, facial reaction, and object handling. Avoid model-like posing, frozen smiles, duplicated limbs, finger artifacts, rubbery motion, or unexplained gestures.",
+            "PHYSICAL REALISM: products must obey gravity, contact, friction, scale, reflections, shadows, and material behavior. Hands must actually grip or touch the product rather than float beside it. Prefer simple physically plausible actions over spectacular but unstable transformations.",
+            "COMPOSITION: use a strong focal hierarchy, controlled depth, deliberate negative space, and motivated foreground/background layers. Keep the product legible at phone scale while preserving enough environmental context to communicate the story.",
+            "REALISM: natural human motion and product interaction, correct hands/fingers, stable geometry, consistent wardrobe/background, no unsupported claims."
             studioPrompt.trim(),
             remixHint ? "REMIX DIRECTION: " + remixHint + ". Preserve the product identity and core concept while materially improving the visual execution." : "",
             studioAudio === "custom"
