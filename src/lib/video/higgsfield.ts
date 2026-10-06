@@ -96,6 +96,19 @@ export async function getHiggsfieldStatus(requestId: string) {
   return requestHiggsfield(`requests/${encodeURIComponent(requestId)}/status`, { method: "GET" });
 }
 
+export async function cancelHiggsfieldRequest(requestId: string) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  try {
+    return await requestHiggsfield(`requests/${encodeURIComponent(requestId)}/cancel`, {
+      method: "POST",
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function extractHiggsfieldVideoUrl(result: Record<string, unknown>) {
   const direct = (result.video as Record<string, unknown> | undefined)?.url;
   if (typeof direct === "string" && /^https?:/i.test(direct)) return direct;
