@@ -257,7 +257,9 @@ test("STOP after repeated poor results: no creative, and next-creative refuses e
     retweet_count: 0,
   };
   // Old posts already have fresh metrics so only p1 is processed.
-  for (const id of chain) db.seed("post_metrics", [{ social_post_id: id, impressions: 5000, likes: 300, raw: { source: "x" }, measured_at: iso(-HOUR) }]);
+  // The current post must also carry a genuinely poor engagement signal.
+  // Otherwise a strong current result correctly overrides the historical poor lineage.
+  for (const id of chain) db.seed("post_metrics", [{ social_post_id: id, impressions: 5000, likes: 10, comments: 0, shares: 0, raw: { source: "x" }, measured_at: iso(-HOUR) }]);
 
   const body = await (await operatorLoop(cronRequest())).json();
   const r = body.results.find((x: { postId?: string }) => x.postId === "p1");
