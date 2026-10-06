@@ -5,7 +5,7 @@ import { extractHiggsfieldVideoUrl, generateHiggsfieldVideo, getHiggsfieldStatus
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; delete process.env.HIGGSFIELD_API_BASE_URL; });
 
-test("requests go to the documented platform host with the model path and Key auth", async () => {
+test("requests go to the documented API host with the model path and Key auth", async () => {
   process.env.HF_API_KEY = "k:s";
   const calls: Array<{ url: string; auth: string | null }> = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -14,9 +14,9 @@ test("requests go to the documented platform host with the model path and Key au
   }) as typeof fetch;
   await generateHiggsfieldVideo({ prompt: "p", model: "/alibaba/wan-3.0-prime/image-to-video/", imageUrl: "https://img.test/a.webp" });
   await getHiggsfieldStatus("r 1");
-  assert.equal(higgsfieldBaseUrl(), "https://platform.higgsfield.ai");
-  assert.equal(calls[0].url, "https://platform.higgsfield.ai/alibaba/wan-3.0-prime/image-to-video");
-  assert.equal(calls[1].url, "https://platform.higgsfield.ai/requests/r%201/status");
+  assert.equal(higgsfieldBaseUrl(), "https://api.higgsfield.ai");
+  assert.equal(calls[0].url, "https://api.higgsfield.ai/alibaba/wan-3.0-prime/image-to-video");
+  assert.equal(calls[1].url, "https://api.higgsfield.ai/requests/r%201/status");
   assert.equal(calls[0].auth, "Key k:s");
   delete process.env.HF_API_KEY;
 });
