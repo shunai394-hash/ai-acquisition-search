@@ -203,4 +203,6 @@ export async function waitForHiggsfieldVideo(
   if (Array.isArray(value)) for (const item of value) { const found = firstHttpUrl(item); if (found) return found; }
   if (value && typeof value === "object") for (const key of ["url","video_url","download_url","src"]) { const found = firstHttpUrl((value as Record<string, unknown>)[key]); if (found) return found; }
   return undefined;
+}\n\n\n/* video: accept provider success states */\nfunction normalizedStatus(result: Record<string, unknown>) {
+  return String(result.status ?? result.state ?? result.request_status ?? "").toLowerCase().replace(/[-_\s]/g, "");
 }\n
