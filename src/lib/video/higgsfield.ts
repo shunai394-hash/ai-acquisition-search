@@ -175,8 +175,9 @@ export function extractHiggsfieldVideoUrl(result: Record<string, unknown>) {
 }
 
 function normalizedStatus(result: Record<string, unknown>) {
+  const nested = result.request && typeof result.request === "object" ? result.request as Record<string, unknown> : undefined;
   return String(
-    result.status ?? result.state ?? result.request_status ?? "",
+    result.status ?? result.state ?? result.request_status ?? nested?.status ?? "",
   ).toLowerCase().replace(/[-_\s]/g, "");
 }
 
