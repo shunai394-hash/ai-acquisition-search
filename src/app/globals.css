@@ -1240,3 +1240,7 @@ label:has(> input[type="file"]:focus-visible),label:has(> input[type="checkbox"]
 
 /* AWARD PASS 21 — result actions as finishing tools */
 .studio-result-actions button,.studio-result-actions a{min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:6px}.studio-result-actions button:first-child{box-shadow:0 10px 30px rgba(155,140,255,.12)}.studio-result-actions a:hover{background:rgba(255,255,255,.055)}
+
+
+/* AWARD PASS 22 — mobile cinematic viewport */
+@media(max-width:600px){.studio-result video,.video-result video{max-height:72svh;width:auto;max-width:100%;margin-left:auto;margin-right:auto}.studio-result-head{align-items:flex-start;flex-direction:column;gap:8px}.studio-result-state{align-self:flex-start}.studio-prompt textarea{min-height:190px}}
