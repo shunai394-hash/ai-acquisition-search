@@ -198,3 +198,9 @@ export async function waitForHiggsfieldVideo(
     "Higgsfield動画生成がタイムアウトしました。request_idを保存して後からstatus確認してください。",
   );
 }
+\n\n/* video: harden provider response parsing */\nfunction firstHttpUrl(value: unknown): string | undefined {
+  if (typeof value === "string" && /^https?:/i.test(value)) return value;
+  if (Array.isArray(value)) for (const item of value) { const found = firstHttpUrl(item); if (found) return found; }
+  if (value && typeof value === "object") for (const key of ["url","video_url","download_url","src"]) { const found = firstHttpUrl((value as Record<string, unknown>)[key]); if (found) return found; }
+  return undefined;
+}\n
