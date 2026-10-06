@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { fetchPublicUrl } from "@/lib/security/public-url";
 
 const bucket = "video-assets";
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -27,8 +28,37 @@ export async function saveVideoToStorage(input: {
   }
 
   const contentType = response.headers.get("content-type") || "video/mp4";
-  const arrayBuffer = await response.arrayBuffer();
-  if (!arrayBuffer.byteLength) throw new Error("取得した動画ファイルが空です。");
+  const declaredLength = Number(response.headers.get("content-length") || "0");
+  if (declaredLength > MAX_VIDEO_BYTES) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error("動画ファイルが大きすぎます。");
+  }
+  if (!response.body) throw new Error("動画レスポンスの本文を読み取れません。");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_VIDEO_BYTES) {
+        await reader.cancel().catch(() => {});
+        throw new Error("動画ファイルが大きすぎます。");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  if (!total) throw new Error("取得した動画ファイルが空です。");
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const arrayBuffer = bytes.buffer;
 
   const ext = input.extension ?? (contentType.includes("webm") ? "webm" : "mp4");
   const path = `${input.userId}/${input.jobId}.${ext}`;
