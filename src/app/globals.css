@@ -1232,3 +1232,7 @@ label:has(> input[type="file"]:focus-visible),label:has(> input[type="checkbox"]
 
 /* AWARD PASS 19 — execution command hierarchy */
 .execution-command h2{max-width:760px;font-size:clamp(28px,4vw,46px);line-height:1.05;letter-spacing:-.055em;text-wrap:balance}.execution-command>div>p:not(.eyebrow){max-width:700px;color:#858a95;line-height:1.8}
+
+
+/* AWARD PASS 20 — publishing confidence */
+.publisher-platforms label{transition:transform .18s ease,border-color .18s ease,background .18s ease}.publisher-platforms label:hover{transform:translateY(-1px);border-color:rgba(184,239,255,.22);background:rgba(255,255,255,.035)}.publish-consent:hover{border-color:rgba(155,140,255,.24);background:rgba(155,140,255,.045)}
