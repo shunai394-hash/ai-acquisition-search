@@ -525,6 +525,9 @@ async function runOperatorLoop(db: Db, leaseMode: string) {
         const inputImageUrl = typeof providerResponse.input_image_url === "string"
           ? providerResponse.input_image_url
           : undefined;
+        const inputAudioUrl = typeof providerResponse.audio_url === "string"
+          ? providerResponse.audio_url
+          : undefined;
         const started = await generateHiggsfieldVideo({
           prompt: String(job.prompt || ""),
           duration: Number(job.duration || 5),
@@ -533,6 +536,7 @@ async function runOperatorLoop(db: Db, leaseMode: string) {
           model: job.model ? String(job.model) : undefined,
           generateAudio: job.generate_audio === true,
           imageUrl: inputImageUrl,
+          audioUrl: inputAudioUrl,
         });
         const requestId = String(started.request_id ?? started.requestId ?? started.id ?? "");
         if (!requestId) throw new Error("Higgsfield開始からrequest_idを取得できませんでした。");
