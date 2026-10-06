@@ -42,7 +42,7 @@ function modelPath(model: string) {
 
 // Documented base URL of the Higgsfield platform API (docs.higgsfield.ai).
 export function higgsfieldBaseUrl() {
-  return (process.env.HIGGSFIELD_API_BASE_URL || "https://platform.higgsfield.ai").replace(/\/+$/, "");
+  return (process.env.HIGGSFIELD_API_BASE_URL || "https://api.higgsfield.ai").replace(/\/+$/, "");
 }
 
 async function requestHiggsfield(path: string, init: RequestInit) {
