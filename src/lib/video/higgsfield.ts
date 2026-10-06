@@ -246,8 +246,9 @@ export async function waitForHiggsfieldVideo(
 }
 
 function completionResult(result: Record<string, unknown>, videoUrl: string) {
-  if (!/^https?:/i.test(videoUrl)) {
+  const normalized = videoUrl.trim();
+  if (!/^https?:/i.test(normalized)) {
     throw new Error("Higgsfield returned an invalid video URL.");
   }
-  return { ...result, videoUrl };
+  return { ...result, videoUrl: normalized };
 }
