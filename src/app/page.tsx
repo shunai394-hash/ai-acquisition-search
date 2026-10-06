@@ -247,18 +247,26 @@ export default function Home() {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
           prompt: [
-            [
-              studioPrompt.trim(),
-              remixHint ? "REMIX DIRECTION: " + remixHint + ". Preserve the product identity and core concept while changing the visual execution." : ""
-            ].filter(Boolean).join("\n"),
+            "DIRECTOR BLUEPRINT — award-level short-form product film.",
+            "Deliver a coherent visual story, not a collection of disconnected generations.",
+            "PRODUCT LOCK: preserve the exact product identity, proportions, materials, colors, packaging, logo placement, and functional details from the reference image. Do not invent product features.",
+            "FORMAT: 9:16 vertical, premium social advertising, subject readable on a phone screen, strong visual hierarchy and clean negative space for captions.",
+            "SHOT DESIGN: establish a visual hook in 0–2s; escalate with 2–3 purposeful shots; show the product in believable use; finish with a memorable hero frame and one clear CTA.",
+            "CAMERA: deliberate cinematic movement only (push-in, controlled orbit, lateral reveal, macro detail, or motivated handheld). Avoid random camera motion, morphing, jitter, impossible physics, and excessive depth-of-field blur.",
+            "LIGHTING: motivated, physically coherent light with premium commercial contrast, believable reflections, realistic skin/material response, and continuity between shots.",
+            "EDITING: rhythmic cuts motivated by the story; visual variety without chaos; preserve temporal continuity; no flash frames, accidental jump cuts, warped text, fake UI, or watermarks.",
+            "REALISM: natural human motion and product interaction, correct hands/fingers, stable geometry, consistent wardrobe/background, no unsupported claims.",
+            studioPrompt.trim(),
+            remixHint ? "REMIX DIRECTION: " + remixHint + ". Preserve the product identity and core concept while materially improving the visual execution." : "",
             studioAudio === "custom"
-              ? "AUDIO: Japanese spoken narration. Voice: " + studioVoice + ". Narration script: " + studioNarration.trim() + ". Speak naturally, clearly, and synchronize the delivery to the scene."
+              ? "AUDIO: Japanese spoken narration. Voice: " + studioVoice + ". Narration script: " + studioNarration.trim() + ". Natural pacing, clean diction, intentional pauses, and scene-synchronized delivery."
               : studioAudio === "auto"
-                ? "AUDIO: natural voiceover and synchronized ambient sound. Voice: " + studioVoice + "."
+                ? "AUDIO: natural voiceover with synchronized ambient sound. Voice: " + studioVoice + ". Prioritize intelligibility and emotional timing."
                 : "",
             studioMusic
-              ? "BGM: generate subtle, tasteful background music that supports the scene; keep it underneath the narration and do not overpower speech." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
-              : ""
+              ? "BGM: subtle premium background score, rhythmically aligned to the edit and ducked beneath speech. Avoid generic stock-music energy." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
+              : "",
+            "FINAL QUALITY GATE: every shot must reinforce the same product, story, audience, and promise. If a visual idea conflicts with product truth or continuity, simplify it rather than hallucinate detail."
           ].filter(Boolean).join("\n"),
           imageUrl: imageUrl || undefined,
           audioUrl: audioUrl || undefined,
