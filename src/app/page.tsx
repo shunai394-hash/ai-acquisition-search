@@ -73,37 +73,6 @@ export default function Home() {
   const [studioMusicPrompt, setStudioMusicPrompt] = useState("");
   const [studioResolution, setStudioResolution] = useState<"720p" | "1080p">("1080p");
   const [studioStage, setStudioStage] = useState<"idle" | "prepare" | "visual" | "motion" | "audio" | "render">("idle");
-  const [shopifyProducts, setShopifyProducts] = useState<Array<{id:string;title:string;handle:string;onlineStoreUrl?:string|null;image?:string|null;price?:string|null;currency?:string|null;availableForSale:boolean}>>([]);
-  const [shopifyLoading, setShopifyLoading] = useState(false);
-  const [shopifyError, setShopifyError] = useState("");
-
-  async function loadShopifyProducts() {
-    setShopifyLoading(true);
-    setShopifyError("");
-    try {
-      const res = await fetch("/api/shopify/products?first=12", { cache: "no-store" });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || "Shopify商品を取得できませんでした。");
-      setShopifyProducts(body.products || []);
-    } catch (err) {
-      setShopifyProducts([]);
-      setShopifyError(err instanceof Error ? err.message : "Shopify商品を取得できませんでした。");
-    } finally {
-      setShopifyLoading(false);
-    }
-  }
-
-  function selectShopifyProduct(product: (typeof shopifyProducts)[number]) {
-    setUrl(product.onlineStoreUrl || "");
-    setStudioPrompt([
-      product.title,
-      "Shopify product: " + product.handle,
-      "Create a premium 9:16 short-form product film. Preserve the exact product identity and use the product as the visual hero.",
-      "Product URL: " + (product.onlineStoreUrl || "not available"),
-    ].join("\n"));
-    if (product.image) setStudioImagePreview(product.image);
-    document.getElementById("studio")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
   useEffect(() => {
     return () => {
       if (studioImagePreview) URL.revokeObjectURL(studioImagePreview);
