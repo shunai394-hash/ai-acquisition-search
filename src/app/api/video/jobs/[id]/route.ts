@@ -182,6 +182,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
     return NextResponse.json({ ok: true, job: { ...job, provider_status: status }, asset: null });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "動画ジョブ確認に失敗しました。" }, { status: 500 });
+    console.error("video job status failed", error);
+    return NextResponse.json({ error: "動画ジョブの状態を確認できませんでした。しばらくしてから再試行してください。" }, { status: 500 });
   }
 }
