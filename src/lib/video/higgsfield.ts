@@ -198,45 +198,84 @@ export async function waitForHiggsfieldVideo(
     "Higgsfield動画生成がタイムアウトしました。request_idを保存して後からstatus確認してください。",
   );
 }
-\n\n/* video: harden provider response parsing */\nfunction firstHttpUrl(value: unknown): string | undefined {
+
+
+/* video: harden provider response parsing */
+function firstHttpUrl(value: unknown): string | undefined {
   if (typeof value === "string" && /^https?:/i.test(value)) return value;
   if (Array.isArray(value)) for (const item of value) { const found = firstHttpUrl(item); if (found) return found; }
   if (value && typeof value === "object") for (const key of ["url","video_url","download_url","src"]) { const found = firstHttpUrl((value as Record<string, unknown>)[key]); if (found) return found; }
   return undefined;
-}\n\n\n/* video: accept provider success states */\nfunction normalizedStatus(result: Record<string, unknown>) {
+}
+
+
+/* video: accept provider success states */
+function normalizedStatus(result: Record<string, unknown>) {
   return String(result.status ?? result.state ?? result.request_status ?? "").toLowerCase().replace(/[-_\s]/g, "");
-}\n\n\n/* video: broaden completed URL extraction */\nfunction extractNestedVideoUrl(result: Record<string, unknown>) {
+}
+
+
+/* video: broaden completed URL extraction */
+function extractNestedVideoUrl(result: Record<string, unknown>) {
   for (const key of ["output","result","data","asset"]) {
     const value = result[key]; const found = firstHttpUrl(value);
     if (found && /\.(mp4|webm|mov)(\?|$)/i.test(found)) return found;
   }
   return undefined;
-}\n\n\n/* video: robust status timeout error */\nfunction providerErrorMessage(result: Record<string, unknown>) {
+}
+
+
+/* video: robust status timeout error */
+function providerErrorMessage(result: Record<string, unknown>) {
   const message = result.error ?? result.message ?? result.detail;
   return typeof message === "string" && message.trim() ? message.trim() : JSON.stringify(result);
-}\n\n\n/* video: status polling jitter */\nfunction nextPollDelay(current: number) {
+}
+
+
+/* video: status polling jitter */
+function nextPollDelay(current: number) {
   const base = Math.min(Math.round(current * 1.45), 10_000);
   return Math.max(2_000, base + Math.floor(Math.random() * 350));
-}\n\n\n/* video: request id aliases */\nfunction extractRequestId(result: Record<string, unknown>) {
+}
+
+
+/* video: request id aliases */
+function extractRequestId(result: Record<string, unknown>) {
   for (const key of ["request_id","requestId","id","task_id","taskId"]) {
     const value = result[key]; if (typeof value === "string" && value.trim()) return value.trim();
   }
   return "";
-}\n\n\n/* video: direct URL aliases */\nfunction extractDirectVideoUrl(result: Record<string, unknown>) {
+}
+
+
+/* video: direct URL aliases */
+function extractDirectVideoUrl(result: Record<string, unknown>) {
   for (const key of ["video_url","videoUrl","download_url","downloadUrl"]) {
     const found = firstHttpUrl(result[key]); if (found) return found;
   }
   return undefined;
-}\n\n\n/* video: protect polling against transient provider errors */\nasync function getStatusWithRetry(requestId: string) {
+}
+
+
+/* video: protect polling against transient provider errors */
+async function getStatusWithRetry(requestId: string) {
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try { return await getHiggsfieldStatus(requestId); }
     catch (error) { lastError = error; await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1))); }
   }
   throw lastError instanceof Error ? lastError : new Error("Higgsfield status check failed.");
-}\n\n\n/* video: output validation */\nfunction assertVideoUrl(url: string) {
+}
+
+
+/* video: output validation */
+function assertVideoUrl(url: string) {
   if (!/^https?:/i.test(url)) throw new Error("Higgsfield returned an invalid video URL.");
   return url;
-}\n\n\n/* video: completion result wrapper */\nfunction completionResult(result: Record<string, unknown>, videoUrl: string) {
+}
+
+
+/* video: completion result wrapper */
+function completionResult(result: Record<string, unknown>, videoUrl: string) {
   return { ...result, videoUrl: assertVideoUrl(videoUrl) };
-}\n
+}
