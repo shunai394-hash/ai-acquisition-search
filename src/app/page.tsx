@@ -503,7 +503,7 @@ export default function Home() {
               const file=e.target.files?.[0] || null; setStudioImage(file); setStudioImagePreview(file ? URL.createObjectURL(file) : "");
             }} />
             {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview, next/image cannot optimize it */}
-            {studioImagePreview ? <img src={studioImagePreview} alt="動画生成に使う画像のプレビュー" /> : <span className="upload-empty">＋ 画像・商品写真を追加<br /><small>人物 / 商品 / 写真 / イラスト / 参照素材</small></span>}
+            {studioImagePreview ? <img src={studioImagePreview} alt="動画生成に使う画像のプレビュー" /> : <span className="upload-empty">＋ 画像・商品写真を追加<br /><small>人物 / 商品 / 写真 / イラスト / 参照素材</small><em>ドラッグ＆ドロップ対応 · JPG / PNG / WebP</em></span>}
           </label>
           <div className="studio-prompt">
             <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT <span className="studio-prompt-count">{studioPrompt.length}/2400</span></label><div className="studio-presets">{["シネマティック","UGC広告","商品CM","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","UGC広告":"自然なスマホ撮影感のあるUGC動画。冒頭2秒で視線を引き、リアルな人物の動きを重視。","商品CM":"高級ブランドCMのような商品映像。質感、照明、カメラの動きを美しく見せる。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
