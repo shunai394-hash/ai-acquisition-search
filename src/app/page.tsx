@@ -83,6 +83,7 @@ export default function Home() {
   const [publishCaption, setPublishCaption] = useState("");
   const [tiktokConsent, setTiktokConsent] = useState(false);
   const [publishGenerating, setPublishGenerating] = useState(false);
+  const [autoPublish, setAutoPublish] = useState(true);
   const [publishStatus, setPublishStatus] = useState("");
   const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; url?: string; error?: string }>>([]);
   async function getAccessToken() {
@@ -305,7 +306,14 @@ export default function Home() {
         const poll = await fetch("/api/video/jobs/" + encodeURIComponent(jobId), { headers: { Authorization: "Bearer " + (await getAccessToken()) }, cache: "no-store" });
         const data = await poll.json().catch(() => ({}));
         if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
-        if (data.job?.status === "completed" && data.asset?.video_url) { setStudioStage("render"); setStudioUrl(data.asset.video_url); setStudioStatus("完成。"); setStudioStage("render"); return; }
+        if (data.job?.status === "completed" && data.asset?.video_url) {
+          const completedUrl = data.asset.video_url;
+          setStudioStage("render");
+          setStudioUrl(completedUrl);
+          setStudioStatus("完成。");
+          if (autoPublish && socialPostId) await publishGeneratedVideo(completedUrl);
+          return;
+        }
         if (data.job?.status === "failed") throw new Error(data.job?.error || "動画生成に失敗しました。");
         setStudioStatus(engine + "で生成中… " + (attempt + 1) + "/60");
       }
@@ -350,8 +358,10 @@ export default function Home() {
         const data = await poll.json().catch(() => ({}));
         if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
         if (data.job?.status === "completed" && data.asset?.video_url) {
-          setVideoUrl(data.asset.video_url);
-          setVideoStatus("動画が完成しました。");
+          const completedUrl = data.asset.video_url;
+          setVideoUrl(completedUrl);
+          setVideoStatus(autoPublish && socialPostId ? "動画完成。SNSへ自動投稿中…" : "動画が完成しました。");
+          if (autoPublish && socialPostId) await publishGeneratedVideo(completedUrl);
           return;
         }
         if (data.job?.status === "failed") throw new Error(data.job?.error || `${engine}で動画生成に失敗しました。`);
@@ -1020,6 +1030,10 @@ export default function Home() {
                   </span>
                 </label>
               )}
+              <label className="publish-consent">
+                <input type="checkbox" checked={autoPublish} onChange={(e) => setAutoPublish(e.target.checked)} />
+                <span><strong>動画完成後に自動投稿</strong><small>生成が成功したら、選択中のSNSへ自動公開します。</small></span>
+              </label>
               <div className="video-actions">
                 <button type="button" onClick={() => publishGeneratedVideo(studioUrl || videoUrl)} disabled={publishGenerating || !publishPlatforms.length || (publishPlatforms.includes("tiktok") && !tiktokConsent)}>
                   {publishGenerating ? "投稿中…" : "選択したSNSへ投稿 →"}
