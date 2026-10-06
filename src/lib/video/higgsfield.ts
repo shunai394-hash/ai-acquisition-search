@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 
 const DEFAULT_MODEL = process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video";
+const DEFAULT_BASE_URL = "https://api.higgsfield.ai";
+const HTTP_TIMEOUT_MS = 30_000;
 
 export type HiggsfieldVideoInput = {
   prompt: string;
@@ -42,7 +44,17 @@ function modelPath(model: string) {
 
 // Documented REST base URL of the Higgsfield API (docs.higgsfield.ai).
 export function higgsfieldBaseUrl() {
-  return (process.env.HIGGSFIELD_API_BASE_URL || "https://api.higgsfield.ai").replace(/\/+$/, "");
+  const raw = (process.env.HIGGSFIELD_API_BASE_URL || DEFAULT_BASE_URL).trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("Higgsfield API base URL is invalid.");
+  }
+  if (!["https:", "http:"].includes(parsed.protocol) || parsed.search || parsed.hash) {
+    throw new Error("Higgsfield API base URL must be an absolute HTTP(S) URL without query parameters.");
+  }
+  return parsed.toString().replace(/\/+$/, "");
 }
 
 async function requestHiggsfield(path: string, init: RequestInit) {
@@ -52,8 +64,14 @@ async function requestHiggsfield(path: string, init: RequestInit) {
       Authorization: credentials(),
       "Content-Type": "application/json",
       ...(init.headers ?? {})
+      }
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new Error("Higgsfield API request timed out.");
     }
-  });
+    throw error;
+  }
   const text = await response.text();
   let data: unknown;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
