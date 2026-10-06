@@ -279,7 +279,8 @@ export default function Home() {
             "BGM: subtle premium background score with a distinctive motif, rhythmically aligned to the edit and automatically ducked beneath speech. Build or release energy with the story; avoid generic stock-music energy and avoid masking the product benefit.",
             "SOUND DESIGN: prioritize believable tactile/product sounds where appropriate (fabric, click, spray, package, movement, environment). Never add a sound merely because a visual exists; every audible element should strengthen realism, emotion, or comprehension." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
               : "",
-            "FINAL QUALITY GATE: every shot must reinforce the same product, story, audience, and promise. If a visual idea conflicts with product truth or continuity, simplify it rather than hallucinate detail."
+            "CREATIVE DIFFERENTIATION: avoid interchangeable stock-ad compositions. Find one memorable visual metaphor, interaction, reveal, or contrast that is specific to the product and audience, then build the film around it. Novelty must improve comprehension, not obscure it.",
+            "FINAL QUALITY GATE: score the concept mentally before rendering across concept originality, storytelling clarity, visual craft, sound integration, product truth, brand fit, mobile legibility, and emotional memorability. If any critical dimension is weak, simplify or redesign the shot rather than adding effects. Every shot must reinforce the same product, story, audience, and promise.",
           ].filter(Boolean).join("\n"),
           imageUrl: imageUrl || undefined,
           audioUrl: audioUrl || undefined,
