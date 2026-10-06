@@ -222,4 +222,9 @@ export async function waitForHiggsfieldVideo(
     const value = result[key]; if (typeof value === "string" && value.trim()) return value.trim();
   }
   return "";
+}\n\n\n/* video: direct URL aliases */\nfunction extractDirectVideoUrl(result: Record<string, unknown>) {
+  for (const key of ["video_url","videoUrl","download_url","downloadUrl"]) {
+    const found = firstHttpUrl(result[key]); if (found) return found;
+  }
+  return undefined;
 }\n
