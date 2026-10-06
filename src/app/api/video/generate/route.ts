@@ -55,6 +55,7 @@ export async function POST(request: Request) {
     const model = body.model ? String(body.model) : undefined;
     const duration = Number(body.duration ?? 5);
     if (!Number.isFinite(duration) || duration < 2 || duration > 30) return NextResponse.json({ error: "duration must be between 2 and 30 seconds" }, { status: 400 });
+    if (audioUrl && duration > 15) return NextResponse.json({ error: "narrated image-to-video supports up to 15 seconds" }, { status: 400 });
     const resolution = body.resolution === "480p" || body.resolution === "720p" || body.resolution === "1080p" ? body.resolution : "1080p";
     const aspectRatio = ["16:9","4:3","1:1","3:4","9:16","adaptive"].includes(body.aspectRatio) ? body.aspectRatio : "9:16";
     const generateAudio = Boolean(body.generateAudio ?? false);
