@@ -237,4 +237,6 @@ export async function waitForHiggsfieldVideo(
 }\n\n\n/* video: output validation */\nfunction assertVideoUrl(url: string) {
   if (!/^https?:/i.test(url)) throw new Error("Higgsfield returned an invalid video URL.");
   return url;
+}\n\n\n/* video: completion result wrapper */\nfunction completionResult(result: Record<string, unknown>, videoUrl: string) {
+  return { ...result, videoUrl: assertVideoUrl(videoUrl) };
 }\n
