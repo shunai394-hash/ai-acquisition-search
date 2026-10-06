@@ -57,7 +57,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         provider_response: mergeProviderResponse(job.provider_response, {
           timed_out_request_id: requestId,
           timed_out_at: new Date().toISOString(),
-          ...(cancelError ? { cancel_error: cancelError } : { cancel_requested: true }),
+          cancel_requested: true,
+          ...(cancelError ? { cancel_failed: true } : {}),
         }),
       }).eq("status", job.status);
       if (timeoutError) throw new Error("タイムアウトした動画ジョブの状態保存に失敗しました: " + timeoutError.message);
@@ -91,7 +92,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     // Merge, never replace: input_image_url and retry_count drive the retry path.
     const completedPatch = () => ({
       status: "completed",
-      provider_response: mergeProviderResponse(job.provider_response, { status_response: result }),
+      provider_response: mergeProviderResponse(job.provider_response, { status_response: { status: "completed", request_id: requestId, video_available: Boolean(videoUrl) } }),
       completed_at: new Date().toISOString(),
       error: null,
     });
@@ -170,12 +171,12 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
     // Terminal provider states (docs: completed | failed | nsfw | canceled).
     if (status === "failed" || status === "nsfw" || status === "canceled") {
-      const message = `Higgsfield generation ${status}: ${JSON.stringify(result).slice(0, 300)}`;
+      const message = `動画生成がプロバイダ側で ${status} になりました。次回の巡回で復旧処理を行います。`;
       const { error: failUpdateError } = await updateJob({
         status: "failed",
         // A moderation rejection fails again with the same prompt and image.
         provider_response: mergeProviderResponse(job.provider_response, {
-          status_response: result,
+          status_response: { status, request_id: requestId },
           ...(status === "nsfw" ? { non_retryable: true } : {}),
         }),
         error: message,
