@@ -227,4 +227,11 @@ export async function waitForHiggsfieldVideo(
     const found = firstHttpUrl(result[key]); if (found) return found;
   }
   return undefined;
+}\n\n\n/* video: protect polling against transient provider errors */\nasync function getStatusWithRetry(requestId: string) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { return await getHiggsfieldStatus(requestId); }
+    catch (error) { lastError = error; await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1))); }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Higgsfield status check failed.");
 }\n
