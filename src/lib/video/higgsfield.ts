@@ -58,8 +58,11 @@ async function requestHiggsfield(path: string, init: RequestInit) {
   let data: unknown;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
   if (!response.ok) {
-    // Bounded: this message is stored on the job and returned to the UI.
-    throw new Error(`Higgsfield API error ${response.status}: ${JSON.stringify(data).slice(0, 500)}`);
+    console.error("Higgsfield API request failed", {
+      status: response.status,
+      response: typeof data === "object" && data !== null ? data : undefined,
+    });
+    throw new Error(`Higgsfield API error ${response.status}`);
   }
   return data as Record<string, unknown>;
 }
