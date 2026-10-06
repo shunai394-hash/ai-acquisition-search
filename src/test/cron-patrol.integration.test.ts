@@ -29,6 +29,7 @@ type LoopAnswer = { status: number; body: Record<string, unknown> } | "timeout" 
 let loopAnswer: LoopAnswer;
 let loopCalls = 0;
 let openAiAnswer: string | null = null;
+let openAiInputs: string[] = [];
 
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -42,6 +43,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return Response.json(loopAnswer.body, { status: loopAnswer.status });
   }
   if (url.host === "api.openai.com") {
+    openAiInputs.push(String(init?.body ?? ""));
     if (openAiAnswer === null) throw new TypeError("OpenAI unreachable");
     return Response.json({ choices: [{ message: { content: openAiAnswer } }] });
   }
@@ -56,6 +58,7 @@ beforeEach(() => {
   loopAnswer = { status: 200, body: { ok: true, checked: 3, processed: 2, attention: 0, results: [{ postId: "secret-post-of-u2", error: "u2 private error" }] } };
   loopCalls = 0;
   openAiAnswer = null;
+  openAiInputs = [];
   delete process.env.OPENAI_API_KEY;
   db.seed("social_posts", [
     { id: "a1", user_id: "u1", status: "published", network: "x", metadata: { operator_patrol_status: "superseded" } },
@@ -114,6 +117,22 @@ test("each user's stored patrol report contains only that user's data", async ()
   assert.ok(!stored.includes("job-u2"), "no other user's job");
   assert.ok(!stored.includes("secret-post-of-u2") && !stored.includes("u2 private error"), "no other user's loop results");
   assert.deepEqual((u1.output as { patrolCounts: Record<string, number> }).patrolCounts, { active: 0, stopped: 0, superseded: 1, stalled: 0, unmanaged: 1 });
+});
+
+test("global patrol output and supervisor prompt contain no tenant job IDs or private loop errors", async () => {
+  process.env.OPENAI_API_KEY = "sk-test";
+  openAiAnswer = JSON.stringify({ severity: "healthy", summary: "監査完了", next_check: "次回巡回" });
+  db.seed("production_jobs", [
+    { id: "job-u1", user_id: "u1", status: "running", request_id: null, started_at: iso(-45 * 60_000), provider_response: {} },
+    { id: "job-u2", user_id: "u2", status: "running", request_id: null, started_at: iso(-45 * 60_000), provider_response: {} },
+  ]);
+  const body = await (await patrolRoute.GET(cron())).json();
+  const global = JSON.stringify(body);
+  const prompt = openAiInputs.join("\\n");
+  assert.ok(!global.includes("job-u1") && !global.includes("job-u2"));
+  assert.ok(!global.includes("secret-post-of-u2") && !global.includes("u2 private error"));
+  assert.ok(!prompt.includes("job-u1") && !prompt.includes("job-u2"));
+  assert.ok(!prompt.includes("secret-post-of-u2") && !prompt.includes("u2 private error"));
 });
 
 test("stale job without request_id becomes manual recovery and leaves the loop; with request_id it is left alone", async () => {
