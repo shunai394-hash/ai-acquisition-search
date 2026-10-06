@@ -206,7 +206,7 @@ body:before{
 
 /* AWARD PASS 02 — interaction discipline */
 body{isolation:isolate}
-:where(a,button,input,textarea):focus-visible{
+:where(a,button,input,textarea,select,summary,[tabindex]):focus-visible{
   outline:2px solid rgba(170,160,255,.78);
   outline-offset:3px;
 }
@@ -217,7 +217,8 @@ textarea[readonly]{cursor:default;color:#c5c8d0}
   .topbar>div:last-child{gap:8px!important}
   .topbar .status{font-size:8px;padding:7px 9px}
 }
-\n.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}\n.search button[aria-busy="true"]{cursor:wait}\n
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.search button[aria-busy="true"]{cursor:wait}
 
 /* VIDEO STUDIO — generic creation, image optional */
 .video-studio{
@@ -1042,4 +1043,78 @@ body{overflow-x:hidden}
 .publish-consent small{color:#707580;font-size:10px;line-height:1.5}
 @media(max-width:700px){
   .publish-consent{padding:14px}
+}
+
+/* AUTOPILOT — the operator loop made visible: decision, reasons, pipeline, attention */
+.autopilot{margin:6px 0 34px;border:1px solid var(--line-strong);border-radius:26px;padding:30px;background:linear-gradient(180deg,rgba(155,140,255,.07),rgba(255,255,255,.02) 46%);position:relative;overflow:hidden}
+.autopilot:before{content:"";position:absolute;inset:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,rgba(155,140,255,.6),rgba(102,227,255,.45),transparent)}
+.autopilot-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}
+.autopilot-head .eyebrow{display:flex;align-items:center;gap:10px;color:#c9c3ff}
+.autopilot h2{margin:0;font-size:clamp(22px,3vw,32px);line-height:1.25;letter-spacing:-.03em;max-width:760px}
+.autopilot h3{margin:0 0 12px;font-size:13px;letter-spacing:.06em;color:#d9dbe2}
+.autopilot-refresh{min-height:44px;border:1px solid var(--line-strong);background:transparent;color:var(--ink);border-radius:12px;padding:0 16px;cursor:pointer}
+.autopilot-refresh:hover{background:var(--glass)}
+.autopilot-lead{color:#b9bcc6;line-height:1.8;max-width:760px;margin:16px 0 22px}
+.autopilot-rail{list-style:none;margin:0 0 18px;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;counter-reset:none}
+.autopilot-rail li{border:1px solid var(--line);border-radius:16px;padding:14px;background:rgba(0,0,0,.18);display:grid;gap:4px;position:relative}
+.autopilot-rail li:not(:last-child):after{content:"→";position:absolute;right:-9px;top:50%;transform:translateY(-50%);color:#6f7380;font-size:12px}
+.autopilot-rail b{color:#9d95ff;font-size:11px;font-weight:600}.autopilot-rail strong{font-size:13px;letter-spacing:.08em}.autopilot-rail span{color:#a3a7b2;font-size:12px}
+.autopilot-guarantees{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.autopilot-guarantees li{display:grid;gap:6px;padding:14px 16px;border-radius:16px;background:rgba(185,255,207,.035);border:1px solid rgba(185,255,207,.12)}
+.autopilot-guarantees strong{font-size:13px;color:#d9ffe5}.autopilot-guarantees span{font-size:12px;line-height:1.7;color:#a9b3ad}
+.autopilot-totals{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:22px 0 16px}
+.autopilot-totals div{border:1px solid var(--line);border-radius:16px;padding:14px 16px;background:rgba(0,0,0,.2)}
+.autopilot-totals dt{font-size:11px;color:#a3a7b2;letter-spacing:.04em}.autopilot-totals dd{margin:6px 0 0;font-size:28px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.autopilot-totals .attention{border-color:rgba(255,170,120,.4);background:rgba(255,150,90,.06)}.autopilot-totals .attention dd{color:#ffc29e}
+.autopilot-decision{border:1px solid var(--line-strong);border-radius:20px;padding:20px 22px;background:rgba(0,0,0,.26);margin-bottom:14px}
+.autopilot-decision .eyebrow{margin-bottom:8px}
+.autopilot-decision h3{font-size:20px;letter-spacing:-.01em;color:var(--ink);margin:0 0 14px}
+.autopilot-decision h3 b{display:inline-block;margin-right:8px;padding:3px 10px;border-radius:999px;font-size:12px;letter-spacing:.12em;vertical-align:3px;background:rgba(155,140,255,.16);color:#d6d1ff}
+.verdict-continue h3 b{background:rgba(120,230,160,.16);color:#bff5d2}.verdict-stop h3 b{background:rgba(255,120,120,.16);color:#ffc6c6}.verdict-wait h3 b{background:rgba(255,210,120,.14);color:#ffe2a8}
+.autopilot-reason,.autopilot-next{margin:0 0 10px;line-height:1.75;color:#d2d4da;display:grid;grid-template-columns:44px 1fr;gap:10px}
+.autopilot-reason span,.autopilot-next span{font-size:11px;color:#9d95ff;letter-spacing:.06em;padding-top:4px}
+.autopilot-meta{list-style:none;margin:14px 0 0;padding:14px 0 0;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12px;color:#a3a7b2}
+.autopilot-meta b{color:var(--ink);font-variant-numeric:tabular-nums}.autopilot-meta .warn{color:#ffd29a}
+.autopilot-attention{border:1px solid rgba(255,170,120,.32);border-radius:20px;padding:18px 20px;background:rgba(255,150,90,.05);margin-bottom:14px}
+.autopilot-attention h3{color:#ffd0b0}
+.autopilot-attention ul,.autopilot-pipeline ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.autopilot-attention li{display:grid;gap:4px}.autopilot-attention strong{font-size:14px}.autopilot-attention span{font-size:12px;color:#c9bfb8;line-height:1.7}.autopilot-attention em{font-style:normal;font-size:12px;color:#ffd0b0}
+.autopilot-pipeline{margin-bottom:12px}
+.autopilot-pipeline li{display:grid;grid-template-columns:12px 1fr auto;gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.18)}
+.autopilot-pipeline li div{display:grid;gap:3px}.autopilot-pipeline strong{font-size:13px}.autopilot-pipeline li div>span{font-size:12px;color:#a3a7b2}.autopilot-pipeline small{font-size:12px;color:#8f939e;line-height:1.6}
+.autopilot-pipeline time{font-size:11px;color:#8f939e;font-variant-numeric:tabular-nums;white-space:nowrap}
+.autopilot-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;background:#8f939e}
+.tone-ok .autopilot-dot{background:#7fe3a5}.tone-busy .autopilot-dot{background:#9b8cff;box-shadow:0 0 0 4px rgba(155,140,255,.14)}.tone-warn .autopilot-dot{background:#ffd27f}.tone-error .autopilot-dot{background:#ff8e8e}
+.autopilot-footer{margin:14px 0 0;font-size:12px;color:#8f939e;line-height:1.7}
+.autopilot-error{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:18px;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,142,142,.32);background:rgba(255,142,142,.06);color:#ffc6c6}
+.autopilot-error button{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid rgba(255,198,198,.4);background:transparent;color:inherit;cursor:pointer}
+.autopilot-skeleton{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}
+.autopilot-skeleton i{display:block;height:76px;border-radius:16px;background:linear-gradient(90deg,rgba(255,255,255,.03),rgba(255,255,255,.07),rgba(255,255,255,.03));background-size:200% 100%;animation:autopilot-shimmer 1.4s linear infinite}
+@keyframes autopilot-shimmer{to{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){.autopilot-skeleton i{animation:none}}
+@media(max-width:860px){.autopilot-totals{grid-template-columns:repeat(3,1fr)}.autopilot-guarantees{grid-template-columns:1fr}}
+@media(max-width:700px){
+  .autopilot{padding:22px 18px;border-radius:20px}
+  .autopilot-head{flex-direction:column}
+  .autopilot-rail{grid-template-columns:repeat(2,1fr)}
+  .autopilot-rail li:after{display:none}
+  .autopilot-totals{grid-template-columns:repeat(2,1fr)}
+  .autopilot-pipeline li{grid-template-columns:12px 1fr}
+  .autopilot-pipeline time{grid-column:2}
+  .autopilot-skeleton{grid-template-columns:1fr}
+}
+/* Touch targets: interactive controls stay at least 44px tall on touch screens. */
+@media(pointer:coarse){
+  :where(.studio-presets button,.studio-audio-grid button,.studio-result-actions button,.studio-result-actions a,.publisher-platforms label,.metrics-form button,.test-loop-actions button,.performance-loop>button){min-height:44px}
+}
+
+
+/* The hero glow (::before) extends past the viewport on phones; clip it without creating a scroll container. */
+.hero,.video-studio{overflow-x:clip}
+/* Keyboard focus is always visible: component rules above must not hide it.
+   The URL field is excluded because .search:focus-within already draws its ring. */
+:is(a,button,select,textarea,summary,[tabindex],input:not(.search input)):focus-visible,
+label:has(> input[type="file"]:focus-visible),label:has(> input[type="checkbox"]:focus-visible){
+  outline:2px solid rgba(170,160,255,.85)!important;
+  outline-offset:3px!important;
 }

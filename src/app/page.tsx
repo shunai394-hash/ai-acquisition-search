@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import GoogleSignIn from "@/components/GoogleSignIn";
 import BillingButton from "@/components/BillingButton";
+import OperatorAutopilot from "@/components/OperatorAutopilot";
+import { VERDICT_COPY, type Verdict } from "@/lib/operator/activity";
 import Link from "next/link";
 import type { AcquisitionAnalyzeResult, EcPulseResearchBundle, EcPulseResearchRun } from "@/lib/acquisition/types";
 
@@ -37,6 +39,7 @@ export default function Home() {
   const [testSaving, setTestSaving] = useState(false);
   const [testSaved, setTestSaved] = useState("");
   const [metricsOpen, setMetricsOpen] = useState(false);
+  const [metricsSaving, setMetricsSaving] = useState(false);
   const [metrics, setMetrics] = useState({ impressions:"", views:"", clicks:"", conversions:"", revenue:"", grossProfit:"", adSpend:"" });
   const [verdict, setVerdict] = useState<{
     verdict: string;
@@ -54,7 +57,6 @@ export default function Home() {
   const [videoStatus, setVideoStatus] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [videoError, setVideoError] = useState("");
-  const [videoEngine, setVideoEngine] = useState("");
   const [studioPrompt, setStudioPrompt] = useState("");
   const [studioImage, setStudioImage] = useState<File | null>(null);
   const [studioImagePreview, setStudioImagePreview] = useState("");
@@ -271,7 +273,6 @@ export default function Home() {
       if (!jobId) throw new Error("動画ジョブIDを取得できませんでした。");
       setVideoJobId(jobId);
       const engine = String(body.engine || "video engine");
-      setVideoEngine(engine);
       setVideoStatus(`${engine}で生成中…`);
       for (let attempt = 0; attempt < 60; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : 5000));
@@ -337,6 +338,8 @@ export default function Home() {
   }
 
   async function saveMetrics() {
+    if (metricsSaving) return;
+    setMetricsSaving(true);
     setVerdict(null);
     setError("");
     try {
@@ -362,6 +365,7 @@ export default function Home() {
         evidenceCount: Array.isArray(verdictBody.decision?.evidence) ? verdictBody.decision.evidence.length : undefined,
       });
     } catch(err) { setError(err instanceof Error ? err.message : "実績保存に失敗しました。"); }
+    finally { setMetricsSaving(false); }
   }
 
   return (
@@ -381,7 +385,7 @@ export default function Home() {
           )}
           <span className="status">AI AD OPERATOR · LIVE</span>
           <GoogleSignIn />
-          <Link href="/billing" style={{ color: "#ffffff70", fontSize: 11 }}>契約管理</Link>
+          <Link href="/billing" style={{ color: "#c5c8d0", fontSize: 12 }}>契約管理</Link>
         </div>
       </header>
 
@@ -403,7 +407,7 @@ export default function Home() {
               <div><b>03</b><strong>次を試す</strong><span>訴求・動画・テストまで一本の仮説にする</span></div>
             </div>
           </div>
-          <div className="hero-instrument" aria-label="AI Acquisition Search decision loop">
+          <div className="hero-instrument" role="img" aria-label="AIが市場シグナルから次の一手を決めるループ: 調査 → 矛盾 → 判断 → クリエイティブ">
             <div className="instrument-grid" aria-hidden="true"></div>
             <div className="signal-orbit orbit-one"></div><div className="signal-orbit orbit-two"></div><div className="signal-orbit orbit-three"></div>
             <div className="signal-core"><span>AI</span><strong>DECIDE</strong><small>FROM SIGNAL → ACTION</small></div>
@@ -415,6 +419,8 @@ export default function Home() {
         <div className="hero-loop" aria-label="Acquisition loop"><span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span></div>
         <p className="hint">分析結果はレポートで終わらない。判断を、次のクリエイティブとテストへ接続します。</p>
       </section>
+
+      <OperatorAutopilot />
 
       {!result && (
       <section className="video-studio" aria-labelledby="video-studio-title">
@@ -430,13 +436,14 @@ export default function Home() {
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
               const file=e.target.files?.[0] || null; setStudioImage(file); setStudioImagePreview(file ? URL.createObjectURL(file) : "");
             }} />
+            {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview, next/image cannot optimize it */}
             {studioImagePreview ? <img src={studioImagePreview} alt="動画生成に使う画像のプレビュー" /> : <span className="upload-empty">＋ 画像・商品写真を追加<br /><small>人物 / 商品 / 写真 / イラスト / 参照素材</small></span>}
           </label>
           <div className="studio-prompt">
             <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","UGC広告","商品CM","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","UGC広告":"自然なスマホ撮影感のあるUGC動画。冒頭2秒で視線を引き、リアルな人物の動きを重視。","商品CM":"高級ブランドCMのような商品映像。質感、照明、カメラの動きを美しく見せる。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
             <textarea id="studio-prompt" value={studioPrompt} onChange={(e)=>setStudioPrompt(e.target.value)} rows={8}
               placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この商品画像を使って、20代女性が自然に商品を紹介するUGC風広告。最初の2秒で視線を引き、夕方の柔らかな光。縦9:16、リアルなスマホ撮影感。"} />
-            <div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · AUDIO</span><div className="studio-audio-grid">{([["off","OFF"],["auto","AUTO"],["custom","CUSTOM"]] as const).map(([value,label]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} onClick={()=>setStudioAudio(value)}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option>日本語 · Natural</option><option>日本語 · Deep</option><option>English · Natural</option><option>English · Deep</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> BGMを自動生成</label>{studioMusic && <input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="BGMの雰囲気（例：minimal electronic / warm acoustic）" aria-label="BGMの雰囲気" />}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
+            <div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · AUDIO</span><div className="studio-audio-grid">{([["off","OFF"],["auto","AUTO"],["custom","CUSTOM"]] as const).map(([value,label]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} aria-pressed={studioAudio===value} onClick={()=>setStudioAudio(value)}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option>日本語 · Natural</option><option>日本語 · Deep</option><option>English · Natural</option><option>English · Deep</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> BGMを自動生成</label>{studioMusic && <input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="BGMの雰囲気（例：minimal electronic / warm acoustic）" aria-label="BGMの雰囲気" />}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
               {([["prepare","PREPARE","素材"],["visual","VISUAL","映像設計"],["motion","MOTION","モーション"],["audio","AUDIO","音"],["render","RENDER","仕上げ"]] as const).map(([key,label,ja], index) => {
                 const order = ["idle","prepare","visual","motion","audio","render"] as const;
                 const active = order.indexOf(studioStage) >= order.indexOf(key);
@@ -444,11 +451,11 @@ export default function Home() {
               })}
             </div><div className="studio-actions">
               <button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating || studioPrompt.trim().length < 8} aria-busy={studioGenerating}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
-              {studioStatus && <span className="video-status">{studioStatus}</span>}
+              {studioStatus && <span className="video-status" role="status" aria-live="polite">{studioStatus}</span>}
             </div>
           </div>
         </div>
-        {studioError && <p className="error">{studioError}</p>}
+        {studioError && <p className="error" role="alert">{studioError}</p>}
         {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>↻ Regenerate</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>✦ Remix</button><a href={studioUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></div></div>}
       </section>
       )}
@@ -872,7 +879,7 @@ export default function Home() {
             </button>
             {videoStatus && <p className="hint">{videoStatus}</p>}
             {videoJobId && <small className="hint">Job: {videoJobId}</small>}
-            {videoError && <p className="error">{videoError}</p>}
+            {videoError && <p className="error" role="alert">{videoError}</p>}
             {videoUrl && (
               <div style={{ marginTop: 16 }}>
                 <video src={videoUrl} controls playsInline style={{ width: "100%", maxWidth: 420, borderRadius: 16, background: "#000" }} />
@@ -991,14 +998,14 @@ export default function Home() {
                 </label>
               ))}
               <p className="hint">テスト計画を保存すると投稿IDが自動発行されます。投稿後の実績を入力してください。</p>
-              <button type="button" onClick={saveMetrics}>実績を保存してAI判定</button>
+              <button type="button" onClick={saveMetrics} disabled={metricsSaving} aria-busy={metricsSaving}>{metricsSaving ? "判定中…" : "実績を保存してAI判定"}</button>
             </div>}
             {verdict && (
               <div className="verdict" role="status" aria-live="polite">
                 <div className="verdict-head">
                   <div>
                     <span className="eyebrow">TEACHER DECISION</span>
-                    <strong>{verdict.verdict}</strong>
+                    <strong>{VERDICT_COPY[verdict.verdict as Verdict]?.label ?? verdict.verdict}{VERDICT_COPY[verdict.verdict as Verdict] ? ` · ${VERDICT_COPY[verdict.verdict as Verdict].meaning}` : ""}</strong>
                   </div>
                   <span className="verdict-source">{verdict.aiConnected ? "AI REFINED" : "DETERMINISTIC"}{typeof verdict.evidenceCount === "number" ? ` · ${verdict.evidenceCount} SIGNALS` : ""}</span>
                 </div>
@@ -1009,6 +1016,7 @@ export default function Home() {
                     <strong>{verdict.nextAction}</strong>
                   </div>
                 )}
+                {VERDICT_COPY[verdict.verdict as Verdict] && <p className="hint">{VERDICT_COPY[verdict.verdict as Verdict].next} 自動運用中の投稿は、毎日の巡回でAIがこの判断を実行します。</p>}
               </div>
             )}
           </section>

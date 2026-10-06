@@ -50,6 +50,7 @@ const { POST: socialMetrics } = await import("../app/api/social/metrics/route");
 const { POST: aiDecision } = await import("../app/api/operator/ai-decision/route");
 const { POST: nextCreative } = await import("../app/api/operator/next-creative/route");
 const { GET: videoJob } = await import("../app/api/video/jobs/[id]/route");
+const { GET: activity } = await import("../app/api/operator/activity/route");
 
 const HOUR = 3600_000;
 const MINUTE = 60_000;
@@ -471,4 +472,30 @@ test("recovering metrics resets the failure counter", async () => {
   const body = await runLoop();
   assert.equal(body.results.find((x) => x.postId === "flaky")?.verdict, "pivot", JSON.stringify(body.results));
   assert.equal((db.table("social_posts").find((row) => row.id === "flaky")!.metadata as Record<string, unknown>).operator_metrics_failures, 0);
+});
+
+test("activity API: shows the user's own loop only, and requires auth", async () => {
+  seedJob({ status: "failed", provider_response: { loop_settled_reason: "retries_exhausted" } });
+  db.seed("social_posts", [{ id: "other-post", user_id: "u2", creative_id: "x", network: "x", status: "published", external_post_id: "tw-other", metadata: { operator_patrol_status: "stalled" } }]);
+  db.seed("production_jobs", [{ id: "other-job", user_id: "u2", status: "failed", provider_response: { loop_settled_reason: "non_retryable" } }]);
+  db.seed("operator_runs", [{ user_id: "u2", run_type: "ai_performance_verdict", completed_at: iso(-MINUTE), output: { decision: { verdict: "stop", reason: "u2 secret reason", evidence: [] } } }]);
+
+  const unauthenticated = await activity(new Request("https://app.test/api/operator/activity"));
+  assert.equal(unauthenticated.status, 401);
+
+  const res = await activity(new Request("https://app.test/api/operator/activity", { headers: { "x-internal-secret": "cron-secret", "x-internal-user-id": "u1" } }));
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  const raw = JSON.stringify(body);
+  assert.ok(!raw.includes("other-post") && !raw.includes("other-job") && !raw.includes("u2 secret reason"), raw);
+  assert.equal(body.latestDecision, null);
+  assert.deepEqual(body.attention.map((a: { id: string }) => a.id), ["job1"]);
+});
+
+test("activity API: a database outage returns a retryable message without internals", async () => {
+  db.failures.production_jobs = "08006";
+  const res = await activity(new Request("https://app.test/api/operator/activity", { headers: { "x-internal-secret": "cron-secret", "x-internal-user-id": "u1" } }));
+  assert.equal(res.status, 503);
+  const body = await res.json();
+  assert.doesNotMatch(body.error, /08006|simulated|production_jobs/);
 });
