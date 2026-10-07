@@ -186,7 +186,7 @@ export async function POST(request: Request) {
                 } catch (error) {
                   const message = error instanceof Error ? error.message : String(error);
                   if ((error as { code?: string }).code === "TIKTOK_PUBLISH_PENDING") {
-                    results.push({ platform, ok: false, error: message });
+                    results.push({ platform, ok: false, error: message, pending: true });
                     continue;
                   }
                   await fail(reservation.row.id, message);
