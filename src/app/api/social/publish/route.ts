@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     // because retrying without provider-side idempotency could create a duplicate external post.
     const findExistingReservation = async (network: Platform) => {
       const { data: snakeCase, error: snakeError } = await supabase.from("social_posts")
-        .select("id,status,external_post_id,post_url")
+        .select("id,status,external_post_id,post_url,metadata")
         .eq("user_id", user.id).eq("network", network)
         .filter("metadata->>source_social_post_id", "eq", socialPostId)
         .maybeSingle();
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       if (snakeCase) return snakeCase;
 
       const { data: camelCase, error: camelError } = await supabase.from("social_posts")
-        .select("id,status,external_post_id,post_url")
+        .select("id,status,external_post_id,post_url,metadata")
         .eq("user_id", user.id).eq("network", network)
         .filter("metadata->>sourceSocialPostId", "eq", socialPostId)
         .maybeSingle();
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
         const { data: reclaimed, error: reclaimError } = await supabase.from("social_posts")
           .update({ status: "publishing", published_at: null, updated_at: new Date().toISOString() })
           .eq("id", existingBeforeInsert.id).eq("user_id", user.id).eq("status", "failed")
-          .select("id,status,external_post_id,post_url").maybeSingle();
+          .select("id,status,external_post_id,post_url,metadata").maybeSingle();
         if (reclaimError) throw reclaimError;
         if (reclaimed) return { claimed: true, row: reclaimed };
       }
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
         status: "publishing",
         caption,
         metadata,
-      }).select("id,status,external_post_id,post_url").single();
+      }).select("id,status,external_post_id,post_url,metadata").single();
 
       if (!error && data) return { claimed: true, row: data };
 
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
         .eq("id", existing.id)
         .eq("user_id", user.id)
         .eq("status", "failed")
-        .select("id,status,external_post_id,post_url")
+        .select("id,status,external_post_id,post_url,metadata")
         .maybeSingle();
       if (reclaimError) throw reclaimError;
       return reclaimed
@@ -172,6 +172,29 @@ export async function POST(request: Request) {
         try {
           reservation = await reserve(platform);
           if (!reservation.claimed) {
+            // TikTok moderation can keep a Direct Post in processing for hours.
+            // Reconcile the existing publish_id instead of creating a duplicate.
+            if (platform === "tiktok" && reservation.row.status === "publishing") {
+              const publishId = typeof reservation.row.metadata?.publish_id === "string" ? reservation.row.metadata.publish_id : "";
+              if (publishId) {
+                try {
+                  const resolved = await resolveTikTokVideoId(publishId, 3, 4000);
+                  const shareUrl = typeof resolved.share_url === "string" ? resolved.share_url : null;
+                  const saved = await complete(reservation.row.id, platform, resolved.videoId, shareUrl, { publishId, publishStatus: resolved.status, reconciled: true });
+                  results.push({ platform, ok: true, postId: saved.external_post_id ?? resolved.videoId, url: saved.post_url ?? shareUrl ?? undefined });
+                  continue;
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : String(error);
+                  if ((error as { code?: string }).code === "TIKTOK_PUBLISH_PENDING") {
+                    results.push({ platform, ok: false, error: message });
+                    continue;
+                  }
+                  await fail(reservation.row.id, message);
+                  results.push({ platform, ok: false, error: message });
+                  continue;
+                }
+              }
+            }
             if (reservation.row.status === "published") {
               results.push({
                 platform,
@@ -192,8 +215,12 @@ export async function POST(request: Request) {
           const rowId = reservation.row.id;
           if (platform === "tiktok") {
             const r = await publishTikTokVideo({videoUrl,title:caption,isAigc:true});
-            // TikTok's init endpoint only starts the publish job. Do not mark the
-            // database row as published until TikTok confirms the public video id.
+            // Persist the provider publish_id before polling. TikTok moderation may
+            // take hours; keeping the reservation prevents duplicate external posts.
+            await supabase.from("social_posts").update({
+              metadata: { source_social_post_id: socialPostId, publish_id: r.publishId },
+              updated_at: new Date().toISOString(),
+            }).eq("id", rowId).eq("user_id", user.id).eq("status", "publishing");
             const resolved = await resolveTikTokVideoId(r.publishId);
             externalPublishSucceeded = true;
             externalPostId = resolved.videoId;
