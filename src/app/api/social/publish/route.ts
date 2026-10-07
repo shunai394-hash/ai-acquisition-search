@@ -57,7 +57,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const results: Array<{platform:string;ok:boolean;postId?:string;url?:string;error?:string;manualRecoveryRequired?:boolean}> = [];
+    const results: Array<{platform:string;ok:boolean;pending?:boolean;postId?:string;url?:string;error?:string;manualRecoveryRequired?:boolean}> = [];
     let tempFile = "";
     let videoBuffer: Uint8Array | null = null;
     const getVideoBuffer = async () => {
