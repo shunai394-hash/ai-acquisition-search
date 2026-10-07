@@ -151,6 +151,8 @@ async function publishCompletedVideo(
 
   const manualRecoveryRequired = Array.isArray(result.payload?.results)
     && result.payload.results.some((item: { manualRecoveryRequired?: boolean } | null) => item?.manualRecoveryRequired === true);
+  const pending = Array.isArray(result.payload?.results)
+    && result.payload.results.some((item: { pending?: boolean } | null) => item?.pending === true);
   const published = Array.isArray(result.payload?.results)
     ? result.payload.results.filter((item: { ok?: boolean } | null) => item?.ok)
     : [];
@@ -171,10 +173,11 @@ async function publishCompletedVideo(
 
   return {
     ok: published.length > 0,
+    pending,
     status: result.status,
     result: result.payload,
     manualRecoveryRequired,
-    error: published.length ? undefined : result.payload?.results?.[0]?.error,
+    error: published.length || pending ? undefined : result.payload?.results?.[0]?.error,
   };
 }
 
