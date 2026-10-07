@@ -85,13 +85,20 @@ export async function getTikTokVideoMetrics(videoId: string) {
 export async function resolveTikTokVideoId(publishId: string, attempts = 8, delayMs = 2500) {
   for (let attempt = 0; attempt < attempts; attempt++) {
     const status = await getTikTokPublishStatus(publishId);
-    const videoId = status?.publicaly_available_post_id ?? status?.publicly_available_post_id ?? status?.video_id;
-    if (typeof videoId === "string" && videoId) return { ...status, videoId };
+    const rawIds = status?.publicaly_available_post_id ?? status?.publicly_available_post_id ?? status?.video_id;
+    const videoId = Array.isArray(rawIds) ? rawIds[0] : rawIds;
+    if ((typeof videoId === "string" && videoId) || (typeof videoId === "number" && Number.isFinite(videoId))) {
+      return { ...status, videoId: String(videoId) };
+    }
     const publishStatus = String(status?.status ?? "");
     if (publishStatus === "FAILED" || publishStatus === "PUBLISH_CANCELLED") {
-      throw new Error(`TikTok publish failed: ${publishStatus}: ${JSON.stringify(status)}`);
+      const error = new Error(`TikTok publish failed: ${publishStatus}: ${String(status?.fail_reason ?? "")}`);
+      Object.assign(error, { code: "TIKTOK_PUBLISH_FAILED", publishId, status });
+      throw error;
     }
     if (attempt < attempts - 1) await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
-  throw new Error(`TikTok publish completed statusからvideo_idを取得できませんでした: publish_id=${publishId}`);
+  const error = new Error(`TikTok publish is still processing: publish_id=${publishId}`);
+  Object.assign(error, { code: "TIKTOK_PUBLISH_PENDING", publishId });
+  throw error;
 }
