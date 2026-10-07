@@ -383,6 +383,10 @@ async function runOperatorLoop(db: Db, leaseMode: string) {
     } else if (publish.skipped) {
       await settle(job, "completed", "social_post_missing", { publish_skipped_reason: publish.reason });
       status = "skipped";
+    } else if (publish.pending) {
+      // TikTok moderation may take hours. Keep the job unsettled so the next
+      // operator pass reconciles the same publish_id instead of retrying.
+      status = "publish-pending";
     } else {
       // Failed before reaching the SNS (bad credentials, consent missing, API down):
       // retry on later runs, but not forever.
