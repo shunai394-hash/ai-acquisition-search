@@ -110,15 +110,31 @@ export function generateBgm(durationSeconds: number, prompt = "") {
 
   return pcm;
 }
+export function fitWavToDuration(wav: Uint8Array, durationSeconds: number) {
+  const pcm = readWavPcm(wav);
+  const target = Math.max(2, Math.min(30, durationSeconds)) * SAMPLE_RATE;
+  if (pcm.length <= target) return wav;
+
+  const output = new Int16Array(target);
+  output.set(pcm.subarray(0, target));
+  const fadeSamples = Math.min(Math.floor(SAMPLE_RATE * 0.08), output.length);
+  for (let i = 0; i < fadeSamples; i++) {
+    const index = output.length - fadeSamples + i;
+    output[index] = Math.round(output[index] * (1 - i / fadeSamples));
+  }
+  return pcmToWav(output);
+}
+
 export function mixNarrationWithBgm(narrationWav: Uint8Array, durationSeconds: number, bgmPrompt = "") {
   const narration = readWavPcm(narrationWav);
-  const bgm = generateBgm(Math.max(durationSeconds, narration.length / SAMPLE_RATE), bgmPrompt);
-  const length = Math.max(narration.length, bgm.length);
+  const seconds = Math.max(2, Math.min(30, durationSeconds));
+  const bgm = generateBgm(seconds, bgmPrompt);
+  const length = bgm.length;
   const mixed = new Int16Array(length);
 
   for (let i = 0; i < length; i++) {
     const voice = i < narration.length ? narration[i] * 0.98 : 0;
-    const music = i < bgm.length ? bgm[i] * 0.22 : 0;
+    const music = bgm[i] * 0.22;
     mixed[i] = clamp16(voice + music);
   }
   return pcmToWav(mixed);
