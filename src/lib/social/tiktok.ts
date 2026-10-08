@@ -138,7 +138,7 @@ export async function getTikTokAccessToken(userId: string) {
     access_token_encrypted: encryptTikTokToken(refreshed.access_token),
     refresh_token_encrypted: encryptTikTokToken(refreshed.refresh_token),
     access_token_expires_at: refreshed.expires_in ? new Date(Date.now() + Number(refreshed.expires_in) * 1000).toISOString() : null,
-    refresh_expires_at: refreshed.refresh_expires_in ? new Date(Date.now() + Number(refreshed.refresh_expires_in) * 1000).toISOString() : null,
+    refresh_token_expires_at: refreshed.refresh_expires_in ? new Date(Date.now() + Number(refreshed.refresh_expires_in) * 1000).toISOString() : null,
     scope: refreshed.scope || account.scope,
     updated_at: new Date().toISOString(),
   }).eq("user_id", userId);
@@ -244,9 +244,9 @@ export async function getTikTokVideoMetrics(videoId: string) {
   return video;
 }
 
-export async function resolveTikTokVideoId(publishId: string, attempts = 8, delayMs = 2500) {
+export async function resolveTikTokVideoId(publishId: string, accessToken?: string, attempts = 8, delayMs = 2500) {
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const status = await getTikTokPublishStatus(publishId);
+    const status = await getTikTokPublishStatus(publishId, accessToken);
     const availableIds = Array.isArray(status?.publicaly_available_post_id)
       ? status.publicaly_available_post_id
       : Array.isArray(status?.publicly_available_post_id)
