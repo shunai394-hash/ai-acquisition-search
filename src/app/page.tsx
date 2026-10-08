@@ -222,17 +222,24 @@ export default function Home() {
       if (studioAudio !== "off" || studioMusic) {
         setStudioStage("audio");
         setStudioStatus("ナレーション / BGMを準備中…");
-        const narrationText = studioAudio === "custom"
-          ? studioNarration.trim()
-          : studioAudio === "auto"
-            ? (studioNarration.trim() || [
-                "短尺広告ナレーション。",
-                studioPrompt.trim(),
-                result?.analysis?.nextPosts?.[selectedScenario]?.hook ? "冒頭フック: " + result.analysis.nextPosts[selectedScenario].hook : "",
-                result?.analysis?.decision?.valueProposition ? "訴求: " + result.analysis.decision.valueProposition : "",
-                "最後は自然な購入・行動CTAで締める。"
-              ].filter(Boolean).join("\n"))
-            : "";
+        let narrationText = studioAudio === "custom" ? studioNarration.trim() : "";
+        if (studioAudio === "auto") {
+          const scriptResponse = await fetch("/api/video/script", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+            body: JSON.stringify({
+              prompt: studioPrompt.trim(),
+              hook: result?.analysis?.nextPosts?.[selectedScenario]?.hook || "",
+              valueProposition: result?.analysis?.decision?.valueProposition || "",
+              duration: studioDuration,
+              language: "ja-JP",
+            }),
+          });
+          const scriptBody = await scriptResponse.json().catch(() => ({}));
+          if (!scriptResponse.ok) throw new Error(scriptBody.error || "AIナレーション台本の生成に失敗しました。");
+          narrationText = String(scriptBody.script || "").trim();
+          if (!narrationText) throw new Error("AIナレーション台本が空です。");
+        }
         const audioResponse = await fetch("/api/video/audio", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
