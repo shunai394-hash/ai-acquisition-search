@@ -28,7 +28,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const prompt = String(body.prompt || "").trim();
     const imageUrl = body.imageUrl ? String(body.imageUrl) : undefined;
+    const audioUrl = body.audioUrl ? String(body.audioUrl) : undefined;
     if (imageUrl && !/^https:\/\//i.test(imageUrl)) return NextResponse.json({ error: "imageUrl must be an HTTPS URL" }, { status: 400 });
+    if (audioUrl && !/^https:\/\//i.test(audioUrl)) return NextResponse.json({ error: "audioUrl must be an HTTPS URL" }, { status: 400 });
     if (!prompt) return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     if (prompt.length > 10000) return NextResponse.json({ error: "prompt is too long" }, { status: 400 });
 
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
       resolution,
       aspect_ratio: aspectRatio,
       generate_audio: generateAudio,
-      provider_response: imageUrl ? { input_image_url: imageUrl } : null,
+      provider_response: imageUrl || audioUrl ? { ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}) } : null,
     }).select("id").single();
 
     if (jobError || !job) throw new Error(jobError?.message || "production jobの作成に失敗しました。");
@@ -91,12 +93,13 @@ export async function POST(request: Request) {
     // エンジン選択はRouterに集約する。現在の既定値はHiggsfield。
     const started = await generateVideo({
       prompt,
-      model: model ?? (imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
+      model: model ?? (audioUrl ? process.env.HF_AUDIO_VIDEO_MODEL ?? "alibaba/wan-3.0/reference-to-video" : imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
       duration,
       resolution,
       aspectRatio,
       generateAudio,
       imageUrl,
+      audioUrl,
     });
     const requestId = started.requestId;
     providerRequestId = requestId;
