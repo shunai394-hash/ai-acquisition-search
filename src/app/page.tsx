@@ -253,6 +253,7 @@ export default function Home() {
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
           body: JSON.stringify({
             text: narrationText,
+            voice: studioVoice,
             bgm: studioMusic,
             bgmPrompt: studioMusicPrompt.trim(),
             duration: studioDuration,
