@@ -11,9 +11,11 @@ const BUCKET = "audio-inputs";
 const MAX_BYTES = 15 * 1024 * 1024;
 
 export async function POST(request: Request) {
+  let userId = "";
   try {
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
+    userId = user.id;
 
     const body = await request.json();
     const text = typeof body.text === "string" ? body.text.trim() : "";
@@ -90,7 +92,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (usageEventId) {
-      try { await refundMonthlyUsage(user?.id ?? "", "narration_generation", usageEventId); } catch {}
+      try { await refundMonthlyUsage(userId, "narration_generation", usageEventId); } catch {}
     }
     return NextResponse.json({ error: error instanceof Error ? error.message : "音声生成に失敗しました。" }, { status: 502 });
   }
