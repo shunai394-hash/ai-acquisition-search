@@ -178,10 +178,10 @@ export type TikTokPublishInput = {
   videoCoverTimestampMs?: number;
 };
 
-export async function queryTikTokCreator() {
+export async function queryTikTokCreator(accessToken = getAccessToken()) {
   const response = await fetch(`${TIKTOK_API_BASE}/post/publish/creator_info/query/`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${input.accessToken || getAccessToken()}`, "Content-Type": "application/json; charset=UTF-8" },
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json; charset=UTF-8" },
     body: "{}",
   });
   const payload = await response.json();
@@ -198,7 +198,7 @@ export async function publishTikTokVideo(input: TikTokPublishInput) {
 
   const response = await fetch(`${TIKTOK_API_BASE}/post/publish/video/init/`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${getAccessToken()}`, "Content-Type": "application/json; charset=UTF-8" },
+    headers: { Authorization: `Bearer ${input.accessToken || getAccessToken()}`, "Content-Type": "application/json; charset=UTF-8" },
     body: JSON.stringify({
       post_info: {
         title: input.title.slice(0, 2200),
@@ -228,7 +228,7 @@ export async function publishTikTokVideo(input: TikTokPublishInput) {
   };
 }
 
-export async function getTikTokPublishStatus(publishId: string) {
+export async function getTikTokPublishStatus(publishId: string, accessToken = getAccessToken()) {
   const response = await fetch(`${TIKTOK_API_BASE}/post/publish/status/fetch/`, {
     method: "POST",
     headers: { Authorization: `Bearer ${getAccessToken()}`, "Content-Type": "application/json; charset=UTF-8" },
@@ -239,7 +239,7 @@ export async function getTikTokPublishStatus(publishId: string) {
   return payload.data;
 }
 
-export async function getTikTokVideoMetrics(videoId: string) {
+export async function getTikTokVideoMetrics(videoId: string, accessToken = getAccessToken()) {
   const response = await fetch(
     `${TIKTOK_API_BASE}/video/query/?fields=id,share_url,like_count,comment_count,share_count,view_count,is_aigc`,
     {
