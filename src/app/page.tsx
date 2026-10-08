@@ -207,14 +207,25 @@ export default function Home() {
         if (!upload.ok) throw new Error(body.error || "画像のアップロードに失敗しました。");
         imageUrl = String(body.url || "");
       }
-      if (studioAudio === "custom" || studioMusic) {
+      if (studioAudio !== "off" || studioMusic) {
         setStudioStage("audio");
         setStudioStatus("ナレーション / BGMを準備中…");
+        const narrationText = studioAudio === "custom"
+          ? studioNarration.trim()
+          : studioAudio === "auto"
+            ? (studioNarration.trim() || [
+                "短尺広告ナレーション。",
+                studioPrompt.trim(),
+                result?.analysis?.nextPosts?.[selectedScenario]?.hook ? "冒頭フック: " + result.analysis.nextPosts[selectedScenario].hook : "",
+                result?.analysis?.decision?.valueProposition ? "訴求: " + result.analysis.decision.valueProposition : "",
+                "最後は自然な購入・行動CTAで締める。"
+              ].filter(Boolean).join("\n"))
+            : "";
         const audioResponse = await fetch("/api/video/audio", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
           body: JSON.stringify({
-            text: studioAudio === "custom" ? studioNarration.trim() : "",
+            text: narrationText,
             bgm: studioMusic,
             bgmPrompt: studioMusicPrompt.trim(),
             duration: studioDuration,
@@ -236,11 +247,9 @@ export default function Home() {
               studioPrompt.trim(),
               remixHint ? "REMIX DIRECTION: " + remixHint + ". Preserve the product identity and core concept while changing the visual execution." : ""
             ].filter(Boolean).join("\n"),
-            studioAudio === "custom"
-              ? "AUDIO: Japanese spoken narration. Voice: " + studioVoice + ". Narration script: " + studioNarration.trim() + ". Speak naturally, clearly, and synchronize the delivery to the scene."
-              : studioAudio === "auto"
-                ? "AUDIO: natural voiceover and synchronized ambient sound. Voice: " + studioVoice + "."
-                : "",
+            studioAudio !== "off"
+              ? "AUDIO: Japanese spoken narration is pre-rendered and must be used as the primary voice track. Voice: " + studioVoice + (studioAudio === "custom" ? ". Narration script: " + studioNarration.trim() : ". Auto-generated narration script. Speak naturally, clearly, and synchronize delivery to the visual beats.") + "."
+              : "",
             studioMusic
               ? "BGM: generate subtle, tasteful background music that supports the scene; keep it underneath the narration and do not overpower speech." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
               : ""
@@ -264,7 +273,31 @@ export default function Home() {
         const poll = await fetch("/api/video/jobs/" + encodeURIComponent(jobId), { headers: { Authorization: "Bearer " + (await getAccessToken()) }, cache: "no-store" });
         const data = await poll.json().catch(() => ({}));
         if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
-        if (data.job?.status === "completed" && data.asset?.video_url) { setStudioStage("render"); setStudioUrl(data.asset.video_url); setStudioStatus("完成。"); return; }
+        if (data.job?.status === "completed" && data.asset?.video_url) {
+          setStudioStage("render");
+          setStudioUrl(data.asset.video_url);
+          setStudioStatus("完成。");
+          if (socialPostId && publishPlatforms.length && (!publishPlatforms.includes("tiktok") || tiktokConsent)) {
+            setPublishStatus("完成動画をSNSへ自動投稿中…");
+            try {
+              const publishToken = await getAccessToken();
+              const caption = publishCaption.trim() || result?.analysis?.nextPosts?.[selectedScenario]?.hook || result?.analysis?.decision?.valueProposition || "AI Acquisition Search creative";
+              const publishResponse = await fetch("/api/social/publish", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: "Bearer " + publishToken },
+                body: JSON.stringify({ socialPostId, videoUrl: data.asset.video_url, caption, platforms: publishPlatforms }),
+              });
+              const publishBody = await publishResponse.json().catch(() => ({}));
+              if (!publishResponse.ok) throw new Error(publishBody.error || "SNS自動投稿に失敗しました。");
+              setPublishResults(Array.isArray(publishBody.results) ? publishBody.results : []);
+              setPublishStatus(publishBody.failed ? `自動投稿：${publishBody.published || 0}件成功 / ${publishBody.failed}件失敗` : `自動投稿：${publishBody.published || 0}件`);
+            } catch (publishError) {
+              setPublishStatus("");
+              setStudioError(publishError instanceof Error ? publishError.message : "SNS自動投稿に失敗しました。");
+            }
+          }
+          return;
+        }
         if (data.job?.status === "failed") throw new Error(data.job?.error || "動画生成に失敗しました。");
         setStudioStatus(engine + "で生成中… " + (attempt + 1) + "/60");
       }
