@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { assertPublicUrl } from "@/lib/security/public-url";
 
 const DEFAULT_T2V_MODEL =
   process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0-prime/text-to-video";
@@ -41,15 +42,6 @@ function credentials() {
 
 function modelPath(model: string) {
   return model.replace(/^\/+|\/+$/g, "");
-}
-
-function isHttpUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
 }
 
 async function requestHiggsfield(path: string, init: RequestInit) {
@@ -95,12 +87,8 @@ export async function generateHiggsfieldVideo(
     input.model ??
     (audioUrl ? DEFAULT_AUDIO_MODEL : hasImage ? DEFAULT_I2V_MODEL : DEFAULT_T2V_MODEL);
 
-  if (hasImage && imageUrl && !isHttpUrl(imageUrl)) {
-    throw new Error("imageUrl must be a public HTTP(S) URL.");
-  }
-  if (audioUrl && !isHttpUrl(audioUrl)) {
-    throw new Error("audioUrl must be a public HTTP(S) URL.");
-  }
+  if (hasImage && imageUrl) await assertPublicUrl(imageUrl, ["http:", "https:"]);
+  if (audioUrl) await assertPublicUrl(audioUrl, ["http:", "https:"]);
 
   const isReferenceToVideo = model.includes("/reference-to-video");
   const isImageToVideo =
@@ -135,9 +123,7 @@ export async function generateHiggsfieldVideo(
     body.image_url = imageUrl;
 
     if (input.endImageUrl) {
-      if (!isHttpUrl(input.endImageUrl)) {
-        throw new Error("endImageUrl must be a public HTTP(S) URL.");
-      }
+      await assertPublicUrl(input.endImageUrl, ["http:", "https:"]);
 
       body.end_image_url = input.endImageUrl;
     }
