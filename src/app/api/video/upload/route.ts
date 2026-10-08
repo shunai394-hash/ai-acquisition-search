@@ -7,6 +7,13 @@ export const runtime = "nodejs";
 const BUCKET = "video-inputs";
 const MAX_BYTES = 8 * 1024 * 1024;
 
+function matchesImageSignature(bytes: Uint8Array, mime: string) {
+  if (mime === "image/jpeg") return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (mime === "image/png") return bytes.length >= 8 && bytes.slice(0, 8).every((value, index) => value === [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a][index]);
+  if (mime === "image/webp") return bytes.length >= 12 && new TextDecoder().decode(bytes.slice(0, 4)) === "RIFF" && new TextDecoder().decode(bytes.slice(8, 12)) === "WEBP";
+  return false;
+}
+
 export async function POST(request: Request) {
   try {
     const user = await getUserFromBearer(request);
@@ -22,6 +29,8 @@ export async function POST(request: Request) {
     if (!(file instanceof File)) return NextResponse.json({ error: "画像ファイルが必要です。" }, { status: 400 });
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return NextResponse.json({ error: "JPG / PNG / WebP の画像を指定してください。" }, { status: 400 });
     if (file.size > MAX_BYTES) return NextResponse.json({ error: "画像は8MB以下にしてください。" }, { status: 400 });
+    const fileBytes = new Uint8Array(await file.arrayBuffer());
+    if (!matchesImageSignature(fileBytes, file.type)) return NextResponse.json({ error: "画像の内容とMIMEタイプが一致しません。" }, { status: 400 });
 
     const { data: buckets } = await admin.storage.listBuckets();
     if (!buckets?.some((bucket) => bucket.name === BUCKET)) {
@@ -31,7 +40,7 @@ export async function POST(request: Request) {
 
     const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
     const path = user.id + "/" + crypto.randomUUID() + "." + ext;
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const buffer = Buffer.from(fileBytes);
     const uploaded = await admin.storage.from(BUCKET).upload(path, buffer, { contentType: file.type, upsert: false, cacheControl: "3600" });
     if (uploaded.error) throw new Error(uploaded.error.message);
 
