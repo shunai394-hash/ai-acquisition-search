@@ -82,6 +82,14 @@ export default function Home() {
     const value = new URLSearchParams(window.location.search).get("tiktok");
     if (value === "connected") setTiktokNotice("TikTokアカウントを接続しました。自動投稿を利用できます。");
     if (value === "error") setTiktokNotice("TikTok接続に失敗しました。もう一度接続してください。");
+    getAccessToken().then(async (token) => {
+      const response = await fetch("/api/social/tiktok-consent", {
+        headers: { Authorization: "Bearer " + token },
+        cache: "no-store",
+      });
+      const body = await response.json().catch(() => ({}));
+      if (response.ok) setTiktokConsent(body.consented === true);
+    }).catch(() => {});
   }, []);
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
