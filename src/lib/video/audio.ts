@@ -63,27 +63,53 @@ export function generateBgm(durationSeconds: number, prompt = "") {
   const samples = Math.ceil(seconds * SAMPLE_RATE);
   const pcm = new Int16Array(samples);
   const lower = prompt.toLowerCase();
-  const tempo = lower.includes("energetic") || lower.includes("upbeat") ? 112 : lower.includes("lofi") ? 78 : 92;
+
+  const tempo = lower.includes("energetic") || lower.includes("upbeat") || lower.includes("dance")
+    ? 118
+    : lower.includes("lofi") || lower.includes("calm")
+      ? 78
+      : lower.includes("luxury") || lower.includes("cinematic")
+        ? 84
+        : 96;
   const beat = 60 / tempo;
-  const chords = lower.includes("warm") || lower.includes("acoustic")
-    ? [220, 261.63, 329.63]
-    : [196, 246.94, 293.66];
+  const bars = [
+    [196, 246.94, 293.66],
+    [174.61, 220, 261.63],
+    [146.83, 196, 246.94],
+    [164.81, 220, 277.18],
+  ];
+
+  const note = (freq: number, t: number, gain: number) =>
+    Math.sin(2 * Math.PI * freq * t) * gain
+    + Math.sin(2 * Math.PI * freq * 2 * t) * gain * 0.16
+    + Math.sin(2 * Math.PI * freq * 3 * t) * gain * 0.045;
 
   for (let i = 0; i < samples; i++) {
     const t = i / SAMPLE_RATE;
-    const phase = (t % (beat * 4)) / (beat * 4);
-    const chordIndex = Math.floor(phase * chords.length);
-    const root = chords[chordIndex];
-    const pulse = Math.pow(Math.max(0, 1 - ((t % beat) / beat) * 2), 2);
-    const pad = Math.sin(2 * Math.PI * root * t) * 0.20
-      + Math.sin(2 * Math.PI * root * 1.5 * t) * 0.07
-      + Math.sin(2 * Math.PI * root * 2 * t) * 0.035;
-    const tremolo = 0.78 + 0.22 * Math.sin(2 * Math.PI * 0.18 * t);
-    pcm[i] = clamp16((pad * tremolo + pulse * 0.018) * 32767 * 0.32);
+    const beatIndex = Math.floor(t / beat);
+    const barIndex = Math.floor(beatIndex / 4) % bars.length;
+    const beatPhase = (t % beat) / beat;
+    const chord = bars[barIndex];
+    const leadFreq = chord[(beatIndex + Math.floor(beatPhase * 2)) % chord.length];
+
+    const pad = note(chord[0], t, 0.17)
+      + note(chord[1], t, 0.075)
+      + note(chord[2], t, 0.05);
+
+    const pulseEnvelope = Math.pow(Math.max(0, 1 - beatPhase * 3.5), 3);
+    const pulse = Math.sin(2 * Math.PI * (tempo / 60 > 105 ? 110 : 92) * t) * pulseEnvelope * 0.035;
+    const lead = Math.sin(2 * Math.PI * leadFreq * 2 * t) * Math.exp(-beatPhase * 5) * 0.018;
+
+    const fadeIn = Math.min(1, t / 0.35);
+    const fadeOut = Math.min(1, (seconds - t) / 0.65);
+    const movement = 0.86 + 0.14 * Math.sin(2 * Math.PI * 0.11 * t);
+    const level = 0.24 * fadeIn * fadeOut * movement;
+
+    pcm[i] = clamp16((pad + pulse + lead) * 32767 * level);
   }
+
   return pcm;
 }
-
 export function mixNarrationWithBgm(narrationWav: Uint8Array, durationSeconds: number, bgmPrompt = "") {
   const narration = readWavPcm(narrationWav);
   const bgm = generateBgm(Math.max(durationSeconds, narration.length / SAMPLE_RATE), bgmPrompt);
