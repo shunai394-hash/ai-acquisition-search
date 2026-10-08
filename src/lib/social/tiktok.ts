@@ -35,8 +35,8 @@ export function getTikTokRedirectUri() {
   return oauthRequired("TIKTOK_REDIRECT_URI");
 }
 
-export function createTikTokState() {
-  const payload = Buffer.from(JSON.stringify({ nonce: crypto.randomBytes(24).toString("base64url"), issuedAt: Date.now() })).toString("base64url");
+export function createTikTokState(userId: string) {
+  const payload = Buffer.from(JSON.stringify({ userId, nonce: crypto.randomBytes(24).toString("base64url"), issuedAt: Date.now() })).toString("base64url");
   const signature = crypto.createHmac("sha256", encryptionKey()).update(payload).digest("base64url");
   return payload + "." + signature;
 }
@@ -51,6 +51,17 @@ export function verifyTikTokState(state: string) {
     return typeof parsed.issuedAt === "number" && Date.now() - parsed.issuedAt < 10 * 60_000;
   } catch {
     return false;
+  }
+}
+
+export function getTikTokStateUserId(state: string) {
+  const [payload] = state.split(".");
+  if (!payload) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { userId?: string };
+    return typeof parsed.userId === "string" ? parsed.userId : null;
+  } catch {
+    return null;
   }
 }
 
