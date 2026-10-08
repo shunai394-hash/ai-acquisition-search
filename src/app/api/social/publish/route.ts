@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { publishTikTokVideo } from "@/lib/social/tiktok";
+import { publishTikTokVideo, resolveTikTokVideoId } from "@/lib/social/tiktok";
 import { publishInstagramReel, publishFacebookReel } from "@/lib/social/meta";
 import { uploadYouTubeVideo } from "@/lib/social/youtube";
 import { publishXPost } from "@/lib/social/x";
@@ -192,10 +192,12 @@ export async function POST(request: Request) {
           const rowId = reservation.row.id;
           if (platform === "tiktok") {
             const r = await publishTikTokVideo({videoUrl,title:caption,isAigc:true});
+            const resolved = await resolveTikTokVideoId(r.publishId);
             externalPublishSucceeded = true;
-            externalPostId = r.publishId;
-            const saved = await complete(rowId,platform,r.publishId,null,{publishId:r.publishId});
-            results.push({platform,ok:true,postId:saved.external_post_id ?? r.publishId});
+            externalPostId = resolved.videoId;
+            externalPostUrl = typeof resolved.share_url === "string" ? resolved.share_url : null;
+            const saved = await complete(rowId,platform,resolved.videoId,externalPostUrl,{publishId:r.publishId,publishStatus:resolved.status,creatorUsername:r.creatorUsername});
+            results.push({platform,ok:true,postId:saved.external_post_id ?? resolved.videoId,url:saved.post_url ?? externalPostUrl ?? undefined});
           } else if (platform === "instagram") {
             const r = await publishInstagramReel({videoUrl,caption});
             externalPublishSucceeded = true;
