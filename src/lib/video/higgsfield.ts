@@ -5,11 +5,14 @@ const DEFAULT_T2V_MODEL =
 
 const DEFAULT_I2V_MODEL =
   process.env.HF_I2V_MODEL ?? "alibaba/wan-3.0-prime/image-to-video";
+const DEFAULT_AUDIO_MODEL =
+  process.env.HF_AUDIO_VIDEO_MODEL ?? "alibaba/wan-3.0/reference-to-video";
 
 export type HiggsfieldVideoInput = {
   prompt: string;
   imageUrl?: string;
   endImageUrl?: string;
+  audioUrl?: string;
   model?: string;
   duration?: number;
   resolution?: "480p" | "720p" | "1080p";
@@ -90,14 +93,25 @@ export async function generateHiggsfieldVideo(
     (hasImage ? DEFAULT_I2V_MODEL : DEFAULT_T2V_MODEL);
 
   const imageUrl = input.imageUrl?.trim();
+  const audioUrl = input.audioUrl?.trim();
 
   if (hasImage && imageUrl && !isHttpUrl(imageUrl)) {
     throw new Error("imageUrl must be a public HTTP(S) URL.");
   }
+  if (audioUrl && !isHttpUrl(audioUrl)) {
+    throw new Error("audioUrl must be a public HTTP(S) URL.");
+  }
 
+  const isReferenceToVideo = model.includes("/reference-to-video");
   const isImageToVideo =
     hasImage &&
     (model.includes("/image-to-video") || model === DEFAULT_I2V_MODEL);
+
+  if (audioUrl && !isReferenceToVideo) {
+    throw new Error(
+      `The selected Higgsfield model does not support audio reference input: ${model}. Use HF_AUDIO_VIDEO_MODEL with a reference-to-video model.`
+    );
+  }
 
   if (hasImage && !isImageToVideo) {
     throw new Error(
@@ -105,6 +119,7 @@ export async function generateHiggsfieldVideo(
     );
   }
 
+  const effectiveModel = audioUrl ? DEFAULT_AUDIO_MODEL : model;
   const body: Record<string, unknown> = {
     prompt: input.prompt,
     duration: input.duration ?? 5,
@@ -114,7 +129,9 @@ export async function generateHiggsfieldVideo(
     enable_thinking: false,
   };
 
-  if (isImageToVideo && imageUrl) {
+  if (isReferenceToVideo && imageUrl) {
+    body.image_urls = [imageUrl];
+  } else if (isImageToVideo && imageUrl) {
     body.image_url = imageUrl;
 
     if (input.endImageUrl) {
@@ -126,7 +143,12 @@ export async function generateHiggsfieldVideo(
     }
   }
 
-  return requestHiggsfield(model, {
+  if (audioUrl) {
+    body.audio_urls = [audioUrl];
+    body.generate_audio = false;
+  }
+
+  return requestHiggsfield(effectiveModel, {
     method: "POST",
     body: JSON.stringify(body),
   });
