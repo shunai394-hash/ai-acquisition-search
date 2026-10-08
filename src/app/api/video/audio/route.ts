@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const text = typeof body.text === "string" ? body.text.trim() : "";
     const bgm = Boolean(body.bgm);
     const bgmPrompt = typeof body.bgmPrompt === "string" ? body.bgmPrompt.trim() : "";
-const voice = typeof body.voice === "string" ? body.voice.trim() : "";
+    const voice = typeof body.voice === "string" ? body.voice.trim() : "";
     const duration = Math.max(2, Math.min(30, Number(body.duration || 5)));
 
     if (!text && !bgm) {
