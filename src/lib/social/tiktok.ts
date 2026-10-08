@@ -231,7 +231,7 @@ export async function publishTikTokVideo(input: TikTokPublishInput) {
 export async function getTikTokPublishStatus(publishId: string, accessToken = getAccessToken()) {
   const response = await fetch(`${TIKTOK_API_BASE}/post/publish/status/fetch/`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${getAccessToken()}`, "Content-Type": "application/json; charset=UTF-8" },
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json; charset=UTF-8" },
     body: JSON.stringify({ publish_id: publishId }),
   });
   const payload = await response.json();
@@ -244,7 +244,7 @@ export async function getTikTokVideoMetrics(videoId: string, accessToken = getAc
     `${TIKTOK_API_BASE}/video/query/?fields=id,share_url,like_count,comment_count,share_count,view_count,is_aigc`,
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${getAccessToken()}`, "Content-Type": "application/json; charset=UTF-8" },
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json; charset=UTF-8" },
       body: JSON.stringify({ filters: { video_ids: [videoId] } }),
     },
   );
