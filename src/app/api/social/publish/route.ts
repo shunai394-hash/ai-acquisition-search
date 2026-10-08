@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { publishTikTokVideo, resolveTikTokVideoId } from "@/lib/social/tiktok";
+import { getTikTokAccessToken, publishTikTokVideo, resolveTikTokVideoId } from "@/lib/social/tiktok";
 import { publishInstagramReel, publishFacebookReel } from "@/lib/social/meta";
 import { uploadYouTubeVideo } from "@/lib/social/youtube";
 import { publishXPost } from "@/lib/social/x";
@@ -191,8 +191,9 @@ export async function POST(request: Request) {
 
           const rowId = reservation.row.id;
           if (platform === "tiktok") {
-            const r = await publishTikTokVideo({videoUrl,title:caption,isAigc:true});
-            const resolved = await resolveTikTokVideoId(r.publishId);
+            const accessToken = await getTikTokAccessToken(user.id);
+            const r = await publishTikTokVideo({accessToken,videoUrl,title:caption,isAigc:true});
+            const resolved = await resolveTikTokVideoId(r.publishId, accessToken);
             externalPublishSucceeded = true;
             externalPostId = resolved.videoId ?? r.publishId;
             externalPostUrl = typeof resolved.share_url === "string" ? resolved.share_url : null;
