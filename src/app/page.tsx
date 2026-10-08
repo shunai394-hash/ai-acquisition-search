@@ -76,7 +76,7 @@ export default function Home() {
   const [tiktokConsent, setTiktokConsent] = useState(false);
   const [publishGenerating, setPublishGenerating] = useState(false);
   const [publishStatus, setPublishStatus] = useState("");
-  const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; url?: string; error?: string }>>([]);
+  const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; pending?: boolean; url?: string; error?: string }>>([]);
   const [tiktokNotice, setTiktokNotice] = useState("");
   useEffect(() => {
     const value = new URLSearchParams(window.location.search).get("tiktok");
@@ -1069,9 +1069,9 @@ export default function Home() {
               {publishResults.length > 0 && (
                 <div className="publish-results">
                   {publishResults.map((item) => (
-                    <div key={item.platform} className={"publish-row " + (item.ok ? "done" : "failed")}>
+                    <div key={item.platform} className={"publish-row " + (item.ok ? "done" : item.pending ? "pending" : "failed")}>
                       <span>{item.platform}</span>
-                      <strong>{item.ok ? "PUBLISHED" : item.error || "FAILED"}</strong>
+                      <strong>{item.ok ? "PUBLISHED" : item.pending ? "PROCESSING" : item.error || "FAILED"}</strong>
                       {item.url ? <a href={item.url} target="_blank" rel="noreferrer">開く →</a> : <span />}
                     </div>
                   ))}
