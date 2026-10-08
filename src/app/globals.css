@@ -1048,3 +1048,5 @@ body{overflow-x:hidden}
 .tiktok-connect-box span{color:#707682;font-size:10px;line-height:1.5}
 .tiktok-connect-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:9px 12px;color:#fff;text-decoration:none;font-size:11px;font-weight:650;background:rgba(255,255,255,.045);transition:transform .2s ease,border-color .2s ease,background .2s ease}
 .tiktok-connect-link:hover{transform:translateY(-1px);border-color:rgba(155,140,255,.42);background:rgba(155,140,255,.08)}
+
+.integration-notice{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:30;padding:10px 14px;border:1px solid rgba(120,255,180,.2);border-radius:999px;background:rgba(8,12,12,.88);backdrop-filter:blur(14px);color:#c9ffe0;font-size:11px;box-shadow:0 14px 40px rgba(0,0,0,.35)}
