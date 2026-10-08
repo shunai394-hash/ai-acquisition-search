@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/billing";
 import { generateHiggsfieldVideo } from "@/lib/video/higgsfield";
+import { getTikTokAccessToken, resolveTikTokVideoId } from "@/lib/social/tiktok";
 import { acquireLease, releaseLease } from "@/lib/ops/lease";
 import { cronSecret, unauthorizedCron, verifyCronRequest } from "@/lib/security/cron-auth";
 
@@ -241,6 +242,42 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
         step: "post-loop",
         error: error instanceof Error ? error.message : String(error),
       });
+    }
+  }
+
+  // TikTokは投稿直後にPROCESSINGが長時間続くことがあるため、pending行を別ループで追跡する。
+  const { data: pendingTikToks } = await db.from("social_posts")
+    .select("id,user_id,external_post_id,metadata")
+    .eq("status", "pending")
+    .eq("network", "tiktok")
+    .not("external_post_id", "is", null)
+    .order("updated_at", { ascending: true })
+    .limit(30);
+
+  for (const pending of pendingTikToks || []) {
+    if (!budgetRemaining()) { timeBudgetExceeded = true; break; }
+    if (!pending.user_id || !pending.external_post_id) continue;
+    try {
+      const accessToken = await getTikTokAccessToken(pending.user_id);
+      const resolved = await resolveTikTokVideoId(String(pending.external_post_id), accessToken, 1, 0);
+      if (resolved.pending) {
+        results.push({ postId: pending.id, step: "tiktok-pending", status: "processing" });
+        continue;
+      }
+      const publicId = resolved.videoId ?? String(pending.external_post_id);
+      const shareUrl = typeof resolved.share_url === "string" ? resolved.share_url : null;
+      const metadata = pending.metadata && typeof pending.metadata === "object" ? pending.metadata as Record<string, unknown> : {};
+      await db.from("social_posts").update({
+        status: "published",
+        external_post_id: publicId,
+        post_url: shareUrl,
+        published_at: new Date().toISOString(),
+        metadata: { ...metadata, publishStatus: resolved.status, publicVideoId: resolved.videoId ?? null, resolved_at: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }).eq("id", pending.id).eq("user_id", pending.user_id).eq("status", "pending");
+      results.push({ postId: pending.id, step: "tiktok-pending", status: "published", externalPostId: publicId });
+    } catch (error) {
+      results.push({ postId: pending.id, step: "tiktok-pending", status: "error", error: error instanceof Error ? error.message : String(error) });
     }
   }
 
