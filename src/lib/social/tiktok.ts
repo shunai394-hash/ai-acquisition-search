@@ -34,16 +34,21 @@ export async function queryTikTokCreator() {
 export async function publishTikTokVideo(input: TikTokPublishInput) {
   if (!input.videoUrl.startsWith("https://")) throw new Error("TikTokのPULL_FROM_URL投稿にはHTTPSの公開動画URLが必要です。");
   const creator = await queryTikTokCreator();
-  const privacy = input.privacyLevel || creator.privacy_level_options?.[0] || "SELF_ONLY";
-  if (!creator.privacy_level_options?.includes(privacy)) throw new Error(`指定されたprivacyLevelはこのTikTokアカウントでは使用できません: ${privacy}`);
+  const options = Array.isArray(creator.privacy_level_options) ? creator.privacy_level_options : [];
+  const privacy = input.privacyLevel || (options.includes("PUBLIC_TO_EVERYONE") ? "PUBLIC_TO_EVERYONE" : options[0] || "SELF_ONLY");
+  if (!options.includes(privacy)) throw new Error(`指定されたprivacyLevelはこのTikTokアカウントでは使用できません: ${privacy}`);
+
   const response = await fetch(`${TIKTOK_API_BASE}/post/publish/video/init/`, {
     method: "POST",
     headers: { Authorization: `Bearer ${getAccessToken()}`, "Content-Type": "application/json; charset=UTF-8" },
     body: JSON.stringify({
       post_info: {
-        title: input.title.slice(0, 2200), privacy_level: privacy,
-        disable_comment: input.disableComment ?? false, disable_duet: input.disableDuet ?? false,
-        disable_stitch: input.disableStitch ?? false, is_aigc: input.isAigc ?? true,
+        title: input.title.slice(0, 2200),
+        privacy_level: privacy,
+        disable_comment: input.disableComment ?? false,
+        disable_duet: input.disableDuet ?? false,
+        disable_stitch: input.disableStitch ?? false,
+        is_aigc: input.isAigc ?? true,
         brand_organic_toggle: input.brandOrganicToggle ?? false,
         ...(input.videoCoverTimestampMs == null ? {} : { video_cover_timestamp_ms: input.videoCoverTimestampMs }),
       },
@@ -52,7 +57,17 @@ export async function publishTikTokVideo(input: TikTokPublishInput) {
   });
   const payload = await response.json();
   if (!response.ok || payload?.error?.code !== "ok") throw new Error(payload?.error?.message || `TikTok publish failed: ${response.status}`);
-  return { publishId: payload.data.publish_id, privacyLevel: privacy, creatorUsername: creator.creator_username };
+
+  const publishId = payload?.data?.publish_id;
+  if (typeof publishId !== "string" || !publishId) {
+    throw new Error("TikTokからpublish_idが返りませんでした。");
+  }
+
+  return {
+    publishId,
+    privacyLevel: privacy,
+    creatorUsername: creator.creator_username,
+  };
 }
 
 export async function getTikTokPublishStatus(publishId: string) {
@@ -87,6 +102,7 @@ export async function resolveTikTokVideoId(publishId: string, attempts = 8, dela
     const status = await getTikTokPublishStatus(publishId);
     const videoId = status?.publicaly_available_post_id ?? status?.publicly_available_post_id ?? status?.video_id;
     if (typeof videoId === "string" && videoId) return { ...status, videoId };
+
     const publishStatus = String(status?.status ?? "");
     if (publishStatus === "FAILED" || publishStatus === "PUBLISH_CANCELLED") {
       throw new Error(`TikTok publish failed: ${publishStatus}: ${JSON.stringify(status)}`);
