@@ -278,5 +278,5 @@ export async function resolveTikTokVideoId(publishId: string, accessToken?: stri
     }
     if (attempt < attempts - 1) await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
-  throw new Error(`TikTok publish status did not reach a terminal state: publish_id=${publishId}`);
+  return { pending: true, publishId, status: "PROCESSING" };
 }
