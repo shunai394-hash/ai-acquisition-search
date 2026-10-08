@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import GoogleSignIn from "@/components/GoogleSignIn";
 import BillingButton from "@/components/BillingButton";
 import Link from "next/link";
@@ -77,6 +77,12 @@ export default function Home() {
   const [publishGenerating, setPublishGenerating] = useState(false);
   const [publishStatus, setPublishStatus] = useState("");
   const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; url?: string; error?: string }>>([]);
+  const [tiktokNotice, setTiktokNotice] = useState("");
+  useEffect(() => {
+    const value = new URLSearchParams(window.location.search).get("tiktok");
+    if (value === "connected") setTiktokNotice("TikTokアカウントを接続しました。自動投稿を利用できます。");
+    if (value === "error") setTiktokNotice("TikTok接続に失敗しました。もう一度接続してください。");
+  }, []);
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -365,7 +371,7 @@ export default function Home() {
   }
 
   return (
-    <main className="shell">
+    <main className="shell">\n      {tiktokNotice && <div className="integration-notice" role="status" aria-live="polite">{tiktokNotice}</div>}
       <header className="topbar">
         <div>
           <strong>AI Acquisition Search</strong>
