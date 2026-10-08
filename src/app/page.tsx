@@ -199,6 +199,7 @@ export default function Home() {
     try {
       const token = await getAccessToken();
       let imageUrl = "";
+      let audioUrl = "";
       if (studioImage) {
         const form = new FormData(); form.append("file", studioImage);
         const upload = await fetch("/api/video/upload", { method: "POST", headers: { Authorization: "Bearer " + token }, body: form });
@@ -206,6 +207,25 @@ export default function Home() {
         if (!upload.ok) throw new Error(body.error || "画像のアップロードに失敗しました。");
         imageUrl = String(body.url || "");
       }
+      if (studioAudio === "custom" || studioMusic) {
+        setStudioStage("audio");
+        setStudioStatus("ナレーション / BGMを準備中…");
+        const audioResponse = await fetch("/api/video/audio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({
+            text: studioAudio === "custom" ? studioNarration.trim() : "",
+            bgm: studioMusic,
+            bgmPrompt: studioMusicPrompt.trim(),
+            duration: studioDuration,
+          }),
+        });
+        const audioBody = await audioResponse.json().catch(() => ({}));
+        if (!audioResponse.ok) throw new Error(audioBody.error || "音声の生成に失敗しました。");
+        audioUrl = String(audioBody.url || "");
+        if (!audioUrl) throw new Error("生成音声URLを取得できませんでした。");
+      }
+
       setStudioStage("visual");
       setStudioStatus("映像設計を組み立て中…");
       const response = await fetch("/api/video/generate", {
@@ -226,6 +246,7 @@ export default function Home() {
               : ""
           ].filter(Boolean).join("\n"),
           imageUrl: imageUrl || undefined,
+          audioUrl: audioUrl || undefined,
           socialPostId: socialPostId || undefined,
           duration: studioDuration,
           resolution: studioResolution,
