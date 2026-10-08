@@ -64,8 +64,13 @@ export async function POST(request: Request) {
       if (videoBuffer) return videoBuffer;
       const response = await fetchPublicUrl(videoUrl);
       if (!response.ok) throw new Error(`動画取得失敗: HTTP ${response.status}`);
-      videoBuffer = new Uint8Array(await response.arrayBuffer());
-      if (!videoBuffer.byteLength) throw new Error("完成動画が空です。");
+      const contentLength = Number(response.headers.get("content-length") || 0);
+      const maxBytes = 250 * 1024 * 1024;
+      if (contentLength > maxBytes) throw new Error("完成動画が大きすぎます（上限250MB）。");
+      const buffer = new Uint8Array(await response.arrayBuffer());
+      if (!buffer.byteLength) throw new Error("完成動画が空です。");
+      if (buffer.byteLength > maxBytes) throw new Error("完成動画が大きすぎます（上限250MB）。");
+      videoBuffer = buffer;
       return videoBuffer;
     };
 
