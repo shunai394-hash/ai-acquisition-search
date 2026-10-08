@@ -1050,3 +1050,32 @@ body{overflow-x:hidden}
 .tiktok-connect-link:hover{transform:translateY(-1px);border-color:rgba(155,140,255,.42);background:rgba(155,140,255,.08)}
 
 .integration-notice{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:30;padding:10px 14px;border:1px solid rgba(120,255,180,.2);border-radius:999px;background:rgba(8,12,12,.88);backdrop-filter:blur(14px);color:#c9ffe0;font-size:11px;box-shadow:0 14px 40px rgba(0,0,0,.35)}
+
+
+/* ─────────────────────────────────────────────────────────────
+   AWARD-QUALITY ACCESSIBILITY / PASS 07
+   Focus visibility · reduced motion · touch targets · readable controls
+   ───────────────────────────────────────────────────────────── */
+:where(button,a,input,textarea,select):focus-visible{
+  outline:2px solid rgba(155,140,255,.9);
+  outline-offset:3px;
+}
+button,a,input,textarea,select{font:inherit}
+button{min-height:44px}
+input,textarea,select{min-height:44px}
+a{transition:opacity .18s ease,transform .18s ease}
+a:hover{opacity:.86}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,*:before,*:after{
+    animation-duration:.001ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.001ms!important;
+    scroll-behavior:auto!important;
+  }
+}
+@media(max-width:700px){
+  .shell{padding-left:16px;padding-right:16px}
+  .video-result video{width:100%;max-height:none}
+  .publisher-platforms label{min-height:44px}
+}
