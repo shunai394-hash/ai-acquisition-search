@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generateBgm, isSupportedNarrationWav, mixNarrationWithBgm } from "@/lib/video/audio";
+import { generateBgm, isSupportedNarrationWav, mixNarrationWithBgm, fitWavToDuration } from "@/lib/video/audio";
 
 function pcmToWav(pcm: Int16Array, sampleRate = 24_000, channels = 1) {
   const dataBytes = pcm.length * 2;
@@ -34,4 +34,15 @@ test("narration + BGM mix preserves a valid WAV contract", () => {
   const mixed = mixNarrationWithBgm(source, 2, "warm acoustic");
   assert.ok(mixed.byteLength > source.byteLength * 0.9);
   assert.equal(isSupportedNarrationWav(mixed), true);
+});
+
+
+test("duration fitting trims long narration with a valid WAV and expected sample count", () => {
+  const source = pcmToWav(generateBgm(5, "speech bed"));
+  const fitted = fitWavToDuration(source, 2);
+  assert.equal(isSupportedNarrationWav(fitted), true);
+  const sampleRate = Buffer.from(fitted).readUInt32LE(24);
+  const dataBytes = Buffer.from(fitted).readUInt32LE(40);
+  assert.equal(sampleRate, 24_000);
+  assert.equal(dataBytes / 2, 24_000 * 2);
 });
