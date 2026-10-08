@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getUserFromBearer, consumeMonthlyUsage } from "@/lib/billing";
+import { getUserFromBearer, consumeMonthlyUsage, refundMonthlyUsage } from "@/lib/billing";
 import { generateNarration } from "@/lib/video/gemini-tts";
 import { generateBgm, mixNarrationWithBgm, pcmToWav, fitWavToDuration } from "@/lib/video/audio";
 
@@ -28,6 +28,7 @@ export async function POST(request: Request) {
 
     let audio: Uint8Array;
     let narrationModel = "";
+    let usageEventId = "";
 
     if (text) {
       const usage = await consumeMonthlyUsage(user.id, "narration_generation", 5);
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `今月の無料ナレーション生成回数（${usage.limit}回）を使い切りました。Proへアップグレードしてください。`, usage }, { status: 429 });
       }
 
+      usageEventId = usage.usage_event_id || "";
       const narration = await generateNarration({
         text,
         voice: voice || undefined,
@@ -87,6 +89,9 @@ export async function POST(request: Request) {
       hasBgm: bgm,
     });
   } catch (error) {
+    if (usageEventId) {
+      try { await refundMonthlyUsage(user?.id ?? "", "narration_generation", usageEventId); } catch {}
+    }
     return NextResponse.json({ error: error instanceof Error ? error.message : "音声生成に失敗しました。" }, { status: 502 });
   }
 }
