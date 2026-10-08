@@ -107,7 +107,12 @@ export async function POST(request: Request) {
     const { error: runningUpdateError } = await admin.from("production_jobs").update({
       status: "running",
       request_id: requestId,
-      provider_response: {\n        engine: started.engine,\n        started_response: started.raw,\n        ...(imageUrl ? { input_image_url: imageUrl } : {}),\n        ...(audioUrl ? { input_audio_url: audioUrl } : {}),\n      },
+      provider_response: {
+        engine: started.engine,
+        started_response: started.raw,
+        ...(imageUrl ? { input_image_url: imageUrl } : {}),
+        ...(audioUrl ? { input_audio_url: audioUrl } : {}),
+      },
       started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", job.id).eq("user_id", user.id);
