@@ -414,12 +414,9 @@ export default function Home() {
       setVideoError("先に「このテスト計画を保存」して、投稿先を紐づけてください。");
       return;
     }
-    if (!publishPlatforms.length) {
-      setVideoError("投稿先を1つ以上選択してください。");
-      return;
-    }
-    if (publishPlatforms.includes("tiktok") && !tiktokConsent) {
-      setVideoError("TikTokを選択した場合は、公開前に自動投稿への明示的な同意が必要です。");
+    const eligiblePublishPlatforms = publishPlatforms.filter((platform) => platform !== "tiktok" || tiktokConsent);
+    if (!eligiblePublishPlatforms.length) {
+      setVideoError("投稿先を1つ以上選択してください。TikTokは公開前の明示的な同意が必要です。");
       return;
     }
     setPublishGenerating(true);
@@ -432,7 +429,7 @@ export default function Home() {
       const response = await fetch("/api/social/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ socialPostId, videoUrl: sourceUrl, caption, platforms: publishPlatforms }),
+        body: JSON.stringify({ socialPostId, videoUrl: sourceUrl, caption, platforms: eligiblePublishPlatforms }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "SNS投稿に失敗しました。");
