@@ -12,6 +12,7 @@ const MAX_BYTES = 15 * 1024 * 1024;
 
 export async function POST(request: Request) {
   let userId = "";
+  let usageEventId = "";
   try {
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
@@ -30,7 +31,6 @@ export async function POST(request: Request) {
 
     let audio: Uint8Array;
     let narrationModel = "";
-    let usageEventId = "";
 
     if (text) {
       const usage = await consumeMonthlyUsage(user.id, "narration_generation", 5);
