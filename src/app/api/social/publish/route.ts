@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     // because retrying without provider-side idempotency could create a duplicate external post.
     const findExistingReservation = async (network: Platform) => {
       const { data: snakeCase, error: snakeError } = await supabase.from("social_posts")
-        .select("id,status,external_post_id,post_url")
+        .select("id,status,external_post_id,post_url,updated_at")
         .eq("user_id", user.id).eq("network", network)
         .filter("metadata->>source_social_post_id", "eq", socialPostId)
         .maybeSingle();
@@ -194,6 +194,15 @@ export async function POST(request: Request) {
             const accessToken = await getTikTokAccessToken(user.id);
             const r = await publishTikTokVideo({accessToken,videoUrl,title:caption,isAigc:true});
             const resolved = await resolveTikTokVideoId(r.publishId, accessToken);
+            if (resolved.pending) {
+              await supabase.from("social_posts").update({
+                status: "pending",
+                metadata: { source_social_post_id: socialPostId, publishId: r.publishId, publishStatus: resolved.status },
+                updated_at: new Date().toISOString(),
+              }).eq("id", rowId).eq("user_id", user.id).eq("status", "publishing");
+              results.push({platform,ok:false,pending:true,postId:r.publishId,error:"TikTok側で処理中です。公開完了まで自動再投稿は行いません。"});
+              continue;
+            }
             externalPublishSucceeded = true;
             externalPostId = resolved.videoId ?? r.publishId;
             externalPostUrl = typeof resolved.share_url === "string" ? resolved.share_url : null;
