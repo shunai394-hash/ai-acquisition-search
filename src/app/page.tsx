@@ -207,6 +207,7 @@ export default function Home() {
     try {
       const token = await getAccessToken();
       let currentSocialPostId = socialPostId;
+      const autoPublishPlatforms = publishPlatforms.filter((platform) => platform !== "tiktok" || tiktokConsent);
       if (!currentSocialPostId && result) {
         const planResponse = await fetch("/api/operator/plan", {
           method: "POST",
@@ -305,7 +306,7 @@ export default function Home() {
           setStudioStage("render");
           setStudioUrl(data.asset.video_url);
           setStudioStatus("完成。");
-          if (currentSocialPostId && publishPlatforms.length && (!publishPlatforms.includes("tiktok") || tiktokConsent)) {
+          if (currentSocialPostId && autoPublishPlatforms.length) {
             setPublishStatus("完成動画をSNSへ自動投稿中…");
             try {
               const publishToken = await getAccessToken();
@@ -313,7 +314,7 @@ export default function Home() {
               const publishResponse = await fetch("/api/social/publish", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: "Bearer " + publishToken },
-                body: JSON.stringify({ socialPostId: currentSocialPostId, videoUrl: data.asset.video_url, caption, platforms: publishPlatforms }),
+                body: JSON.stringify({ socialPostId: currentSocialPostId, videoUrl: data.asset.video_url, caption, platforms: autoPublishPlatforms }),
               });
               const publishBody = await publishResponse.json().catch(() => ({}));
               if (!publishResponse.ok) throw new Error(publishBody.error || "SNS自動投稿に失敗しました。");
