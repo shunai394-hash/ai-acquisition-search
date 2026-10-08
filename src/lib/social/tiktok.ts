@@ -100,14 +100,25 @@ export async function getTikTokVideoMetrics(videoId: string) {
 export async function resolveTikTokVideoId(publishId: string, attempts = 8, delayMs = 2500) {
   for (let attempt = 0; attempt < attempts; attempt++) {
     const status = await getTikTokPublishStatus(publishId);
-    const videoId = status?.publicaly_available_post_id ?? status?.publicly_available_post_id ?? status?.video_id;
-    if (typeof videoId === "string" && videoId) return { ...status, videoId };
+    const availableIds = Array.isArray(status?.publicaly_available_post_id)
+      ? status.publicaly_available_post_id
+      : Array.isArray(status?.publicly_available_post_id)
+        ? status.publicly_available_post_id
+        : [];
+    const videoId = availableIds.length > 0 ? String(availableIds[0]) : (typeof status?.video_id === "string" ? status.video_id : undefined);
+
+    if (videoId) return { ...status, videoId };
 
     const publishStatus = String(status?.status ?? "");
+    if (publishStatus === "PUBLISH_COMPLETE") {
+      // Direct Post can be complete before moderation exposes a public post_id.
+      // The publish_id is still the authoritative external reference.
+      return { ...status, videoId: undefined, publishId };
+    }
     if (publishStatus === "FAILED" || publishStatus === "PUBLISH_CANCELLED") {
       throw new Error(`TikTok publish failed: ${publishStatus}: ${JSON.stringify(status)}`);
     }
     if (attempt < attempts - 1) await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
-  throw new Error(`TikTok publish completed statusからvideo_idを取得できませんでした: publish_id=${publishId}`);
+  throw new Error(`TikTok publish status did not reach a terminal state: publish_id=${publishId}`);
 }
