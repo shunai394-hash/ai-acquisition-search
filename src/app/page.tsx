@@ -916,6 +916,12 @@ export default function Home() {
                 rows={3}
               />
               {publishPlatforms.includes("tiktok") && (
+                <div className="tiktok-connect-box">
+                  <a href="/api/tiktok/connect" className="tiktok-connect-link">TikTokアカウントを接続 →</a>
+                  <span>ユーザーごとのTikTok OAuthで安全に投稿します。</span>
+                </div>
+              )}
+              {publishPlatforms.includes("tiktok") && (
                 <label className="publish-consent">
                   <input
                     type="checkbox"
