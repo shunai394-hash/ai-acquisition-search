@@ -6,7 +6,7 @@ function clamp16(value: number) {
   return Math.max(-32768, Math.min(32767, Math.round(value)));
 }
 
-function pcmWav(pcm: Int16Array) {
+export function pcmToWav(pcm: Int16Array) {
   const dataBytes = pcm.length * 2;
   const buffer = Buffer.alloc(44 + dataBytes);
   buffer.write("RIFF", 0);
@@ -95,7 +95,7 @@ export function mixNarrationWithBgm(narrationWav: Uint8Array, durationSeconds: n
     const music = i < bgm.length ? bgm[i] * 0.22 : 0;
     mixed[i] = clamp16(voice + music);
   }
-  return pcmWav(mixed);
+  return pcmToWav(mixed);
 }
 
 export function isSupportedNarrationWav(bytes: Uint8Array) {
