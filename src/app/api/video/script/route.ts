@@ -6,14 +6,14 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 function fallbackScript(prompt: string, hook: string, value: string, duration: number) {
-  const maxWords = Math.max(24, Math.round(duration * 4.2));
+  const maxChars = Math.max(18, Math.round(duration * 8.5));
   const parts = [
     hook || "これ、知っておくと便利です。",
     prompt ? prompt.split("\n").map((v) => v.trim()).filter(Boolean)[0] : "",
     value ? "ポイントは " + value + " です。" : "",
     "気になる人は、商品ページで詳しい条件を確認してください。",
   ].filter(Boolean);
-  return parts.join(" ").slice(0, Math.max(120, maxWords * 8));
+  return parts.join(" ").slice(0, maxChars);
 }
 
 export async function POST(request: Request) {
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "duration must be between 2 and 30 seconds" }, { status: 400 });
     }
 
-    const maxChars = Math.max(80, Math.round(duration * 10.5));
+    const maxChars = Math.max(18, Math.round(duration * 8.5));
     const ai = await openAiJson({
       system:
         "あなたは短尺広告のトップコピーライター兼AI Directorです。商品を誇張せず、入力情報から確認できる事実だけを使い、視聴開始直後に価値が伝わる自然な日本語ナレーションを設計してください。字幕用の説明ではなく、実際に声に出して自然な一続きの台本を作ります。JSONのみ返してください。形式は {\"script\":\"...\"}。",
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     }
     if (!script) script = fallbackScript(prompt, hook, value, duration);
 
-    return NextResponse.json({ ok: true, script: script.slice(0, maxChars + 40), generatedByAi: Boolean(ai) });
+    return NextResponse.json({ ok: true, script: script.slice(0, maxChars), generatedByAi: Boolean(ai) });
   } catch (error) {
     return NextResponse.json({
       error: error instanceof Error ? error.message : "ナレーション台本の生成に失敗しました。",
