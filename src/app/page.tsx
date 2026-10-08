@@ -372,6 +372,25 @@ export default function Home() {
         if (data.job?.status === "completed" && data.asset?.video_url) {
           setVideoUrl(data.asset.video_url);
           setVideoStatus("動画が完成しました。");
+          if (socialPostId && publishPlatforms.length && (!publishPlatforms.includes("tiktok") || tiktokConsent)) {
+            setPublishStatus("完成動画をSNSへ自動投稿中…");
+            try {
+              const publishToken = await getAccessToken();
+              const caption = publishCaption.trim() || result?.analysis?.nextPosts?.[selectedScenario]?.hook || result?.analysis?.decision?.valueProposition || "AI Acquisition Search creative";
+              const publishResponse = await fetch("/api/social/publish", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: "Bearer " + publishToken },
+                body: JSON.stringify({ socialPostId, videoUrl: data.asset.video_url, caption, platforms: publishPlatforms }),
+              });
+              const publishBody = await publishResponse.json().catch(() => ({}));
+              if (!publishResponse.ok) throw new Error(publishBody.error || "SNS自動投稿に失敗しました。");
+              setPublishResults(Array.isArray(publishBody.results) ? publishBody.results : []);
+              setPublishStatus(publishBody.failed ? `自動投稿：${publishBody.published || 0}件成功 / ${publishBody.failed}件失敗` : `自動投稿：${publishBody.published || 0}件`);
+            } catch (publishError) {
+              setPublishStatus("");
+              setVideoError(publishError instanceof Error ? publishError.message : "SNS自動投稿に失敗しました。");
+            }
+          }
           return;
         }
         if (data.job?.status === "failed") throw new Error(data.job?.error || `${engine}で動画生成に失敗しました。`);
