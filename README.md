@@ -180,8 +180,13 @@ TikTokは公式Content Posting APIのDirect Postを使います。投稿にはTi
 環境変数:
 
 ```text
-TIKTOK_ACCESS_TOKEN=...
+TIKTOK_CLIENT_KEY=...
+TIKTOK_CLIENT_SECRET=...
+TIKTOK_REDIRECT_URI=https://<production-host>/api/tiktok/callback
+TIKTOK_TOKEN_ENCRYPTION_KEY=<random-secret>
 ```
+
+ユーザーごとにTikTok Login KitでOAuth認可し、アクセストークン/リフレッシュトークンは暗号化してサーバー側の `tiktok_accounts` に保存します。`TIKTOK_ACCESS_TOKEN` の単一グローバルトークン方式は本番SaaSの投稿には使用しません。
 
 MCPツール:
 
