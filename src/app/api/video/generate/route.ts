@@ -132,7 +132,7 @@ export async function POST(request: Request) {
       try {
         const { admin } = clients();
         if (providerRequestId) {
-          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message, ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}) }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
         } else {
           await admin.from("production_jobs").update({ status: "failed", provider_response: { error: message }, completed_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
         }
