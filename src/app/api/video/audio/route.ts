@@ -37,6 +37,7 @@ export async function POST(request: Request) {
 
       const narration = await generateNarration({
         text,
+        voice: voice || undefined,
         style: "Japanese commercial narration. Natural, clear, warm, confident, tightly paced for short-form advertising.",
       });
       narrationModel = narration.model;
