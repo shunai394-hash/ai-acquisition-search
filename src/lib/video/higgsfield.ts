@@ -88,12 +88,12 @@ export async function generateHiggsfieldVideo(
 ) {
   const hasImage = Boolean(input.imageUrl?.trim());
 
-  const model =
-    input.model ??
-    (hasImage ? DEFAULT_I2V_MODEL : DEFAULT_T2V_MODEL);
-
   const imageUrl = input.imageUrl?.trim();
   const audioUrl = input.audioUrl?.trim();
+
+  const model =
+    input.model ??
+    (audioUrl ? DEFAULT_AUDIO_MODEL : hasImage ? DEFAULT_I2V_MODEL : DEFAULT_T2V_MODEL);
 
   if (hasImage && imageUrl && !isHttpUrl(imageUrl)) {
     throw new Error("imageUrl must be a public HTTP(S) URL.");
@@ -119,7 +119,7 @@ export async function generateHiggsfieldVideo(
     );
   }
 
-  const effectiveModel = audioUrl ? DEFAULT_AUDIO_MODEL : model;
+  const effectiveModel = model;
   const body: Record<string, unknown> = {
     prompt: input.prompt,
     duration: input.duration ?? 5,
