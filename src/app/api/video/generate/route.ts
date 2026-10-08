@@ -21,14 +21,16 @@ export async function POST(request: Request) {
   let usageEventId = "";
   // Preserve the external provider request if the DB state update fails after start.
   let providerRequestId = "";
+  let imageUrl: string | undefined;
+  let audioUrl: string | undefined;
   try {
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
     userId = user.id;
     const body = await request.json();
     const prompt = String(body.prompt || "").trim();
-    const imageUrl = body.imageUrl ? String(body.imageUrl) : undefined;
-    const audioUrl = body.audioUrl ? String(body.audioUrl) : undefined;
+    imageUrl = body.imageUrl ? String(body.imageUrl) : undefined;
+    audioUrl = body.audioUrl ? String(body.audioUrl) : undefined;
     if (imageUrl && !/^https:\/\//i.test(imageUrl)) return NextResponse.json({ error: "imageUrl must be an HTTPS URL" }, { status: 400 });
     if (audioUrl && !/^https:\/\//i.test(audioUrl)) return NextResponse.json({ error: "audioUrl must be an HTTPS URL" }, { status: 400 });
     if (!prompt) return NextResponse.json({ error: "prompt is required" }, { status: 400 });
