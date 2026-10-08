@@ -75,7 +75,13 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         const { data: concurrentAsset, error: concurrentAssetError } = await admin.from("video_assets")
           .select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,created_at")
           .eq("production_job_id", job.id).maybeSingle();
-        if (concurrentAssetError || !concurrentAsset) throw new Error(concurrentAssetError?.message || "競合したvideo assetを再取得できませんでした。");
+        if (concurrentAssetError || !concurrentAsset) {
+          try { await deleteVideoFromStorage(stored.path); } catch {}
+          throw new Error(concurrentAssetError?.message || "競合したvideo assetを再取得できませんでした。");
+        }
+        try { await deleteVideoFromStorage(stored.path); } catch (cleanupError) {
+          console.error("duplicate video storage cleanup failed", { jobId: job.id, path: stored.path, error: cleanupError });
+        }
         await admin.from("production_jobs").update({
           status: "completed", provider_response: result, completed_at: new Date().toISOString(), error: null
         }).eq("id", job.id).eq("user_id", user.id);
