@@ -25,6 +25,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+// Supabase Storage serves a file as an attachment when `download` is set; the
+// HTML download attribute alone is ignored for cross-origin URLs.
+function downloadUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname.includes("/storage/v1/object/")) parsed.searchParams.set("download", "ai-acquisition-video.mp4");
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<AcquisitionAnalyzeResult | null>(null);
@@ -70,7 +82,8 @@ export default function Home() {
   const [studioMusic, setStudioMusic] = useState(false);
   const [studioMusicPrompt, setStudioMusicPrompt] = useState("");
   const [studioResolution, setStudioResolution] = useState<"720p" | "1080p">("1080p");
-  const [studioStage, setStudioStage] = useState<"idle" | "prepare" | "visual" | "motion" | "audio" | "render">("idle");
+  const [studioStage, setStudioStage] = useState<"idle" | "prepare" | "audio" | "visual" | "motion" | "render">("idle");
+  const [studioJobId, setStudioJobId] = useState("");
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["tiktok"]);
   const [publishCaption, setPublishCaption] = useState("");
   const [tiktokConsent, setTiktokConsent] = useState(false);
@@ -215,8 +228,54 @@ export default function Home() {
     }
   }
 
+  // Poll a video job until it finishes. Transient poll errors (network, a
+  // provider status hiccup) are tolerated a few times instead of failing the UI
+  // while the job keeps running server-side.
+  async function pollVideoJob(jobId: string, onProgress: (elapsedSeconds: number, providerStatus: string) => void) {
+    const started = Date.now();
+    const maxWaitMs = 20 * 60_000;
+    let consecutiveErrors = 0;
+    let attempt = 0;
+    while (Date.now() - started < maxWaitMs) {
+      await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : attempt < 12 ? 5000 : 10000));
+      attempt++;
+      try {
+        const poll = await fetch("/api/video/jobs/" + encodeURIComponent(jobId), { headers: { Authorization: "Bearer " + (await getAccessToken()) }, cache: "no-store" });
+        const data = await poll.json().catch(() => ({}));
+        if (poll.status === 401 || poll.status === 404) throw Object.assign(new Error(data.error || "動画ジョブを確認できません。"), { fatal: true });
+        if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
+        consecutiveErrors = 0;
+        if (data.job?.status === "completed" && data.asset?.video_url) return { status: "completed" as const, videoUrl: String(data.asset.video_url) };
+        if (data.job?.status === "failed") return { status: "failed" as const, error: String(data.job?.error || "動画生成に失敗しました。") };
+        onProgress(Math.round((Date.now() - started) / 1000), String(data.job?.provider_status || ""));
+      } catch (error) {
+        if ((error as { fatal?: boolean }).fatal || ++consecutiveErrors >= 4) throw error;
+      }
+    }
+    return { status: "timeout" as const };
+  }
+
+  function progressLabel(engine: string, elapsedSeconds: number, providerStatus: string) {
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = String(elapsedSeconds % 60).padStart(2, "0");
+    const phase = providerStatus === "queued" ? "順番待ち" : providerStatus === "in_progress" ? "生成中" : "処理中";
+    return `${engine}で${phase}… 経過 ${minutes}:${seconds}（通常1〜5分）`;
+  }
+
+  async function resumeStudioJob() {
+    if (!studioJobId) return;
+    setStudioGenerating(true); setStudioError(""); setStudioStage("motion"); setStudioStatus("生成状況を再確認中…");
+    try {
+      const outcome = await pollVideoJob(studioJobId, (elapsed, providerStatus) => setStudioStatus(progressLabel("Higgsfield", elapsed, providerStatus)));
+      if (outcome.status === "completed") { setStudioStage("render"); setStudioUrl(outcome.videoUrl); setStudioStatus("完成しました。プレビューで確認できます。"); return; }
+      if (outcome.status === "failed") throw new Error(outcome.error);
+      throw new Error("まだ生成中です。数分後にもう一度「生成状況を再確認」を押してください。");
+    } catch (err) { setStudioStage("idle"); setStudioError(err instanceof Error ? err.message : "動画生成状態の取得に失敗しました。"); setStudioStatus(""); }
+    finally { setStudioGenerating(false); }
+  }
+
   async function generateStudioVideo(remixHint = "") {
-    setStudioGenerating(true); setStudioError(""); setStudioUrl(""); setStudioStage("prepare"); setStudioStatus("素材を準備中…");
+    setStudioGenerating(true); setStudioError(""); setStudioUrl(""); setStudioJobId(""); setStudioStage("prepare"); setStudioStatus("素材を準備中…");
     try {
       const token = await getAccessToken();
       let currentSocialPostId = socialPostId;
@@ -298,11 +357,9 @@ export default function Home() {
               studioPrompt.trim(),
               remixHint ? "REMIX DIRECTION: " + remixHint + ". Preserve the product identity and core concept while changing the visual execution." : ""
             ].filter(Boolean).join("\n"),
-            studioAudio !== "off"
-              ? "AUDIO: Japanese spoken narration is pre-rendered and must be used as the primary voice track. Voice: " + studioVoice + (studioAudio === "custom" ? ". Narration script: " + studioNarration.trim() : ". Auto-generated narration script. Speak naturally, clearly, and synchronize delivery to the visual beats.") + "."
-              : "",
-            studioMusic
-              ? "BGM: generate subtle, tasteful background music that supports the scene; keep it underneath the narration and do not overpower speech." + (studioMusicPrompt.trim() ? " Style: " + studioMusicPrompt.trim() + "." : "")
+            audioUrl
+              // The narration/BGM track is pre-rendered and passed as an audio reference.
+              ? "AUDIO: A pre-rendered audio track is supplied as the reference audio. Keep it as the soundtrack; do not invent different speech or music." + (studioAudio !== "off" ? " Time on-screen action and any lip movement to the supplied narration." : "")
               : ""
           ].filter(Boolean).join("\n"),
           imageUrl: imageUrl || undefined,
@@ -315,7 +372,8 @@ export default function Home() {
           duration: studioDuration,
           resolution: studioResolution,
           aspectRatio: studioAspect,
-          generateAudio: studioAudio !== "off" || studioMusic
+          // Audio comes from the supplied reference track, not provider-generated sound.
+          generateAudio: false
         })
       });
       const body = await response.json().catch(() => ({}));
@@ -324,15 +382,14 @@ export default function Home() {
       const engine = String(body.engine || "Higgsfield");
       setStudioStage("motion");
       setStudioStatus(engine + "でモーションを生成中…");
-      for (let attempt = 0; attempt < 60; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : 5000));
-        const poll = await fetch("/api/video/jobs/" + encodeURIComponent(jobId), { headers: { Authorization: "Bearer " + (await getAccessToken()) }, cache: "no-store" });
-        const data = await poll.json().catch(() => ({}));
-        if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
-        if (data.job?.status === "completed" && data.asset?.video_url) {
+      setStudioJobId(jobId);
+      const outcome = await pollVideoJob(jobId, (elapsed, providerStatus) => setStudioStatus(progressLabel(engine, elapsed, providerStatus)));
+      {
+        if (outcome.status === "completed") {
+          const data = { asset: { video_url: outcome.videoUrl } };
           setStudioStage("render");
           setStudioUrl(data.asset.video_url);
-          setStudioStatus("完成。");
+          setStudioStatus("完成しました。プレビューで確認できます。");
           if (currentSocialPostId && autoPublishPlatforms.length) {
             setPublishStatus("完成動画をSNSへ自動投稿中…");
             try {
@@ -354,10 +411,9 @@ export default function Home() {
           }
           return;
         }
-        if (data.job?.status === "failed") throw new Error(data.job?.error || "動画生成に失敗しました。");
-        setStudioStatus(engine + "で生成中… " + (attempt + 1) + "/60");
+        if (outcome.status === "failed") throw new Error(outcome.error);
       }
-      throw new Error("動画生成がタイムアウトしました。");
+      throw new Error("生成に時間がかかっています。ジョブはサーバー側で継続中です。下の「生成状況を再確認」で続きから確認できます（失敗時は利用回数を自動返却します）。");
     } catch (err) { setStudioStage("idle"); setStudioError(err instanceof Error ? err.message : "動画生成に失敗しました。"); setStudioStatus(""); }
     finally { setStudioGenerating(false); }
   }
@@ -389,16 +445,10 @@ export default function Home() {
       const engine = String(body.engine || "video engine");
       setVideoEngine(engine);
       setVideoStatus(`${engine}で生成中…`);
-      for (let attempt = 0; attempt < 60; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : 5000));
-        const pollToken = await getAccessToken();
-        const poll = await fetch("/api/video/jobs/" + encodeURIComponent(jobId), {
-          headers: { Authorization: "Bearer " + pollToken },
-          cache: "no-store",
-        });
-        const data = await poll.json().catch(() => ({}));
-        if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
-        if (data.job?.status === "completed" && data.asset?.video_url) {
+      const outcome = await pollVideoJob(jobId, (elapsed, providerStatus) => setVideoStatus(progressLabel(engine, elapsed, providerStatus)));
+      {
+        const data = { asset: { video_url: outcome.status === "completed" ? outcome.videoUrl : "" } };
+        if (outcome.status === "completed") {
           setVideoUrl(data.asset.video_url);
           setVideoStatus("動画が完成しました。");
           const eligiblePublishPlatforms = publishPlatforms.filter((platform) => platform !== "tiktok" || tiktokConsent);
@@ -423,8 +473,7 @@ export default function Home() {
           }
           return;
         }
-        if (data.job?.status === "failed") throw new Error(data.job?.error || `${engine}で動画生成に失敗しました。`);
-        setVideoStatus(`${engine}で生成中… ${attempt + 1}/60`);
+        if (outcome.status === "failed") throw new Error(outcome.error);
       }
       throw new Error("動画生成がタイムアウトしました。時間を置いてジョブを再確認してください。");
     } catch (err) {
@@ -561,8 +610,12 @@ export default function Home() {
         <div className="studio-grid">
           <label className="studio-upload">
             <span className="eyebrow">01 · REFERENCE <em>OPTIONAL</em></span>
-            <input type="file" aria-label="商品画像をアップロード" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
-              const file=e.target.files?.[0] || null; setStudioImage(file); setStudioImagePreview(file ? URL.createObjectURL(file) : "");
+            <input type="file" aria-label="商品画像をアップロード（JPG / PNG / WebP、8MBまで）" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
+              const file=e.target.files?.[0] || null;
+              // Validate before upload so the user learns immediately (the server re-validates).
+              if (file && !["image/jpeg","image/png","image/webp"].includes(file.type)) { setStudioError("商品画像は JPG / PNG / WebP を選んでください。"); e.target.value = ""; return; }
+              if (file && file.size > 8 * 1024 * 1024) { setStudioError("商品画像は8MB以下にしてください。"); e.target.value = ""; return; }
+              setStudioError(""); setStudioImage(file); setStudioImagePreview(file ? URL.createObjectURL(file) : "");
             }} />
             {studioImagePreview ? <img src={studioImagePreview} alt="動画生成に使う画像のプレビュー" /> : <span className="upload-empty">＋ 画像・商品写真を追加<br /><small>人物 / 商品 / 写真 / イラスト / 参照素材</small></span>}
           </label>
@@ -570,20 +623,25 @@ export default function Home() {
             <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","UGC広告","商品CM","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","UGC広告":"自然なスマホ撮影感のあるUGC動画。冒頭2秒で視線を引き、リアルな人物の動きを重視。","商品CM":"高級ブランドCMのような商品映像。質感、照明、カメラの動きを美しく見せる。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
             <textarea id="studio-prompt" value={studioPrompt} onChange={(e)=>setStudioPrompt(e.target.value)} rows={8}
               placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この商品画像を使って、20代女性が自然に商品を紹介するUGC風広告。最初の2秒で視線を引き、夕方の柔らかな光。縦9:16、リアルなスマホ撮影感。"} />
-            <div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · AUDIO</span><div className="studio-audio-grid">{([["off","OFF"],["auto","AUTO"],["custom","CUSTOM"]] as const).map(([value,label]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} onClick={()=>setStudioAudio(value)} aria-pressed={studioAudio === value}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option value="Kore">日本語 · Firm</option><option value="Leda">日本語 · Youthful</option><option value="Charon">日本語 · Informative</option><option value="Aoede">日本語 · Breezy</option><option value="Puck">English · Upbeat</option><option value="Achird">English · Friendly</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> 簡易BGMを追加</label>{studioMusic && <><p className="studio-music-note">現在は軽量な合成BGMです。AI作曲によるフル楽曲ではありません。</p><input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="雰囲気のヒント（例：lofi / calm / upbeat）" aria-label="BGMの雰囲気" /></>}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
-              {([["prepare","PREPARE","素材"],["visual","VISUAL","映像設計"],["motion","MOTION","モーション"],["audio","AUDIO","音"],["render","RENDER","仕上げ"]] as const).map(([key,label,ja], index) => {
-                const order = ["idle","prepare","visual","motion","audio","render"] as const;
+            <span className="eyebrow">03 · FORMAT</span><div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · AUDIO</span><div className="studio-audio-grid">{([["off","OFF"],["auto","AUTO"],["custom","CUSTOM"]] as const).map(([value,label]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} onClick={()=>setStudioAudio(value)} aria-pressed={studioAudio === value}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option value="Kore">日本語 · Firm</option><option value="Leda">日本語 · Youthful</option><option value="Charon">日本語 · Informative</option><option value="Aoede">日本語 · Breezy</option><option value="Puck">English · Upbeat</option><option value="Achird">English · Friendly</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> 簡易BGMを追加</label>{studioMusic && <><p className="studio-music-note">現在は軽量な合成BGMです。AI作曲によるフル楽曲ではありません。</p><input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="雰囲気のヒント（例：lofi / calm / upbeat）" aria-label="BGMの雰囲気" /></>}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
+              {([["prepare","PREPARE","素材"],["audio","AUDIO","音声"],["visual","VISUAL","映像設計"],["motion","MOTION","生成"],["render","RENDER","完成"]] as const).map(([key,label,ja], index) => {
+                // Same order as generateStudioVideo(): upload → narration/BGM → request → provider → result.
+                const order = ["idle","prepare","audio","visual","motion","render"] as const;
                 const active = order.indexOf(studioStage) >= order.indexOf(key);
-                return <div key={key} className={active ? "studio-stage active" : "studio-stage"}><span>0{index + 1}</span><strong>{label}</strong><small>{ja}</small></div>;
+                const current = studioStage === key;
+                return <div key={key} className={active ? "studio-stage active" : "studio-stage"} aria-current={current ? "step" : undefined}><span>0{index + 1}</span><strong>{label}</strong><small>{ja}</small></div>;
               })}
             </div><div className="studio-actions">
               <button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating || studioPrompt.trim().length < 8 || (studioAudio === "custom" && !studioNarration.trim() && !studioMusic)} aria-busy={studioGenerating}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
               {studioStatus && <span className="video-status" role="status" aria-live="polite">{studioStatus}</span>}
+              {!studioGenerating && studioPrompt.trim().length < 8 && <span className="video-status">プロンプトを8文字以上入力すると生成できます。</span>}
+              {!studioGenerating && studioAudio === "custom" && !studioNarration.trim() && !studioMusic && <span className="video-status">CUSTOMではナレーション原稿を入力するか、BGMをオンにしてください。</span>}
+              {!studioGenerating && studioJobId && !studioUrl && studioError && <button type="button" onClick={() => { void resumeStudioJob(); }}>生成状況を再確認</button>}
             </div>
           </div>
         </div>
         {studioError && <p className="error" role="alert">{studioError}</p>}
-        {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>↻ Regenerate</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>✦ Remix</button><a href={studioUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></div></div>}
+        {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline preload="metadata" aria-label="生成した動画のプレビュー" /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>↻ Regenerate</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>✦ Remix</button><a href={studioUrl} target="_blank" rel="noreferrer">新しいタブで開く →</a><a href={downloadUrl(studioUrl)} download>動画を保存 ↓</a></div></div>}
       </section>
       )}
 
@@ -1083,7 +1141,7 @@ export default function Home() {
                   />
                   <span>
                     <strong>TikTok自動投稿を許可する</strong>
-                    <small>チェックすると、完成動画をTikTokへ自動公開できる状態になります。</small>
+                    <small>チェックすると、完成動画をTikTokへ自動投稿します。既定の公開範囲は「自分のみ（SELF_ONLY）」です。一般公開にはTikTokのアプリ審査と管理者設定が必要です。</small>
                   </span>
                 </label>
               )}
