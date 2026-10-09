@@ -47,7 +47,12 @@ export async function POST(request: Request) {
     if (uploaded.error) throw new Error(uploaded.error.message);
 
     const signed = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 60);
-    if (signed.error || !signed.data?.signedUrl) throw new Error(signed.error?.message || "Image signed URL could not be created.");
+    if (signed.error || !signed.data?.signedUrl) {
+      // Avoid orphaned private uploads if the response cannot be used by the client.
+      const cleanup = await admin.storage.from(BUCKET).remove([path]);
+      if (cleanup.error) console.error("image upload cleanup failed after signed URL error", { userId: user.id, path, error: cleanup.error.message });
+      throw new Error(signed.error?.message || "Image signed URL could not be created.");
+    }
     return NextResponse.json({ ok: true, url: signed.data.signedUrl, path, bucket: BUCKET });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "画像アップロードに失敗しました。" }, { status: 500 });
