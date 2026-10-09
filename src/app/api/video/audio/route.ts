@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     const { data: buckets } = await admin.storage.listBuckets();
     if (!buckets?.some((bucket) => bucket.name === BUCKET)) {
       const created = await admin.storage.createBucket(BUCKET, {
-        public: true,
+        public: false,
         fileSizeLimit: MAX_BYTES,
         allowedMimeTypes: ["audio/wav"],
       });
@@ -99,6 +99,8 @@ export async function POST(request: Request) {
         throw new Error(created.error.message);
       }
     }
+    const privacyUpdate = await admin.storage.updateBucket(BUCKET, { public: false });
+    if (privacyUpdate.error) throw new Error(`Audio bucket privacy update failed: ${privacyUpdate.error.message}`);
 
     const path = user.id + "/" + crypto.randomUUID() + ".wav";
     const uploaded = await admin.storage.from(BUCKET).upload(path, Buffer.from(audio), {
@@ -108,10 +110,11 @@ export async function POST(request: Request) {
     });
     if (uploaded.error) throw new Error(uploaded.error.message);
 
-    const publicUrl = admin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    const signed = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 60);
+    if (signed.error || !signed.data?.signedUrl) throw new Error(signed.error?.message || "Audio signed URL could not be created.");
     return NextResponse.json({
       ok: true,
-      url: publicUrl,
+      url: signed.data.signedUrl,
       mimeType: "audio/wav",
       bytes: audio.byteLength,
       narrationModel: narrationModel || undefined,
