@@ -220,6 +220,8 @@ export default function Home() {
         if (currentSocialPostId) setSocialPostId(currentSocialPostId);
       }
       let imageUrl = "";
+      let imagePath = "";
+      let imageBucket = "";
       let audioUrl = "";
       let audioPath = "";
       let audioBucket = "";
@@ -229,6 +231,9 @@ export default function Home() {
         const body = await upload.json().catch(() => ({}));
         if (!upload.ok) throw new Error(body.error || "画像のアップロードに失敗しました。");
         imageUrl = String(body.url || "");
+        imagePath = String(body.path || "");
+        imageBucket = String(body.bucket || "");
+        if (!imageUrl || !imagePath || !imageBucket) throw new Error("画像のURLまたは保存先情報を取得できませんでした。");
       }
       if (studioAudio !== "off" || studioMusic) {
         setStudioStage("audio");
@@ -288,6 +293,8 @@ export default function Home() {
               : ""
           ].filter(Boolean).join("\n"),
           imageUrl: imageUrl || undefined,
+          imagePath: imagePath || undefined,
+          imageBucket: imageBucket || undefined,
           audioUrl: audioUrl || undefined,
           audioPath: audioPath || undefined,
           audioBucket: audioBucket || undefined,
