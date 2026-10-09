@@ -22,6 +22,8 @@ export async function POST(request: Request) {
   let jobId = "";
   let userId = "";
   let usageEventId = "";
+  let narrationUsageEventId = "";
+  let narrationAudioSaved = false;
   // Preserve the external provider request if the DB state update fails after start.
   let providerRequestId = "";
   let imageUrl: string | undefined;
@@ -103,6 +105,18 @@ export async function POST(request: Request) {
     if (!usage.allowed) return NextResponse.json({ error: `今月の無料動画生成回数（${usage.limit}回）を使い切りました。Proへアップグレードしてください。`, usage }, { status: 429 });
     usageEventId = usage.usage_event_id || "";
 
+    if (narrationText) {
+      const narrationUsage = await consumeMonthlyUsage(user.id, "narration_generation", 5);
+      if (!narrationUsage.allowed) {
+        if (usageEventId) {
+          try { await refundMonthlyUsage(user.id, "video_generation", usageEventId); } catch (refundError) {
+            console.error("video quota refund failed after narration quota rejection", { userId: user.id, usageEventId, error: refundError });
+          }
+        }
+        return NextResponse.json({ error: `今月の無料ナレーション生成回数（${narrationUsage.limit}回）を使い切りました。Proへアップグレードしてください。`, usage: narrationUsage }, { status: 429 });
+      }
+      narrationUsageEventId = narrationUsage.usage_event_id || "";
+    }
 
     if (imageUrl && creativeId) {
       const { data: creativeRecord, error: creativeReadError } = await admin.from("creatives")
@@ -145,6 +159,7 @@ export async function POST(request: Request) {
         ? mixNarrationWithBgm(narrationWav, duration, bgmPrompt)
         : fitWavToDuration(narrationWav, duration);
       const savedAudio = await saveAudioToStorage({ userId: user.id, jobId: job.id, bytes: audioWav });
+      narrationAudioSaved = true;
       audioUrl = savedAudio.url;
       audioPath = savedAudio.path;
       audioBucket = savedAudio.bucket;
@@ -171,6 +186,7 @@ export async function POST(request: Request) {
         engine: started.engine,
         started_response: started.raw,
         ...(usageEventId ? { usage_event_id: usageEventId } : {}),
+        ...(narrationUsageEventId ? { narration_usage_event_id: narrationUsageEventId } : {}),
         ...(imageUrl ? { input_image_url: imageUrl } : {}),
         ...(imagePath ? { input_image_path: imagePath, input_image_bucket: imageBucket } : {}),
         ...(audioUrl ? { input_audio_url: audioUrl } : {}),
@@ -195,11 +211,19 @@ export async function POST(request: Request) {
       try {
         const { admin } = clients();
         if (providerRequestId) {
-          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message, ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}), ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}) }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message, ...(usageEventId ? { usage_event_id: usageEventId } : {}), ...(narrationUsageEventId ? { narration_usage_event_id: narrationUsageEventId } : {}), ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(imagePath ? { input_image_path: imagePath, input_image_bucket: imageBucket } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}), ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}) }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
         } else {
           await admin.from("production_jobs").update({ status: "failed", provider_response: { error: message }, completed_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
         }
       } catch {}
+    }
+    if (narrationUsageEventId && !narrationAudioSaved) {
+      try {
+        const refund = await refundMonthlyUsage(userId, "narration_generation", narrationUsageEventId);
+        if (!refund.refunded) console.error("narration quota refund was not applied", { userId, narrationUsageEventId, reason: refund.reason });
+      } catch (refundError) {
+        console.error("narration quota refund failed", { userId, narrationUsageEventId, error: refundError });
+      }
     }
     if (usageEventId && !providerRequestId) {
       try {
