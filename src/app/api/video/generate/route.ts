@@ -213,7 +213,19 @@ export async function POST(request: Request) {
         if (providerRequestId) {
           await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message, ...(usageEventId ? { usage_event_id: usageEventId } : {}), ...(narrationUsageEventId ? { narration_usage_event_id: narrationUsageEventId } : {}), ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(imagePath ? { input_image_path: imagePath, input_image_bucket: imageBucket } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}), ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}) }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
         } else {
-          await admin.from("production_jobs").update({ status: "failed", provider_response: { error: message }, completed_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+          await admin.from("production_jobs").update({
+            status: "failed",
+            provider_response: {
+              error: message,
+              ...(usageEventId ? { usage_event_id: usageEventId } : {}),
+              ...(narrationUsageEventId ? { narration_usage_event_id: narrationUsageEventId } : {}),
+              ...(imageUrl ? { input_image_url: imageUrl } : {}),
+              ...(imagePath ? { input_image_path: imagePath, input_image_bucket: imageBucket } : {}),
+              ...(audioUrl ? { input_audio_url: audioUrl } : {}),
+              ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}),
+            },
+            completed_at: new Date().toISOString()
+          }).eq("id", jobId).eq("user_id", userId);
         }
       } catch {}
     }
