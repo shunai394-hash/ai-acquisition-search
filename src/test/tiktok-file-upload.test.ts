@@ -9,7 +9,7 @@ mock.module("../lib/billing.ts", {
   },
 });
 
-const { publishTikTokVideo } = await import("../lib/social/tiktok.ts");
+const { publishTikTokVideo } = await import("../lib/social/tiktok");
 
 test("TikTok falls back to bounded FILE_UPLOAD when PULL_FROM_URL ownership is unverified", async () => {
   const originalFetch = globalThis.fetch;
