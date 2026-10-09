@@ -124,6 +124,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       // (video + narration charged for this job) have been attempted. If the RPC
       // errors, this request returns 500 and the next poll retries the refund.
       const refund = await refundJobUsage(user.id, savedProviderResponse);
+      // Jobs that charged the user are refunded and closed; quota-free operator
+      // jobs keep the existing bounded auto-retry unless retrying cannot help.
+      const terminal = refund.video !== undefined || refund.narration !== undefined || status === "nsfw" || status === "timeout";
       const { error: failedUpdateError } = await admin.from("production_jobs").update({
         status: "failed",
         provider_response: {
@@ -132,7 +135,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
           final_provider_detail: summarizeProviderPayload(result),
           quota_refunded: refund,
           // A refunded job must never be restarted by the operator loop for free.
-          terminal: true,
+          ...(terminal ? { terminal: true } : {}),
         },
         error: message,
         completed_at: new Date().toISOString(),

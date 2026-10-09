@@ -443,3 +443,15 @@ test("old finished jobs do not starve a newly queued job", async () => {
   assert.ok(body.results.some((r: { jobId?: string; step?: string }) => r.jobId === "job-new" && r.step === "video-start"), JSON.stringify(body.results));
   assert.equal(stub.higgsfieldCalls, 1);
 });
+
+test("a quota-free operator job that failed at the provider keeps its bounded auto-retry", async () => {
+  seedJob({ id: "job-operator", social_post_id: null, provider_response: { retry_count: 0 } });
+  stub.higgsfieldStatus = { status: "failed" };
+  await videoJob(userRequest("/api/video/jobs/job-operator"), { params: Promise.resolve({ id: "job-operator" }) } as never);
+  const failed = db.table("production_jobs")[0] as { status: string; provider_response: Record<string, unknown> };
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.provider_response.terminal, undefined);
+  assert.equal(refunds.length, 0);
+  await operatorLoop(cronRequest());
+  assert.equal(stub.higgsfieldCalls, 1, "operator loop retried the quota-free job");
+});

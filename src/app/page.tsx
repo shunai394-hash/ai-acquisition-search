@@ -66,7 +66,7 @@ export default function Home() {
   const [videoStatus, setVideoStatus] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [videoError, setVideoError] = useState("");
-  const [videoEngine, setVideoEngine] = useState("");
+  const [, setVideoEngine] = useState("");
   const [studioPrompt, setStudioPrompt] = useState("");
   const [studioImage, setStudioImage] = useState<File | null>(null);
   const [studioImagePreview, setStudioImagePreview] = useState("");
@@ -268,7 +268,7 @@ export default function Home() {
     try {
       const outcome = await pollVideoJob(studioJobId, (elapsed, providerStatus) => setStudioStatus(progressLabel("Higgsfield", elapsed, providerStatus)));
       if (outcome.status === "completed") { setStudioStage("render"); setStudioUrl(outcome.videoUrl); setStudioStatus("完成しました。プレビューで確認できます。"); return; }
-      if (outcome.status === "failed") throw new Error(outcome.error);
+      if (outcome.status === "failed") { setStudioJobId(""); throw new Error(outcome.error); }
       throw new Error("まだ生成中です。数分後にもう一度「生成状況を再確認」を押してください。");
     } catch (err) { setStudioStage("idle"); setStudioError(err instanceof Error ? err.message : "動画生成状態の取得に失敗しました。"); setStudioStatus(""); }
     finally { setStudioGenerating(false); }
@@ -411,7 +411,7 @@ export default function Home() {
           }
           return;
         }
-        if (outcome.status === "failed") throw new Error(outcome.error);
+        if (outcome.status === "failed") { setStudioJobId(""); throw new Error(outcome.error); }
       }
       throw new Error("生成に時間がかかっています。ジョブはサーバー側で継続中です。下の「生成状況を再確認」で続きから確認できます（失敗時は利用回数を自動返却します）。");
     } catch (err) { setStudioStage("idle"); setStudioError(err instanceof Error ? err.message : "動画生成に失敗しました。"); setStudioStatus(""); }

@@ -147,7 +147,7 @@ function createServer(): McpServer {
               else if (post.platform === "tiktok") previousPerformance.push(await normalizeTikTokPerformance(await getTikTokVideoMetrics(post.postId)));
               else if (post.platform === "instagram") previousPerformance.push(await normalizeInstagramPerformance(await getInstagramReelMetrics(post.postId)));
               else if (post.platform === "facebook") previousPerformance.push(await normalizeFacebookPerformance(await getFacebookReelMetrics(post.postId)));
-            } catch (error) {
+            } catch {
               previousPerformance.push({ platform: post.platform, postId: post.postId, metrics: {} });
             }
           }
