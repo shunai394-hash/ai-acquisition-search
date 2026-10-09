@@ -11,22 +11,23 @@ function builder(table: string) {
   const rows = (tables[table] ||= []);
   let op: "select" | "insert" | "update" = "select";
   let payload: Row = {};
+  let returning = false;
   const filters: Array<[string, unknown]> = [];
   const api = {
     insert(row: Row) { op = "insert"; payload = row; return api; },
     update(row: Row) { op = "update"; payload = row; return api; },
     upsert(row: Row) { upserts.push({ table, row }); return Promise.resolve({ data: null, error: null }); },
-    select() { return api; },
+    select() { if (op === "update") returning = true; return api; },
     eq(col: string, value: unknown) { filters.push([col, value]); return api; },
     maybeSingle() { return api; },
     then(resolve: (value: unknown) => unknown) {
       const match = rows.filter((row) => filters.every(([col, value]) => row[col] === value));
       if (op === "insert") {
         if (table === "stripe_webhook_events" && rows.some((row) => row.event_id === payload.event_id)) return Promise.resolve({ data: null, error: { code: "23505", message: "duplicate key" } }).then(resolve);
-        rows.push({ ...payload });
+        rows.push({ ...(table === "stripe_webhook_events" ? { received_at: new Date().toISOString() } : {}), ...payload });
         return Promise.resolve({ data: { event_id: payload.event_id }, error: null }).then(resolve);
       }
-      if (op === "update") { match.forEach((row) => Object.assign(row, payload)); return Promise.resolve({ data: null, error: null }).then(resolve); }
+      if (op === "update") { match.forEach((row) => Object.assign(row, payload)); return Promise.resolve({ data: returning ? match[0] ?? null : null, error: null }).then(resolve); }
       return Promise.resolve({ data: match[0] ?? null, error: null }).then(resolve);
     },
   };
@@ -140,6 +141,14 @@ test("subscription.deleted and past_due both drop the user to the free plan", as
   await webhook(signed(subscriptionEvent("evt_pd", "customer.subscription.updated", "past_due")));
   const subs = upserts.filter((u) => u.table === "subscriptions").map((u) => [u.row.status, u.row.plan]);
   assert.deepEqual(subs, [["canceled", "free"], ["past_due", "free"]]);
+});
+
+test("concurrent duplicate invoice deliveries create one usage event", async () => {
+  tables.billing_customers = [{ stripe_customer_id: "cus_1", user_id: "u1" }];
+  const event = { id: "evt_inv_conc", type: "invoice.payment_failed", data: { object: { id: "in_1", customer: "cus_1" } } };
+  const [a, b] = await Promise.all([webhook(signed(event)), webhook(signed(event))]);
+  assert.deepEqual([a.status, b.status], [200, 200]);
+  assert.equal(tables.usage_events?.length, 1);
 });
 
 test("invoice.payment_failed records an event but does not change the plan", async () => {
