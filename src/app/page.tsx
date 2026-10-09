@@ -141,37 +141,43 @@ export default function Home() {
         decision?.format ? "形式: " + decision.format : "9:16 short-form ad",
         "Natural UGC-style product advertising, clear first 3 seconds, factual claims only, no watermark.",
       ].filter(Boolean).join("\n"));
+      // Show the primary analysis immediately; enrichment is independent and should not
+      // keep the main action in a loading state while secondary research is still running.
       setEcPulse(null);
       setEcPulseLoading(true);
-      try {
-        const researchToken = await getAccessToken();
-        const researchRes = await fetch("/api/ec-pulse-research", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${researchToken}` },
-          body: JSON.stringify({ url }),
-        });
-        const researchData = await researchRes.json();
-        setEcPulse(researchData);
-      } catch {
-        setEcPulse({ connected: false, research: null, products: [], error: "EC Pulseリサーチに接続できませんでした。" });
-      } finally {
-        setEcPulseLoading(false);
-      }
+      void (async () => {
+        try {
+          const researchToken = await getAccessToken();
+          const researchRes = await fetch("/api/ec-pulse-research", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${researchToken}` },
+            body: JSON.stringify({ url }),
+          });
+          const researchData = await researchRes.json();
+          setEcPulse(researchData);
+        } catch {
+          setEcPulse({ connected: false, research: null, products: [], error: "EC Pulseリサーチに接続できませんでした。" });
+        } finally {
+          setEcPulseLoading(false);
+        }
+      })();
 
       setHistoryLoading(true);
-      try {
-        const historyToken = await getAccessToken();
-        const historyResponse = await fetch("/api/ec-pulse-research/history?url=" + encodeURIComponent(url) + "&limit=8", {
-          headers: { Authorization: `Bearer ${historyToken}` },
-          cache: "no-store"
-        });
-        const historyData = await historyResponse.json().catch(() => ({}));
-        setResearchHistory(historyData.runs || []);
-      } catch {
-        setResearchHistory([]);
-      } finally {
-        setHistoryLoading(false);
-      }
+      void (async () => {
+        try {
+          const historyToken = await getAccessToken();
+          const historyResponse = await fetch("/api/ec-pulse-research/history?url=" + encodeURIComponent(url) + "&limit=8", {
+            headers: { Authorization: `Bearer ${historyToken}` },
+            cache: "no-store"
+          });
+          const historyData = await historyResponse.json().catch(() => ({}));
+          setResearchHistory(historyData.runs || []);
+        } catch {
+          setResearchHistory([]);
+        } finally {
+          setHistoryLoading(false);
+        }
+      })();
     } catch (err) {
       setError(err instanceof Error ? err.message : "分析に失敗しました。");
     } finally {
