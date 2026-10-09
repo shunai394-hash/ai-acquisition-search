@@ -99,7 +99,7 @@ export async function saveAudioToStorage(input: {
 
   if (!buckets?.some((item) => item.name === audioBucket)) {
     const created = await supabase.storage.createBucket(audioBucket, {
-      public: true,
+      public: false,
       fileSizeLimit: 16 * 1024 * 1024,
       allowedMimeTypes: ["audio/wav"],
     });
@@ -107,6 +107,8 @@ export async function saveAudioToStorage(input: {
       throw new Error(`Supabase audio bucket creation failed: ${created.error.message}`);
     }
   }
+  const privacyUpdate = await supabase.storage.updateBucket(audioBucket, { public: false });
+  if (privacyUpdate.error) throw new Error(`Supabase audio bucket privacy update failed: ${privacyUpdate.error.message}`);
 
   const path = `${input.userId}/${input.jobId}.wav`;
   const { error: uploadError } = await supabase.storage.from(audioBucket).upload(path, input.bytes, {
@@ -116,7 +118,10 @@ export async function saveAudioToStorage(input: {
   });
   if (uploadError) throw new Error(`Supabase audio upload failed: ${uploadError.message}`);
 
-  const { data } = supabase.storage.from(audioBucket).getPublicUrl(path);
-  return { bucket: audioBucket, path, url: data.publicUrl, bytes: input.bytes.byteLength, contentType: "audio/wav" };
+  const signed = await supabase.storage.from(audioBucket).createSignedUrl(path, 60 * 60);
+  if (signed.error || !signed.data?.signedUrl) {
+    throw new Error(`Supabase audio signed URL creation failed: ${signed.error?.message || "unknown error"}`);
+  }
+  return { bucket: audioBucket, path, url: signed.data.signedUrl, bytes: input.bytes.byteLength, contentType: "audio/wav" };
 }
 
