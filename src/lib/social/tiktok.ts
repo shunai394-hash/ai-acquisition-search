@@ -200,7 +200,7 @@ export async function queryTikTokCreator(accessToken = getAccessToken()) {
 }
 
 const MAX_TIKTOK_UPLOAD_BYTES = 100 * 1024 * 1024;
-const TIKTOK_CHUNK_BYTES = 10 * 1024 * 1024;
+const TIKTOK_CHUNK_BYTES = 64 * 1024 * 1024;
 
 async function readVideoForTikTok(videoUrl: string) {
   const response = await fetch(videoUrl, {
