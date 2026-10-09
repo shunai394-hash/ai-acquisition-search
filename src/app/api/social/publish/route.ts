@@ -25,8 +25,9 @@ export async function POST(request: Request) {
     const caption = typeof body.caption === "string" ? body.caption.trim() : "";
     const supportedPlatforms: Platform[] = ["tiktok", "instagram", "facebook", "youtube", "x", "linkedin"];
     const platforms: Platform[] = Array.isArray(body.platforms)
-      ? [...new Set(body.platforms
-          .filter((v: unknown): v is Platform => typeof v === "string" && supportedPlatforms.includes(v as Platform)))]
+      ? Array.from(new Set<Platform>((body.platforms as unknown[]).filter(
+          (v: unknown): v is Platform => typeof v === "string" && supportedPlatforms.includes(v as Platform),
+        )))
       : [];
     if (!socialPostId) return NextResponse.json({ error: "socialPostIdが必要です。" }, { status: 400 });
     if (!videoUrl.startsWith("https://")) return NextResponse.json({ error: "完成動画のHTTPS URLが必要です。" }, { status: 400 });
