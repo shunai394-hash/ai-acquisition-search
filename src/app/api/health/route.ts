@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 async function check<T>(fn: () => Promise<T>) {
   const started = Date.now();
   try {
-    return { ok: true, ms: Date.now() - started, ...(await fn()) };
+    const result = await fn();
+    return { ...result, ok: true, ms: Date.now() - started };
   } catch (error) {
     return { ok: false, ms: Date.now() - started, error: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 200) : "unknown" };
   }
