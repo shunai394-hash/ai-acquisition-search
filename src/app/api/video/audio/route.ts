@@ -23,7 +23,20 @@ export async function POST(request: Request) {
     const bgm = Boolean(body.bgm);
     const bgmPrompt = typeof body.bgmPrompt === "string" ? body.bgmPrompt.trim() : "";
     const voice = typeof body.voice === "string" ? body.voice.trim() : "";
-    const duration = Math.max(2, Math.min(30, Number(body.duration || 5)));
+    const requestedDuration = Number(body.duration ?? 5);
+    if (!Number.isFinite(requestedDuration) || requestedDuration < 2 || requestedDuration > 30) {
+      return NextResponse.json({ error: "durationは2〜30秒で指定してください。" }, { status: 400 });
+    }
+    const duration = requestedDuration;
+    if (text.length > 10_000) {
+      return NextResponse.json({ error: "ナレーション本文は10,000文字以内で指定してください。" }, { status: 400 });
+    }
+    if (bgmPrompt.length > 500) {
+      return NextResponse.json({ error: "BGMプロンプトは500文字以内で指定してください。" }, { status: 400 });
+    }
+    if (voice.length > 100) {
+      return NextResponse.json({ error: "音声設定が長すぎます。" }, { status: 400 });
+    }
 
     if (!text && !bgm) {
       return NextResponse.json({ error: "ナレーション本文またはBGMを指定してください。" }, { status: 400 });
