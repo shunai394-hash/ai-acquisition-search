@@ -65,6 +65,18 @@ export async function GET(request: Request) {
       ecPulseUrlExplicit: ec.explicitUrl,
       ecPulseUrlPinnedDeployment: ec.pinnedDeployment,
       ecPulseKey: ec.configured,
+      // Presence only (never values) so a deploy can be checked against the
+      // variable names the video/audio/billing/SNS code actually reads.
+      supabaseServiceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      supabasePublicKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      higgsfield: Boolean(process.env.HIGGSFIELD_API_KEY || process.env.HF_API_KEY || (process.env.HF_API_KEY_ID && process.env.HF_API_KEY_SECRET)),
+      videoEngine: process.env.VIDEO_ENGINE || "higgsfield",
+      geminiTts: Boolean(process.env.GEMINI_API_KEY),
+      stripe: Boolean(process.env.STRIPE_SECRET_KEY),
+      stripeWebhook: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
+      stripeProPrice: Boolean(process.env.STRIPE_PRO_PRICE_ID),
+      tiktokOAuth: Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET && process.env.TIKTOK_REDIRECT_URI && process.env.TIKTOK_TOKEN_ENCRYPTION_KEY),
+      tiktokPrivacyLevel: process.env.TIKTOK_PRIVACY_LEVEL || "SELF_ONLY",
     },
   }, { status: ok ? 200 : 503 });
 }
