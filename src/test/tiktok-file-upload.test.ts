@@ -78,3 +78,48 @@ test("TikTok falls back to bounded FILE_UPLOAD when PULL_FROM_URL ownership is u
     globalThis.fetch = originalFetch;
   }
 });
+
+test("TikTok file upload rejects an unexpected upload host before sending video bytes", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; method: string }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method || "GET";
+    calls.push({ url, method });
+
+    if (url.includes("/post/publish/creator_info/query/")) {
+      return Response.json({ error: { code: "ok" }, data: { privacy_level_options: ["SELF_ONLY"] } });
+    }
+    if (url.includes("/post/publish/video/init/") && calls.filter((call) => call.url.includes("/post/publish/video/init/")).length === 1) {
+      return Response.json({ error: { code: "url_ownership_unverified" } }, { status: 403 });
+    }
+    if (url.startsWith("https://proj.supabase.co/storage/")) {
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-type": "video/mp4", "content-length": "3" },
+      });
+    }
+    if (url.includes("/post/publish/video/init/")) {
+      return Response.json({
+        error: { code: "ok" },
+        data: { publish_id: "publish-file-2", upload_url: "https://evil.example/upload?token=secret" },
+      });
+    }
+    throw new Error("Unexpected mocked fetch: " + method + " " + url);
+  }) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      publishTikTokVideo({
+        accessToken: "test-access-token",
+        videoUrl: "https://proj.supabase.co/storage/v1/object/sign/video-assets/u1/job.mp4?token=signed",
+        title: "Test post",
+        privacyLevel: "SELF_ONLY",
+      }),
+      /unexpected file upload host/,
+    );
+    assert.equal(calls.some((call) => call.method === "PUT"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
