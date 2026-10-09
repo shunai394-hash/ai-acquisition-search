@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
+import { getAdminSupabase, getUserFromBearer, refundMonthlyUsage } from "@/lib/billing";
 import { getHiggsfieldStatus, extractHiggsfieldVideoUrl } from "@/lib/video/higgsfield";
 import { deleteVideoFromStorage, saveVideoToStorage } from "@/lib/video/storage";
 
@@ -107,9 +107,26 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
     if (isFailed) {
       const message = `Higgsfield generation ${status}: ${JSON.stringify(result)}`;
-      await admin.from("production_jobs").update({
-        status: "failed", provider_response: result, error: message, completed_at: new Date().toISOString()
+      const savedProviderResponse = job.provider_response && typeof job.provider_response === "object"
+        ? job.provider_response as Record<string, unknown>
+        : {};
+      const usageEventId = typeof savedProviderResponse.usage_event_id === "string"
+        ? savedProviderResponse.usage_event_id
+        : "";
+      if (usageEventId) {
+        // Do not terminally mark the job failed until the idempotent quota refund has been attempted.
+        // If the RPC errors, this request returns 500 and the next poll can retry the refund.
+        const refund = await refundMonthlyUsage(user.id, "video_generation", usageEventId);
+        if (!refund.refunded && refund.reason) {
+          console.warn("video generation quota refund was not applied", {
+            jobId: job.id, usageEventId, reason: refund.reason,
+          });
+        }
+      }
+      const { error: failedUpdateError } = await admin.from("production_jobs").update({
+        status: "failed", provider_response: { ...savedProviderResponse, final_provider_response: result }, error: message, completed_at: new Date().toISOString()
       }).eq("id", job.id).eq("user_id", user.id);
+      if (failedUpdateError) throw new Error("動画生成は失敗しましたが、ジョブ状態の保存に失敗しました: " + failedUpdateError.message);
       return NextResponse.json({ ok: true, job: { ...job, status: "failed", error: message }, asset: null });
     }
 
