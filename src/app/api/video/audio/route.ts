@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const text = typeof body.text === "string" ? body.text.trim() : "";
-    const bgm = Boolean(body.bgm);
+    const bgm = body.bgm === true;
     const bgmPrompt = typeof body.bgmPrompt === "string" ? body.bgmPrompt.trim() : "";
     const voice = typeof body.voice === "string" ? body.voice.trim() : "";
     const requestedDuration = Number(body.duration ?? 5);
