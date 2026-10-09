@@ -26,6 +26,8 @@ export async function POST(request: Request) {
   let providerRequestId = "";
   let imageUrl: string | undefined;
   let audioUrl: string | undefined;
+  let audioPath: string | undefined;
+  let audioBucket: string | undefined;
   try {
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
@@ -34,6 +36,8 @@ export async function POST(request: Request) {
     const prompt = String(body.prompt || "").trim();
     imageUrl = body.imageUrl ? String(body.imageUrl) : undefined;
     audioUrl = body.audioUrl ? String(body.audioUrl) : undefined;
+    audioPath = body.audioPath ? String(body.audioPath) : undefined;
+    audioBucket = body.audioBucket ? String(body.audioBucket) : undefined;
     const narrationText = typeof body.narrationText === "string" ? body.narrationText.trim() : "";
     const includeBgm = body.includeBgm !== false;
     const narrationVoice = typeof body.narrationVoice === "string" ? body.narrationVoice.trim() : undefined;
@@ -41,6 +45,12 @@ export async function POST(request: Request) {
     const bgmPrompt = typeof body.bgmPrompt === "string" ? body.bgmPrompt.trim() : "";
     if (imageUrl && !/^https:\/\//i.test(imageUrl)) return NextResponse.json({ error: "imageUrl must be an HTTPS URL" }, { status: 400 });
     if (audioUrl && !/^https:\/\//i.test(audioUrl)) return NextResponse.json({ error: "audioUrl must be an HTTPS URL" }, { status: 400 });
+    if (audioPath && (!audioPath.startsWith(user.id + "/") || audioPath.split("/").some((part) => !part || part === "." || part === ".."))) {
+      return NextResponse.json({ error: "audioPath is invalid for this user" }, { status: 400 });
+    }
+    if (audioPath && !["audio-inputs", "video-audio"].includes(audioBucket || "")) {
+      return NextResponse.json({ error: "audioBucket is invalid" }, { status: 400 });
+    }
     if (!prompt) return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     if (prompt.length > 10000) return NextResponse.json({ error: "prompt is too long" }, { status: 400 });
     if (narrationText.length > 8000) return NextResponse.json({ error: "narrationText must be 8,000 characters or fewer" }, { status: 400 });
@@ -56,6 +66,13 @@ export async function POST(request: Request) {
     const generateAudio = body.generateAudio === true;
     const socialPostId = body.socialPostId ? String(body.socialPostId) : null;
     const { admin } = clients();
+    if (audioPath && audioBucket) {
+      const signedAudio = await admin.storage.from(audioBucket).createSignedUrl(audioPath, 60 * 60);
+      if (signedAudio.error || !signedAudio.data?.signedUrl) {
+        throw new Error("音声ファイルの署名付きURLを再発行できませんでした: " + (signedAudio.error?.message || "unknown error"));
+      }
+      audioUrl = signedAudio.data.signedUrl;
+    }
 
     let creativeId: string | null = null;
     if (socialPostId) {
@@ -98,7 +115,7 @@ export async function POST(request: Request) {
       resolution,
       aspect_ratio: aspectRatio,
       generate_audio: generateAudio,
-      provider_response: imageUrl || audioUrl ? { ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}) } : null,
+      provider_response: imageUrl || audioUrl ? { ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}), ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}) } : null,
     }).select("id").single();
 
     if (jobError || !job) throw new Error(jobError?.message || "production jobの作成に失敗しました。");
@@ -112,6 +129,8 @@ export async function POST(request: Request) {
         : fitWavToDuration(narrationWav, duration);
       const savedAudio = await saveAudioToStorage({ userId: user.id, jobId: job.id, bytes: audioWav });
       audioUrl = savedAudio.url;
+      audioPath = savedAudio.path;
+      audioBucket = savedAudio.bucket;
     }
 
     // エンジン選択はRouterに集約する。現在の既定値はHiggsfield。
@@ -137,6 +156,7 @@ export async function POST(request: Request) {
         ...(usageEventId ? { usage_event_id: usageEventId } : {}),
         ...(imageUrl ? { input_image_url: imageUrl } : {}),
         ...(audioUrl ? { input_audio_url: audioUrl } : {}),
+        ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}),
       },
       started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -157,7 +177,7 @@ export async function POST(request: Request) {
       try {
         const { admin } = clients();
         if (providerRequestId) {
-          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message, ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}) }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message, ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}), ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}) }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
         } else {
           await admin.from("production_jobs").update({ status: "failed", provider_response: { error: message }, completed_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
         }
