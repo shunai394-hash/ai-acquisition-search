@@ -23,11 +23,11 @@ begin
   values(p_user_id,p_event_type,1,jsonb_build_object('plan','free'))
   returning id into v_event_id;
   return jsonb_build_object('allowed',true,'plan','free','used',v_used+1,'limit',p_free_limit,'usage_event_id',v_event_id);
-end; $;
+end; $$;
 
 create or replace function public.refund_monthly_usage(
   p_usage_event_id uuid, p_user_id uuid, p_event_type text
-) returns jsonb language plpgsql security definer set search_path = public as $
+) returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_deleted uuid;
 begin
   perform pg_advisory_xact_lock(hashtextextended(p_user_id::text || ':' || p_event_type, 0));
@@ -42,7 +42,7 @@ begin
     return jsonb_build_object('refunded',false,'reason','usage_event_not_found');
   end if;
   return jsonb_build_object('refunded',true,'usage_event_id',v_deleted);
-end; $;
+end; $$;
 
 revoke all on function public.refund_monthly_usage(uuid,uuid,text) from public;
 grant execute on function public.refund_monthly_usage(uuid,uuid,text) to service_role;
