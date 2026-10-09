@@ -22,7 +22,7 @@ function builder(table: string) {
     then(resolve: (value: unknown) => unknown) {
       const match = rows.filter((row) => filters.every(([col, value]) => row[col] === value));
       if (op === "insert") {
-        if (rows.some((row) => row.event_id === payload.event_id)) return Promise.resolve({ data: null, error: { code: "23505", message: "duplicate key" } }).then(resolve);
+        if (table === "stripe_webhook_events" && rows.some((row) => row.event_id === payload.event_id)) return Promise.resolve({ data: null, error: { code: "23505", message: "duplicate key" } }).then(resolve);
         rows.push({ ...payload });
         return Promise.resolve({ data: { event_id: payload.event_id }, error: null }).then(resolve);
       }
@@ -40,10 +40,12 @@ process.env.STRIPE_SECRET_KEY = "sk_test";
 
 let stripeSubscription: Row = {};
 let stripeDown = false;
+let stripeFetches = 0;
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
   if (url.host === "api.stripe.com") {
+    stripeFetches++;
     if (stripeDown) return new Response(JSON.stringify({ error: { message: "unavailable" } }), { status: 503 });
     return new Response(JSON.stringify(stripeSubscription), { status: 200 });
   }
@@ -52,11 +54,12 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 
 const { POST: webhook } = await import("../app/api/stripe/webhook/route");
 
-function signed(event: Row) {
+function signed(event: Row, options: { ageSeconds?: number; tamper?: boolean } = {}) {
   const payload = JSON.stringify(event);
-  const t = Math.floor(Date.now() / 1000);
+  const t = Math.floor(Date.now() / 1000) - (options.ageSeconds ?? 0);
   const v1 = createHmac("sha256", "whsec_test").update(`${t}.${payload}`).digest("hex");
-  return new Request("https://app.test/api/stripe/webhook", { method: "POST", headers: { "stripe-signature": `t=${t},v1=${v1}` }, body: payload });
+  const body = options.tamper ? payload.replace("sub_1", "sub_X") : payload;
+  return new Request("https://app.test/api/stripe/webhook", { method: "POST", headers: { "stripe-signature": `t=${t},v1=${v1}` }, body });
 }
 
 const staleActiveEvent = {
@@ -69,6 +72,7 @@ beforeEach(() => {
   for (const key of Object.keys(tables)) delete tables[key];
   upserts.length = 0;
   stripeDown = false;
+  stripeFetches = 0;
   stripeSubscription = { id: "sub_1", customer: "cus_1", status: "canceled", items: { data: [{ current_period_end: 1893456000 }] } };
 });
 
@@ -97,4 +101,65 @@ test("a failed delivery can be retried: the duplicate event id no longer returns
   assert.equal(tables.stripe_webhook_events[0].status, "processed");
   const again = await (await webhook(signed(staleActiveEvent))).json();
   assert.equal(again.reused, true);
+});
+
+const subscriptionEvent = (id: string, type: string, status = "active") => ({
+  id,
+  type,
+  data: { object: { id: "sub_1", customer: "cus_1", status, metadata: { user_id: "u1" } } },
+});
+
+test("an already processed event is acknowledged without touching Stripe or the database", async () => {
+  stripeSubscription = { ...stripeSubscription, status: "active" };
+  assert.equal((await webhook(signed(subscriptionEvent("evt_dup", "customer.subscription.updated")))).status, 200);
+  const fetchesAfterFirst = stripeFetches;
+  const upsertsAfterFirst = upserts.length;
+  const again = await webhook(signed(subscriptionEvent("evt_dup", "customer.subscription.updated")));
+  assert.deepEqual(await again.json(), { received: true, reused: true });
+  assert.equal(stripeFetches, fetchesAfterFirst);
+  assert.equal(upserts.length, upsertsAfterFirst);
+});
+
+test("concurrent duplicate deliveries both succeed and converge on the same state", async () => {
+  stripeSubscription = { ...stripeSubscription, status: "active" };
+  const [a, b] = await Promise.all([
+    webhook(signed(subscriptionEvent("evt_conc", "customer.subscription.updated"))),
+    webhook(signed(subscriptionEvent("evt_conc", "customer.subscription.updated"))),
+  ]);
+  assert.deepEqual([a.status, b.status], [200, 200]);
+  const states = upserts.filter((u) => u.table === "subscriptions").map((u) => `${u.row.status}/${u.row.plan}`);
+  assert.ok(states.length >= 1 && states.every((s) => s === "active/pro"), states.join(","));
+  assert.equal(tables.stripe_webhook_events.length, 1);
+  assert.equal(tables.stripe_webhook_events[0].status, "processed");
+});
+
+test("subscription.deleted and past_due both drop the user to the free plan", async () => {
+  stripeSubscription = { ...stripeSubscription, status: "canceled" };
+  await webhook(signed(subscriptionEvent("evt_del", "customer.subscription.deleted", "canceled")));
+  stripeSubscription = { ...stripeSubscription, status: "past_due" };
+  await webhook(signed(subscriptionEvent("evt_pd", "customer.subscription.updated", "past_due")));
+  const subs = upserts.filter((u) => u.table === "subscriptions").map((u) => [u.row.status, u.row.plan]);
+  assert.deepEqual(subs, [["canceled", "free"], ["past_due", "free"]]);
+});
+
+test("invoice.payment_failed records an event but does not change the plan", async () => {
+  tables.billing_customers = [{ stripe_customer_id: "cus_1", user_id: "u1" }];
+  const res = await webhook(signed({ id: "evt_inv", type: "invoice.payment_failed", data: { object: { id: "in_1", customer: "cus_1" } } }));
+  assert.equal(res.status, 200);
+  assert.equal(upserts.filter((u) => u.table === "subscriptions").length, 0);
+  assert.equal(tables.usage_events?.[0]?.event_type, "billing_payment_failed");
+});
+
+test("a subscription with no matching user is processed without writing a plan", async () => {
+  stripeSubscription = { id: "sub_9", customer: "cus_unknown", status: "active" };
+  const res = await webhook(signed({ id: "evt_orphan", type: "customer.subscription.updated", data: { object: { id: "sub_9", customer: "cus_unknown", status: "active" } } }));
+  assert.equal(res.status, 200);
+  assert.equal(upserts.filter((u) => u.table === "subscriptions").length, 0);
+});
+
+test("stale (>5 min) or tampered signatures are rejected before any processing", async () => {
+  assert.equal((await webhook(signed(staleActiveEvent, { ageSeconds: 600 }))).status, 400);
+  assert.equal((await webhook(signed(staleActiveEvent, { tamper: true }))).status, 400);
+  assert.equal(tables.stripe_webhook_events?.length ?? 0, 0);
+  assert.equal(stripeFetches, 0);
 });
