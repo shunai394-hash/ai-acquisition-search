@@ -403,9 +403,22 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
         const inputImageUrl = typeof providerResponse.input_image_url === "string"
           ? providerResponse.input_image_url
           : undefined;
-        const inputAudioUrl = typeof providerResponse.input_audio_url === "string"
+        const inputAudioPath = typeof providerResponse.input_audio_path === "string"
+          ? providerResponse.input_audio_path
+          : undefined;
+        const inputAudioBucket = typeof providerResponse.input_audio_bucket === "string"
+          ? providerResponse.input_audio_bucket
+          : undefined;
+        let inputAudioUrl = typeof providerResponse.input_audio_url === "string"
           ? providerResponse.input_audio_url
           : undefined;
+        if (inputAudioPath && inputAudioBucket && ["audio-inputs", "video-audio"].includes(inputAudioBucket)) {
+          const renewedAudio = await db.storage.from(inputAudioBucket).createSignedUrl(inputAudioPath, 60 * 60);
+          if (renewedAudio.error || !renewedAudio.data?.signedUrl) {
+            throw new Error("Retry could not renew signed audio URL: " + (renewedAudio.error?.message || "unknown error"));
+          }
+          inputAudioUrl = renewedAudio.data.signedUrl;
+        }
         const started = await generateHiggsfieldVideo({
           prompt: String(job.prompt || ""),
           duration: Number(job.duration || 5),
@@ -428,6 +441,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
             retry_count: attemptCount,
             input_image_url: inputImageUrl,
             input_audio_url: inputAudioUrl,
+            ...(inputAudioPath ? { input_audio_path: inputAudioPath, input_audio_bucket: inputAudioBucket } : {}),
             started_response: started,
           },
           error: null,
