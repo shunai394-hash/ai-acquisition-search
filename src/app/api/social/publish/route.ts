@@ -60,17 +60,45 @@ export async function POST(request: Request) {
     const results: Array<{platform:string;ok:boolean;pending?:boolean;postId?:string;url?:string;error?:string;manualRecoveryRequired?:boolean}> = [];
     let tempFile = "";
     let videoBuffer: Uint8Array | null = null;
+    const maxVideoBytes = 250 * 1024 * 1024;
+    const readVideoBody = async (response: Response) => {
+      const contentLength = Number(response.headers.get("content-length") || 0);
+      if (contentLength > maxVideoBytes) {
+        await response.body?.cancel().catch(() => {});
+        throw new Error("完成動画が大きすぎます（上限250MB）。");
+      }
+      if (!response.body) throw new Error("動画レスポンスに本文がありません。");
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let totalBytes = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          totalBytes += value.byteLength;
+          if (totalBytes > maxVideoBytes) {
+            await reader.cancel().catch(() => {});
+            throw new Error("完成動画が大きすぎます（上限250MB）。");
+          }
+          chunks.push(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      if (!totalBytes) throw new Error("完成動画が空です。");
+      const buffer = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        buffer.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return buffer;
+    };
     const getVideoBuffer = async () => {
       if (videoBuffer) return videoBuffer;
       const response = await fetchPublicUrl(videoUrl);
       if (!response.ok) throw new Error(`動画取得失敗: HTTP ${response.status}`);
-      const contentLength = Number(response.headers.get("content-length") || 0);
-      const maxBytes = 250 * 1024 * 1024;
-      if (contentLength > maxBytes) throw new Error("完成動画が大きすぎます（上限250MB）。");
-      const buffer = new Uint8Array(await response.arrayBuffer());
-      if (!buffer.byteLength) throw new Error("完成動画が空です。");
-      if (buffer.byteLength > maxBytes) throw new Error("完成動画が大きすぎます（上限250MB）。");
-      videoBuffer = buffer;
+      videoBuffer = await readVideoBody(response);
       return videoBuffer;
     };
 
@@ -229,7 +257,7 @@ export async function POST(request: Request) {
             const response = await fetchPublicUrl(videoUrl);
             if (!response.ok) throw new Error(`動画取得失敗: HTTP ${response.status}`);
             tempFile = path.join(os.tmpdir(),`ai-acquisition-${source.id}.mp4`);
-            await writeFile(tempFile,Buffer.from(await response.arrayBuffer()));
+            await writeFile(tempFile,Buffer.from(await readVideoBody(response)));
             const r = await uploadYouTubeVideo({filePath:tempFile,title:caption,description:caption,privacyStatus:"public",containsSyntheticMedia:true});
             externalPublishSucceeded = true;
             externalPostId = r.videoId;
