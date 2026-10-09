@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
-import { getAdminSupabase, getUserFromBearer, refundMonthlyUsage } from "@/lib/billing";
+import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
 import { getHiggsfieldStatus, extractHiggsfieldVideoUrl } from "@/lib/video/higgsfield";
 import { deleteVideoFromStorage, saveVideoToStorage } from "@/lib/video/storage";
+import { jobMeta, PROVIDER_JOB_TIMEOUT_MS, providerFailureMessage, refundJobUsage, summarizeProviderPayload } from "@/lib/video/job-recovery";
+
+// provider_response holds signed input URLs and quota event ids; keep it server-side.
+function publicJob<T extends { provider_response?: unknown }>(job: T, overrides: Record<string, unknown> = {}) {
+  const { provider_response: _providerResponse, ...rest } = job;
+  void _providerResponse;
+  return { ...rest, ...overrides };
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,15 +32,19 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       const { data: asset } = await admin.from("video_assets")
         .select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,created_at")
         .eq("production_job_id", job.id).maybeSingle();
-      return NextResponse.json({ ok: true, job, asset: asset ?? null });
+      return NextResponse.json({ ok: true, job: publicJob(job), asset: asset ?? null });
     }
 
-    if (!job.request_id) return NextResponse.json({ ok: true, job, asset: null });
+    if (!job.request_id) return NextResponse.json({ ok: true, job: publicJob(job), asset: null });
 
     const result = await getHiggsfieldStatus(job.request_id);
-    const status = String(result.status ?? "").toLowerCase();
+    let status = String(result.status ?? "").toLowerCase();
     const isCompleted = status === "completed" || status === "succeeded";
-    const isFailed = status === "failed" || status === "nsfw" || status === "cancelled" || status === "canceled";
+    const startedAt = job.started_at ? Date.parse(job.started_at) : NaN;
+    if (!isCompleted && Number.isFinite(startedAt) && Date.now() - startedAt > PROVIDER_JOB_TIMEOUT_MS) {
+      status = "timeout";
+    }
+    const isFailed = status === "failed" || status === "nsfw" || status === "cancelled" || status === "canceled" || status === "timeout";
 
     const syncCreative = async (assetUrl: string) => {
       if (!job.creative_id) return;
@@ -56,11 +68,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
       if (existingAsset) {
         const { error: jobUpdateError } = await admin.from("production_jobs").update({
-          status: "completed", provider_response: result, completed_at: new Date().toISOString(), error: null
+          status: "completed", provider_response: { ...jobMeta(job.provider_response), final_provider_response: result }, completed_at: new Date().toISOString(), error: null
         }).eq("id", job.id).eq("user_id", user.id);
         if (jobUpdateError) throw new Error("動画は保存済みですが、ジョブ状態の更新に失敗しました: " + jobUpdateError.message);
         await syncCreative(existingAsset.video_url);
-        return NextResponse.json({ ok: true, job: { ...job, status: "completed" }, asset: existingAsset });
+        return NextResponse.json({ ok: true, job: publicJob(job, { status: "completed" }), asset: existingAsset });
       }
 
       const stored = await saveVideoToStorage({ userId: user.id, jobId: job.id, sourceUrl: videoUrl });
@@ -83,10 +95,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
           console.error("duplicate video storage cleanup failed", { jobId: job.id, path: stored.path, error: cleanupError });
         }
         await admin.from("production_jobs").update({
-          status: "completed", provider_response: result, completed_at: new Date().toISOString(), error: null
+          status: "completed", provider_response: { ...jobMeta(job.provider_response), final_provider_response: result }, completed_at: new Date().toISOString(), error: null
         }).eq("id", job.id).eq("user_id", user.id);
         await syncCreative(concurrentAsset.video_url);
-        return NextResponse.json({ ok: true, job: { ...job, status: "completed" }, asset: concurrentAsset });
+        return NextResponse.json({ ok: true, job: publicJob(job, { status: "completed" }), asset: concurrentAsset });
       }
 
       if (assetError || !asset) {
@@ -97,40 +109,40 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       }
 
       const { error: jobUpdateError } = await admin.from("production_jobs").update({
-        status: "completed", provider_response: result, completed_at: new Date().toISOString(), error: null
+        status: "completed", provider_response: { ...jobMeta(job.provider_response), final_provider_response: result }, completed_at: new Date().toISOString(), error: null
       }).eq("id", job.id).eq("user_id", user.id);
       if (jobUpdateError) throw new Error("動画は保存されましたが、ジョブ状態の更新に失敗しました: " + jobUpdateError.message);
 
       await syncCreative(stored.url);
-      return NextResponse.json({ ok: true, job: { ...job, status: "completed" }, asset });
+      return NextResponse.json({ ok: true, job: publicJob(job, { status: "completed" }), asset });
     }
 
     if (isFailed) {
-      const message = `Higgsfield generation ${status}: ${JSON.stringify(result)}`;
-      const savedProviderResponse = job.provider_response && typeof job.provider_response === "object"
-        ? job.provider_response as Record<string, unknown>
-        : {};
-      const usageEventId = typeof savedProviderResponse.usage_event_id === "string"
-        ? savedProviderResponse.usage_event_id
-        : "";
-      if (usageEventId) {
-        // Do not terminally mark the job failed until the idempotent quota refund has been attempted.
-        // If the RPC errors, this request returns 500 and the next poll can retry the refund.
-        const refund = await refundMonthlyUsage(user.id, "video_generation", usageEventId);
-        if (!refund.refunded && refund.reason) {
-          console.warn("video generation quota refund was not applied", {
-            jobId: job.id, usageEventId, reason: refund.reason,
-          });
-        }
-      }
+      const message = providerFailureMessage(status);
+      const savedProviderResponse = jobMeta(job.provider_response);
+      // Do not terminally mark the job failed until the idempotent quota refunds
+      // (video + narration charged for this job) have been attempted. If the RPC
+      // errors, this request returns 500 and the next poll retries the refund.
+      const refund = await refundJobUsage(user.id, savedProviderResponse);
       const { error: failedUpdateError } = await admin.from("production_jobs").update({
-        status: "failed", provider_response: { ...savedProviderResponse, final_provider_response: result }, error: message, completed_at: new Date().toISOString()
+        status: "failed",
+        provider_response: {
+          ...savedProviderResponse,
+          final_provider_status: status,
+          final_provider_detail: summarizeProviderPayload(result),
+          quota_refunded: refund,
+          // A refunded job must never be restarted by the operator loop for free.
+          terminal: true,
+        },
+        error: message,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }).eq("id", job.id).eq("user_id", user.id);
       if (failedUpdateError) throw new Error("動画生成は失敗しましたが、ジョブ状態の保存に失敗しました: " + failedUpdateError.message);
-      return NextResponse.json({ ok: true, job: { ...job, status: "failed", error: message }, asset: null });
+      return NextResponse.json({ ok: true, job: publicJob(job, { status: "failed", error: message }), asset: null });
     }
 
-    return NextResponse.json({ ok: true, job: { ...job, provider_response: result }, asset: null });
+    return NextResponse.json({ ok: true, job: publicJob(job, { provider_status: status || null }), asset: null });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "動画ジョブ確認に失敗しました。" }, { status: 500 });
   }

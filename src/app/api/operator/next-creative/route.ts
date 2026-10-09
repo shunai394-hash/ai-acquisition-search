@@ -202,9 +202,14 @@ export async function POST(request: Request) {
     if (nextPostError || !nextPost) throw new Error(nextPostError?.message || "次の投稿レコード作成に失敗しました。");
     nextPostId = nextPost.id;
 
-    const inputImageUrl = creative.scenario && typeof creative.scenario === "object"
-      && typeof (creative.scenario as Record<string, unknown>).input_image_url === "string"
-      ? String((creative.scenario as Record<string, unknown>).input_image_url)
+    const scenarioRecord = creative.scenario && typeof creative.scenario === "object"
+      ? creative.scenario as Record<string, unknown>
+      : {};
+    const inputImageUrl = typeof scenarioRecord.input_image_url === "string" ? scenarioRecord.input_image_url : undefined;
+    // Signed URLs expire after an hour; carry the private storage path so the
+    // operator loop can re-sign the reference image when it starts the job.
+    const inputImagePath = typeof scenarioRecord.input_image_path === "string" && scenarioRecord.input_image_bucket === "video-inputs"
+      ? scenarioRecord.input_image_path
       : undefined;
 
     let video = null;
@@ -223,14 +228,19 @@ export async function POST(request: Request) {
         social_post_id: nextPost.id,
         creative_id: nextCreative.id,
         provider: "higgsfield",
-        model: inputImageUrl ? "alibaba/wan-3.0-prime/image-to-video" : (process.env.HF_VIDEO_MODEL || "alibaba/wan-3.0/text-to-video"),
+        model: inputImageUrl || inputImagePath ? "alibaba/wan-3.0-prime/image-to-video" : (process.env.HF_VIDEO_MODEL || "alibaba/wan-3.0/text-to-video"),
         status: "queued",
         prompt,
         duration: 5,
         resolution: "1080p",
         aspect_ratio: "9:16",
         generate_audio: false,
-        provider_response: inputImageUrl ? { input_image_url: inputImageUrl } : null
+        provider_response: inputImageUrl || inputImagePath
+          ? {
+            ...(inputImageUrl ? { input_image_url: inputImageUrl } : {}),
+            ...(inputImagePath ? { input_image_path: inputImagePath, input_image_bucket: "video-inputs" } : {}),
+          }
+          : null
       }).select("id").single();
       if (jobError || !job) throw new Error(jobError?.message || "動画生成ジョブの作成に失敗しました。");
       jobId = job.id;
@@ -238,7 +248,7 @@ export async function POST(request: Request) {
       // Higgsfieldはここでは開始しない。
       // next-creativeはproduction_jobs=queuedまででHTTP処理を終了し、
       // operator-loopのWorker処理がqueued Jobを取得してHiggsfieldを開始する。
-      video = { jobId, requestId: null, status: "queued", imageReference: Boolean(inputImageUrl) };
+      video = { jobId, requestId: null, status: "queued", imageReference: Boolean(inputImageUrl || inputImagePath) };
     }
 
     const { data: run, error: runError } = await db.from("operator_runs").insert({

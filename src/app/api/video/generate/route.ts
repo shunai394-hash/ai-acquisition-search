@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   let userId = "";
   let usageEventId = "";
   let narrationUsageEventId = "";
-  let narrationAudioSaved = false;
+  let persistInputRefs: (() => Record<string, unknown>) | null = null;
   // Preserve the external provider request if the DB state update fails after start.
   let providerRequestId = "";
   let imageUrl: string | undefined;
@@ -118,6 +118,13 @@ export async function POST(request: Request) {
       narrationUsageEventId = narrationUsage.usage_event_id || "";
     }
 
+    // Choose the model once so the stored job and the provider request agree.
+    const selectedModel = model ?? ((audioUrl || narrationText)
+      ? process.env.HF_AUDIO_VIDEO_MODEL ?? "alibaba/wan-3.0/reference-to-video"
+      : imageUrl
+        ? process.env.HF_I2V_MODEL ?? "alibaba/wan-3.0-prime/image-to-video"
+        : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video");
+
     if (imageUrl && creativeId) {
       const { data: creativeRecord, error: creativeReadError } = await admin.from("creatives")
         .select("scenario")
@@ -129,24 +136,44 @@ export async function POST(request: Request) {
         ? creativeRecord.scenario as Record<string, unknown>
         : {};
       const { error: creativeImageError } = await admin.from("creatives").update({
-        scenario: { ...scenario, input_image_url: imageUrl },
+        scenario: {
+          ...scenario,
+          input_image_url: imageUrl,
+          // The signed URL expires; the path lets later operator jobs re-sign it.
+          ...(imagePath ? { input_image_path: imagePath, input_image_bucket: imageBucket } : {}),
+        },
       }).eq("id", creativeId).eq("user_id", user.id);
       if (creativeImageError) throw new Error(creativeImageError.message);
     }
 
+    const inputRefs = () => ({
+      ...(usageEventId ? { usage_event_id: usageEventId } : {}),
+      ...(narrationUsageEventId ? { narration_usage_event_id: narrationUsageEventId } : {}),
+      ...(imageUrl ? { input_image_url: imageUrl } : {}),
+      ...(imagePath ? { input_image_path: imagePath, input_image_bucket: imageBucket } : {}),
+      ...(audioUrl ? { input_audio_url: audioUrl } : {}),
+      ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}),
+    });
+    persistInputRefs = inputRefs;
+
+    // Insert as running (not queued) so the operator loop never claims and
+    // re-starts a job this request is still preparing (e.g. during TTS).
+    // provider_start_attempted=false tells recovery that the provider has
+    // definitely not been called yet, so an abandoned job can be refunded.
     const { data: job, error: jobError } = await admin.from("production_jobs").insert({
       user_id: user.id,
       social_post_id: socialPostId,
       creative_id: creativeId,
       provider: process.env.VIDEO_ENGINE ?? "higgsfield",
-      model: model ?? ((audioUrl || narrationText) ? process.env.HF_AUDIO_VIDEO_MODEL ?? "alibaba/wan-3.0/reference-to-video" : imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
-      status: "queued",
+      model: selectedModel,
+      status: "running",
       prompt,
       duration,
       resolution,
       aspect_ratio: aspectRatio,
       generate_audio: generateAudio,
-      provider_response: imageUrl || audioUrl ? { ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(imagePath ? { input_image_path: imagePath, input_image_bucket: imageBucket } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}), ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}) } : null,
+      started_at: new Date().toISOString(),
+      provider_response: { ...inputRefs(), provider_start_attempted: false },
     }).select("id").single();
 
     if (jobError || !job) throw new Error(jobError?.message || "production jobの作成に失敗しました。");
@@ -159,16 +186,23 @@ export async function POST(request: Request) {
         ? mixNarrationWithBgm(narrationWav, duration, bgmPrompt)
         : fitWavToDuration(narrationWav, duration);
       const savedAudio = await saveAudioToStorage({ userId: user.id, jobId: job.id, bytes: audioWav });
-      narrationAudioSaved = true;
       audioUrl = savedAudio.url;
       audioPath = savedAudio.path;
       audioBucket = savedAudio.bucket;
     }
 
+    // Record the start attempt before calling the provider. If the function dies
+    // after this point, recovery must not assume the provider was never charged.
+    const { error: attemptError } = await admin.from("production_jobs").update({
+      provider_response: { ...inputRefs(), provider_start_attempted: true },
+      updated_at: new Date().toISOString(),
+    }).eq("id", job.id).eq("user_id", user.id);
+    if (attemptError) throw new Error(`動画ジョブの状態保存に失敗しました: ${attemptError.message}`);
+
     // エンジン選択はRouterに集約する。現在の既定値はHiggsfield。
     const started = await generateVideo({
       prompt,
-      model: model ?? ((audioUrl || narrationText) ? process.env.HF_AUDIO_VIDEO_MODEL ?? "alibaba/wan-3.0/reference-to-video" : imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
+      model: selectedModel,
       duration,
       resolution,
       aspectRatio,
@@ -185,12 +219,8 @@ export async function POST(request: Request) {
       provider_response: {
         engine: started.engine,
         started_response: started.raw,
-        ...(usageEventId ? { usage_event_id: usageEventId } : {}),
-        ...(narrationUsageEventId ? { narration_usage_event_id: narrationUsageEventId } : {}),
-        ...(imageUrl ? { input_image_url: imageUrl } : {}),
-        ...(imagePath ? { input_image_path: imagePath, input_image_bucket: imageBucket } : {}),
-        ...(audioUrl ? { input_audio_url: audioUrl } : {}),
-        ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}),
+        provider_start_attempted: true,
+        ...inputRefs(),
       },
       started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -210,21 +240,22 @@ export async function POST(request: Request) {
     if (jobId) {
       try {
         const { admin } = clients();
+        const refs = persistInputRefs ? persistInputRefs() : {};
         if (providerRequestId) {
-          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message, ...(usageEventId ? { usage_event_id: usageEventId } : {}), ...(narrationUsageEventId ? { narration_usage_event_id: narrationUsageEventId } : {}), ...(imageUrl ? { input_image_url: imageUrl } : {}), ...(imagePath ? { input_image_path: imagePath, input_image_bucket: imageBucket } : {}), ...(audioUrl ? { input_audio_url: audioUrl } : {}), ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}) }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
+          await admin.from("production_jobs").update({ status: "running", request_id: providerRequestId, provider_response: { recovery: true, error: message, provider_start_attempted: true, ...refs }, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId);
         } else {
           await admin.from("production_jobs").update({
             status: "failed",
+            error: message,
             provider_response: {
               error: message,
-              ...(usageEventId ? { usage_event_id: usageEventId } : {}),
-              ...(narrationUsageEventId ? { narration_usage_event_id: narrationUsageEventId } : {}),
-              ...(imageUrl ? { input_image_url: imageUrl } : {}),
-              ...(imagePath ? { input_image_path: imagePath, input_image_bucket: imageBucket } : {}),
-              ...(audioUrl ? { input_audio_url: audioUrl } : {}),
-              ...(audioPath ? { input_audio_path: audioPath, input_audio_bucket: audioBucket } : {}),
+              ...refs,
+              // Quota is refunded below; never let the operator loop restart this
+              // job for free (it would also drop the narration track).
+              terminal: true,
             },
-            completed_at: new Date().toISOString()
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           }).eq("id", jobId).eq("user_id", userId);
         }
       } catch (statePersistError) {
@@ -235,33 +266,21 @@ export async function POST(request: Request) {
         });
       }
     }
-    if (narrationUsageEventId && !narrationAudioSaved) {
-      try {
-        const refund = await refundMonthlyUsage(userId, "narration_generation", narrationUsageEventId);
-        if (!refund.refunded) console.error("narration quota refund was not applied", { userId, narrationUsageEventId, reason: refund.reason });
-      } catch (refundError) {
-        console.error("narration quota refund failed", { userId, narrationUsageEventId, error: refundError });
-      }
-    }
-    if (usageEventId && !providerRequestId) {
-      try {
-        const refund = await refundMonthlyUsage(userId, "video_generation", usageEventId);
-        if (!refund.refunded) {
-          console.error("video generation quota refund was not applied", {
-            userId,
-            usageEventId,
-            reason: refund.reason,
-          });
+    // If the provider never accepted the job the user receives nothing, so both
+    // the video unit and any narration unit charged by this request are returned.
+    if (!providerRequestId) {
+      const refunds: Array<[string, string]> = [];
+      if (usageEventId) refunds.push(["video_generation", usageEventId]);
+      if (narrationUsageEventId) refunds.push(["narration_generation", narrationUsageEventId]);
+      for (const [eventType, eventId] of refunds) {
+        try {
+          const refund = await refundMonthlyUsage(userId, eventType, eventId);
+          if (!refund.refunded) console.error("quota refund was not applied", { userId, eventType, usageEventId: eventId, reason: refund.reason });
+        } catch (refundError) {
+          console.error("quota refund failed", { userId, eventType, usageEventId: eventId, error: refundError instanceof Error ? refundError.message : String(refundError) });
         }
-      } catch (refundError) {
-        console.error("video generation quota refund failed", {
-          userId,
-          usageEventId,
-          error: refundError,
-        });
       }
     }
     return NextResponse.json({ error: message, jobId: jobId || undefined }, { status: 500 });
   }
 }
-

@@ -7,6 +7,7 @@ import { FakeSupabase } from "./fake-supabase";
 import { secretMatches } from "../lib/security/cron-auth";
 
 let db = new FakeSupabase();
+const refunds: Array<{ userId: string; eventType: string; usageEventId: string }> = [];
 
 mock.module("../lib/billing.ts", {
   namedExports: {
@@ -16,7 +17,10 @@ mock.module("../lib/billing.ts", {
       return id && secretMatches(request.headers.get("x-internal-secret")) ? { id } : null;
     },
     consumeMonthlyUsage: async () => ({ allowed: true }),
-    refundMonthlyUsage: async () => ({ refunded: true }),
+    refundMonthlyUsage: async (userId: string, eventType: string, usageEventId: string) => {
+      refunds.push({ userId, eventType, usageEventId });
+      return { refunded: true };
+    },
   },
 });
 
@@ -43,6 +47,7 @@ type Stub = {
   ecPulse: { status: number } | "down";
   higgsfieldCalls: number;
   higgsfieldBodies: Array<Record<string, unknown>>;
+  higgsfieldStatus: Record<string, unknown>;
   openai: "absent" | "down";
 };
 let stub: Stub;
@@ -76,6 +81,9 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     if (stub.ecPulse.status !== 200) return new Response(JSON.stringify({ detail: "db unavailable" }), { status: stub.ecPulse.status });
     return new Response(JSON.stringify({ runs: [{ run_id: "r1", captured_at: "2026-09-30T00:00:00.000Z", comments_count: 200, top_pain: { pain: "すぐぬるくなる", count: 50, share_percent: 25 }, trend: { signal: "emerging_pain_detected", emerging_pains: [{ pain: "結露でカバンが濡れる", status: "rising", share_delta_percent: 4, current_count: 20, current_share_percent: 10 }] } }] }), { status: 200 });
   }
+  if (url.host === "api.higgsfield.ai" && method === "GET") {
+    return new Response(JSON.stringify(stub.higgsfieldStatus), { status: 200 });
+  }
   if (url.host === "api.higgsfield.ai") {
     stub.higgsfieldCalls++;
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
@@ -104,7 +112,8 @@ function seedPost(id: string, opts: { publishedAgoMs?: number; metadata?: Record
 
 beforeEach(() => {
   db = new FakeSupabase();
-  stub = { tweet: { status: 200, metrics: { impression_count: 5000, like_count: 10, reply_count: 1, retweet_count: 0 } }, ecPulse: { status: 200 }, higgsfieldCalls: 0, higgsfieldBodies: [], openai: "absent" };
+  stub = { tweet: { status: 200, metrics: { impression_count: 5000, like_count: 10, reply_count: 1, retweet_count: 0 } }, ecPulse: { status: 200 }, higgsfieldCalls: 0, higgsfieldBodies: [], higgsfieldStatus: { status: "in_progress" }, openai: "absent" };
+  refunds.length = 0;
   delete process.env.OPENAI_API_KEY;
   db.seed("products", [{ id: "prod1", user_id: "u1", name: "保冷ボトル", url: "https://shop.test/bottle", price: 3000, cost: 1200 }]);
   db.seed("acquisition_plans", [{ id: "plan1", user_id: "u1", product_id: "prod1", target: "通勤する会社員", pain: "すぐぬるくなる", desire: "冷たいまま", value_proposition: "夕方まで氷が残る", angle: "すぐぬるくなる", hypothesis: "通勤者は保冷時間に反応する" }]);
@@ -332,4 +341,105 @@ test("empty product information still yields a structured decision", async () =>
   const run = db.table("operator_runs").find((x) => x.run_type === "ai_performance_verdict") as { output: { decision: { target_customer: string; teacher: { missingData: string[] } } } };
   assert.ok(run.output.decision.target_customer);
   assert.ok(run.output.decision.teacher.missingData.includes("product.price"));
+});
+
+const userRequest = (path: string) => new Request(`https://app.test${path}`, {
+  headers: { "x-internal-secret": "cron-secret", "x-internal-user-id": "u1" },
+});
+
+function seedJob(overrides: Record<string, unknown>) {
+  db.seed("production_jobs", [{
+    user_id: "u1",
+    social_post_id: null,
+    status: "running",
+    request_id: "hf-req",
+    prompt: "product close-up",
+    duration: 5,
+    resolution: "1080p",
+    aspect_ratio: "9:16",
+    model: "alibaba/wan-3.0/reference-to-video",
+    generate_audio: false,
+    provider_response: {},
+    created_at: iso(-HOUR),
+    started_at: iso(-10 * 60_000),
+    ...overrides,
+  }]);
+}
+
+test("provider NSFW failure refunds video + narration once, hides raw payload, and blocks auto-retry", async () => {
+  seedJob({
+    id: "job-nsfw",
+    provider_response: {
+      usage_event_id: "ue-video",
+      narration_usage_event_id: "ue-narration",
+      input_audio_url: "https://storage.test/sign/secret-token",
+    },
+  });
+  stub.higgsfieldStatus = { status: "nsfw", detail: "blocked https://cdn.test/private?token=abc" };
+
+  const res = await videoJob(userRequest("/api/video/jobs/job-nsfw"), { params: Promise.resolve({ id: "job-nsfw" }) } as never);
+  const body = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.job.status, "failed");
+  assert.equal(body.job.provider_response, undefined, "signed URLs and quota ids stay server-side");
+  assert.ok(!String(body.job.error).includes("http"), body.job.error);
+  assert.deepEqual(refunds.map((r) => r.eventType).sort(), ["narration_generation", "video_generation"]);
+
+  const row = db.table("production_jobs")[0] as { status: string; provider_response: Record<string, unknown> };
+  assert.equal(row.status, "failed");
+  assert.equal(row.provider_response.terminal, true);
+  assert.ok(!String(row.provider_response.final_provider_detail).includes("token=abc"));
+
+  // A refunded job must not be restarted for free by the operator loop.
+  await operatorLoop(cronRequest());
+  assert.equal(stub.higgsfieldCalls, 0);
+});
+
+test("jobs stuck at the provider past the timeout are failed and refunded", async () => {
+  seedJob({ id: "job-stuck", started_at: iso(-4 * HOUR), provider_response: { usage_event_id: "ue-stuck" } });
+  const res = await videoJob(userRequest("/api/video/jobs/job-stuck"), { params: Promise.resolve({ id: "job-stuck" }) } as never);
+  const body = await res.json();
+  assert.equal(body.job.status, "failed", JSON.stringify(body));
+  assert.deepEqual(refunds, [{ userId: "u1", eventType: "video_generation", usageEventId: "ue-stuck" }]);
+});
+
+test("exhausted retries are refunded once and no longer selected", async () => {
+  seedJob({ id: "job-exhausted", status: "failed", request_id: null, provider_response: { retry_count: 2, usage_event_id: "ue-ex" } });
+  const first = await (await operatorLoop(cronRequest())).json();
+  assert.ok(first.results.some((r: { jobId?: string; status?: string }) => r.jobId === "job-exhausted" && r.status === "exhausted"));
+  assert.equal(refunds.length, 1);
+  const second = await (await operatorLoop(cronRequest())).json();
+  assert.ok(!second.results.some((r: { jobId?: string }) => r.jobId === "job-exhausted"));
+  assert.equal(refunds.length, 1);
+  assert.equal(stub.higgsfieldCalls, 0);
+});
+
+test("a job abandoned before the provider was called is refunded instead of left for manual recovery", async () => {
+  seedJob({ id: "job-abandoned", request_id: null, started_at: iso(-20 * 60_000), provider_response: { provider_start_attempted: false, usage_event_id: "ue-a", narration_usage_event_id: "ue-n" } });
+  await operatorLoop(cronRequest());
+  const row = db.table("production_jobs")[0] as { status: string; provider_response: Record<string, unknown> };
+  assert.equal(row.status, "failed");
+  assert.equal(row.provider_response.terminal, true);
+  assert.equal(row.provider_response.manual_recovery_required, undefined);
+  assert.equal(refunds.length, 2);
+  assert.equal(stub.higgsfieldCalls, 0);
+});
+
+test("a fresh direct-generation job is not claimed by the operator loop while it is still preparing", async () => {
+  seedJob({ id: "job-preparing", request_id: null, started_at: iso(-30_000), provider_response: { provider_start_attempted: false } });
+  await operatorLoop(cronRequest());
+  const row = db.table("production_jobs")[0] as { status: string };
+  assert.equal(row.status, "running");
+  assert.equal(stub.higgsfieldCalls, 0);
+  assert.equal(refunds.length, 0);
+});
+
+test("old finished jobs do not starve a newly queued job", async () => {
+  for (let i = 0; i < 40; i++) {
+    seedJob({ id: `old-${i}`, status: i % 2 ? "completed" : "failed", request_id: i % 2 ? `r-${i}` : null, created_at: iso(-30 * 24 * HOUR + i), provider_response: i % 2 ? {} : { terminal: true } });
+  }
+  seedJob({ id: "job-new", status: "queued", request_id: null, started_at: null, created_at: iso(-60_000), provider_response: null });
+  const body = await (await operatorLoop(cronRequest())).json();
+  assert.ok(body.results.some((r: { jobId?: string; step?: string }) => r.jobId === "job-new" && r.step === "video-start"), JSON.stringify(body.results));
+  assert.equal(stub.higgsfieldCalls, 1);
 });
