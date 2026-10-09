@@ -205,6 +205,7 @@ const TIKTOK_CHUNK_BYTES = 10 * 1024 * 1024;
 async function readVideoForTikTok(videoUrl: string) {
   const response = await fetch(videoUrl, {
     cache: "no-store",
+    redirect: "error",
     signal: AbortSignal.timeout(25_000),
   });
   if (!response.ok) throw new Error(`TikTok fallback could not download the video (HTTP ${response.status}).`);
@@ -297,6 +298,7 @@ async function uploadTikTokVideoFile(
         "Content-Range": `bytes ${offset}-${lastByte}/${bytes.byteLength}`,
       },
       body: chunk,
+      redirect: "error",
       signal: AbortSignal.timeout(25_000),
     });
     if (!uploadResponse.ok) {
