@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import GoogleSignIn from "@/components/GoogleSignIn";
 import BillingButton from "@/components/BillingButton";
 import Link from "next/link";
@@ -84,6 +84,9 @@ export default function Home() {
   const [studioResolution, setStudioResolution] = useState<"720p" | "1080p">("1080p");
   const [studioStage, setStudioStage] = useState<"idle" | "prepare" | "audio" | "visual" | "motion" | "render">("idle");
   const [studioJobId, setStudioJobId] = useState("");
+  const [studioUrlRefreshing, setStudioUrlRefreshing] = useState(false);
+  // Bounded so an unplayable file cannot loop through fresh signed URLs forever.
+  const studioUrlRefreshes = useRef(0);
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["tiktok"]);
   const [publishCaption, setPublishCaption] = useState("");
   const [tiktokConsent, setTiktokConsent] = useState(false);
@@ -262,6 +265,25 @@ export default function Home() {
     return `${engine}で${phase}… 経過 ${minutes}:${seconds}（通常1〜5分）`;
   }
 
+  // Playback links are signed for one hour. When the preview errors (expired
+  // link), fetch a fresh one for the same job instead of asking to regenerate.
+  async function refreshStudioVideoUrl() {
+    if (!studioJobId || studioUrlRefreshing) return;
+    if (studioUrlRefreshes.current >= 2) { setStudioError("動画を再生できませんでした。「新しいタブで開く」を試すか、ページを再読み込みしてください。"); return; }
+    studioUrlRefreshes.current += 1;
+    setStudioUrlRefreshing(true);
+    try {
+      const poll = await fetch("/api/video/jobs/" + encodeURIComponent(studioJobId), { headers: { Authorization: "Bearer " + (await getAccessToken()) }, cache: "no-store" });
+      const data = await poll.json().catch(() => ({}));
+      if (poll.ok && data.asset?.video_url && data.asset.video_url !== studioUrl) setStudioUrl(String(data.asset.video_url));
+      else setStudioError("動画を読み込めませんでした。ページを再読み込みしてください。");
+    } catch (err) {
+      setStudioError(err instanceof Error ? err.message : "動画を読み込めませんでした。");
+    } finally {
+      setStudioUrlRefreshing(false);
+    }
+  }
+
   async function resumeStudioJob() {
     if (!studioJobId) return;
     setStudioGenerating(true); setStudioError(""); setStudioStage("motion"); setStudioStatus("生成状況を再確認中…");
@@ -383,6 +405,7 @@ export default function Home() {
       setStudioStage("motion");
       setStudioStatus(engine + "でモーションを生成中…");
       setStudioJobId(jobId);
+      studioUrlRefreshes.current = 0;
       const outcome = await pollVideoJob(jobId, (elapsed, providerStatus) => setStudioStatus(progressLabel(engine, elapsed, providerStatus)));
       {
         if (outcome.status === "completed") {
@@ -641,7 +664,7 @@ export default function Home() {
           </div>
         </div>
         {studioError && <p className="error" role="alert">{studioError}</p>}
-        {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline preload="metadata" aria-label="生成した動画のプレビュー" /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>↻ Regenerate</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>✦ Remix</button><a href={studioUrl} target="_blank" rel="noreferrer">新しいタブで開く →</a><a href={downloadUrl(studioUrl)} download>動画を保存 ↓</a></div></div>}
+        {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline preload="metadata" aria-label="生成した動画のプレビュー" onError={() => { void refreshStudioVideoUrl(); }} /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>↻ Regenerate</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>✦ Remix</button><a href={studioUrl} target="_blank" rel="noreferrer">新しいタブで開く →</a><a href={downloadUrl(studioUrl)} download>動画を保存 ↓</a></div></div>}
       </section>
       )}
 

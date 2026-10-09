@@ -38,6 +38,13 @@ export async function GET(request: Request) {
     if (error) throw new Error(`${error.code}: ${error.message}`);
     return {};
   });
+  // Generated videos must not be readable by anyone holding a URL; the app
+  // only hands out signed links, so this bucket should report public=false.
+  const videoAssetsBucket = await check(async () => {
+    const { data, error } = await getAdminSupabase().storage.getBucket("video-assets");
+    if (error) throw new Error(error.message);
+    return { public: Boolean(data?.public) };
+  });
   const ecPulse = await check(async () => {
     const response = await ecPulseFetch("/health", { method: "GET", timeoutMs: 6000 });
     const body = await response.json().catch(() => null) as Record<string, unknown> | null;
@@ -54,7 +61,7 @@ export async function GET(request: Request) {
     ...summary,
     environment: process.env.VERCEL_ENV || process.env.NODE_ENV,
     branch: process.env.VERCEL_GIT_COMMIT_REF || null,
-    checks: { database, operatorLeases: leaseTable, ecPulse },
+    checks: { database, operatorLeases: leaseTable, ecPulse, videoAssetsBucket },
     config: {
       cronSecret: Boolean(cronSecret()),
       cronSecretHasWhitespace: Boolean(process.env.CRON_SECRET) && process.env.CRON_SECRET !== process.env.CRON_SECRET?.trim(),

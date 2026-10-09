@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
 import { getHiggsfieldStatus, extractHiggsfieldVideoUrl } from "@/lib/video/higgsfield";
 import { deleteVideoFromStorage, saveVideoToStorage } from "@/lib/video/storage";
+import { withSignedVideoUrls } from "@/lib/video/asset-access";
 import { jobMeta, PROVIDER_JOB_TIMEOUT_MS, providerFailureMessage, refundJobUsage, summarizeProviderPayload } from "@/lib/video/job-recovery";
 
 // provider_response holds signed input URLs and quota event ids; keep it server-side.
@@ -32,7 +33,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       const { data: asset } = await admin.from("video_assets")
         .select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,created_at")
         .eq("production_job_id", job.id).maybeSingle();
-      return NextResponse.json({ ok: true, job: publicJob(job), asset: asset ?? null });
+      return NextResponse.json({ ok: true, job: publicJob(job), asset: await withSignedVideoUrls(admin, user.id, asset ?? null) });
     }
 
     if (!job.request_id) return NextResponse.json({ ok: true, job: publicJob(job), asset: null });
@@ -72,7 +73,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         }).eq("id", job.id).eq("user_id", user.id);
         if (jobUpdateError) throw new Error("動画は保存済みですが、ジョブ状態の更新に失敗しました: " + jobUpdateError.message);
         await syncCreative(existingAsset.video_url);
-        return NextResponse.json({ ok: true, job: publicJob(job, { status: "completed" }), asset: existingAsset });
+        return NextResponse.json({ ok: true, job: publicJob(job, { status: "completed" }), asset: await withSignedVideoUrls(admin, user.id, existingAsset) });
       }
 
       const stored = await saveVideoToStorage({ userId: user.id, jobId: job.id, sourceUrl: videoUrl });
@@ -98,7 +99,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
           status: "completed", provider_response: { ...jobMeta(job.provider_response), final_provider_response: result }, completed_at: new Date().toISOString(), error: null
         }).eq("id", job.id).eq("user_id", user.id);
         await syncCreative(concurrentAsset.video_url);
-        return NextResponse.json({ ok: true, job: publicJob(job, { status: "completed" }), asset: concurrentAsset });
+        return NextResponse.json({ ok: true, job: publicJob(job, { status: "completed" }), asset: await withSignedVideoUrls(admin, user.id, concurrentAsset) });
       }
 
       if (assetError || !asset) {
@@ -114,7 +115,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       if (jobUpdateError) throw new Error("動画は保存されましたが、ジョブ状態の更新に失敗しました: " + jobUpdateError.message);
 
       await syncCreative(stored.url);
-      return NextResponse.json({ ok: true, job: publicJob(job, { status: "completed" }), asset });
+      return NextResponse.json({ ok: true, job: publicJob(job, { status: "completed" }), asset: await withSignedVideoUrls(admin, user.id, asset) });
     }
 
     if (isFailed) {
