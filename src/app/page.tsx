@@ -221,6 +221,8 @@ export default function Home() {
       }
       let imageUrl = "";
       let audioUrl = "";
+      let audioPath = "";
+      let audioBucket = "";
       if (studioImage) {
         const form = new FormData(); form.append("file", studioImage);
         const upload = await fetch("/api/video/upload", { method: "POST", headers: { Authorization: "Bearer " + token }, body: form });
@@ -263,7 +265,9 @@ export default function Home() {
         const audioBody = await audioResponse.json().catch(() => ({}));
         if (!audioResponse.ok) throw new Error(audioBody.error || "音声の生成に失敗しました。");
         audioUrl = String(audioBody.url || "");
-        if (!audioUrl) throw new Error("生成音声URLを取得できませんでした。");
+        audioPath = String(audioBody.path || "");
+        audioBucket = String(audioBody.bucket || "");
+        if (!audioUrl || !audioPath || !audioBucket) throw new Error("生成音声のURLまたは保存先情報を取得できませんでした。");
       }
 
       setStudioStage("visual");
@@ -285,6 +289,8 @@ export default function Home() {
           ].filter(Boolean).join("\n"),
           imageUrl: imageUrl || undefined,
           audioUrl: audioUrl || undefined,
+          audioPath: audioPath || undefined,
+          audioBucket: audioBucket || undefined,
           socialPostId: currentSocialPostId || undefined,
           duration: studioDuration,
           resolution: studioResolution,
