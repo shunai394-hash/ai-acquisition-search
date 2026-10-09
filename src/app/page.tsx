@@ -485,7 +485,7 @@ export default function Home() {
   }
 
   return (
-    <main className="shell">
+    <main id="main-content" className="shell">
       {tiktokNotice && <div className="integration-notice" role="status" aria-live="polite">{tiktokNotice}</div>}
       <header className="topbar">
         <div>
