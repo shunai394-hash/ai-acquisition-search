@@ -131,7 +131,7 @@ export function fitWavToDuration(wav: Uint8Array, durationSeconds: number) {
 }
 
 export function mixNarrationWithBgm(narrationWav: Uint8Array, durationSeconds: number, bgmPrompt = "") {
-  const seconds = Math.max(2, Math.min(30, durationSeconds));
+  const seconds = normalizeDuration(durationSeconds);
   // Keep the spoken track inside the requested video duration and avoid a hard-cut consonant.
   const fittedNarration = fitWavToDuration(narrationWav, seconds);
   const narration = readWavPcm(fittedNarration);
