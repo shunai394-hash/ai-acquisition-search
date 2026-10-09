@@ -121,6 +121,20 @@ test("an already processed event is acknowledged without touching Stripe or the 
   assert.equal(upserts.length, upsertsAfterFirst);
 });
 
+test("a stale processing event is reclaimed after five minutes", async () => {
+  tables.stripe_webhook_events = [{
+    event_id: "evt_stale",
+    event_type: "customer.subscription.updated",
+    status: "processing",
+    received_at: new Date(Date.now() - 6 * 60_000).toISOString(),
+    payload: staleActiveEvent,
+  }];
+  const res = await webhook(signed({ ...staleActiveEvent, id: "evt_stale" }));
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal(tables.stripe_webhook_events[0].status, "processed");
+  assert.equal(upserts.filter((u) => u.table === "subscriptions").length, 1);
+});
+
 test("concurrent duplicate deliveries both succeed and converge on the same state", async () => {
   stripeSubscription = { ...stripeSubscription, status: "active" };
   const [a, b] = await Promise.all([
