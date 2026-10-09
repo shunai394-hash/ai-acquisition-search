@@ -1079,3 +1079,19 @@ a:hover{opacity:.86}
   .video-result video{width:100%;max-height:none}
   .publisher-platforms label{min-height:44px}
 }
+
+/* Keyboard users can bypass repeated navigation and jump to the primary workspace. */
+.skip-link{
+  position:fixed;
+  top:12px;
+  left:12px;
+  z-index:100;
+  transform:translateY(calc(-100% - 20px));
+  padding:12px 16px;
+  border:1px solid rgba(155,140,255,.7);
+  border-radius:10px;
+  background:#11131c;
+  color:#fff;
+  box-shadow:0 8px 30px rgba(0,0,0,.4);
+}
+.skip-link:focus-visible{transform:translateY(0);opacity:1}
