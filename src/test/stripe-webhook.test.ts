@@ -12,16 +12,17 @@ function builder(table: string) {
   let op: "select" | "insert" | "update" = "select";
   let payload: Row = {};
   let returning = false;
-  const filters: Array<[string, unknown]> = [];
+  const filters: Array<[string, unknown, "eq" | "lt"]> = [];
   const api = {
     insert(row: Row) { op = "insert"; payload = row; return api; },
     update(row: Row) { op = "update"; payload = row; return api; },
     upsert(row: Row) { upserts.push({ table, row }); return Promise.resolve({ data: null, error: null }); },
     select() { if (op === "update") returning = true; return api; },
-    eq(col: string, value: unknown) { filters.push([col, value]); return api; },
+    eq(col: string, value: unknown) { filters.push([col, value, "eq"]); return api; },
+    lt(col: string, value: unknown) { filters.push([col, value, "lt"]); return api; },
     maybeSingle() { return api; },
     then(resolve: (value: unknown) => unknown) {
-      const match = rows.filter((row) => filters.every(([col, value]) => row[col] === value));
+      const match = rows.filter((row) => filters.every(([col, value, op]) => op === "lt" ? String(row[col] ?? "") < String(value) : row[col] === value));
       if (op === "insert") {
         if (table === "usage_events" && usageInsertFailure) return Promise.resolve({ data: null, error: { code: "XX000", message: "simulated usage event persistence failure" } }).then(resolve);
         if (table === "stripe_webhook_events" && rows.some((row) => row.event_id === payload.event_id)) return Promise.resolve({ data: null, error: { code: "23505", message: "duplicate key" } }).then(resolve);
