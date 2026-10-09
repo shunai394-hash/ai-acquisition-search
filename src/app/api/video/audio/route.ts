@@ -28,8 +28,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "durationは2〜30秒で指定してください。" }, { status: 400 });
     }
     const duration = requestedDuration;
-    if (text.length > 10_000) {
-      return NextResponse.json({ error: "ナレーション本文は10,000文字以内で指定してください。" }, { status: 400 });
+    if (text.length > 8_000) {
+      return NextResponse.json({ error: "ナレーション本文は8,000文字以内で指定してください。" }, { status: 400 });
     }
     if (bgmPrompt.length > 500) {
       return NextResponse.json({ error: "BGMプロンプトは500文字以内で指定してください。" }, { status: 400 });
@@ -120,8 +120,18 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (usageEventId) {
-      try { await refundMonthlyUsage(userId, "narration_generation", usageEventId); } catch {}
+      try {
+        const refund = await refundMonthlyUsage(userId, "narration_generation", usageEventId);
+        if (!refund.refunded) {
+          console.error("video audio quota refund was not applied", {
+            userId, usageEventId, reason: refund.reason,
+          });
+        }
+      } catch (refundError) {
+        console.error("video audio quota refund failed", { userId, usageEventId, error: refundError });
+      }
     }
+    console.error("video audio generation failed", { userId, error });
     return NextResponse.json({ error: error instanceof Error ? error.message : "音声生成に失敗しました。" }, { status: 502 });
   }
 }
