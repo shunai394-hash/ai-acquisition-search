@@ -152,6 +152,11 @@ export async function generateHiggsfieldVideo(
 
   if (audioUrl) {
     body.audio_urls = [audioUrl];
+    // UNVERIFIED: Higgsfield's catalog describes generate_audio as "generate a
+    // native audio track for the output video" (default true) and lists audio
+    // references separately; it does not state whether a supplied reference is
+    // kept as the output soundtrack with generate_audio=false. The stored file
+    // is probed (media-probe.ts) and the UI warns when the result is silent.
     body.generate_audio = false;
   }
 

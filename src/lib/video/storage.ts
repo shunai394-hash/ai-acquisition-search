@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { fetchPublicUrl } from "@/lib/security/public-url";
+import { mp4HasAudioTrack } from "@/lib/video/media-probe";
 
 const bucket = "video-assets";
 
@@ -75,7 +76,8 @@ export async function saveVideoToStorage(input: {
     path,
     url: data.publicUrl,
     bytes: arrayBuffer.byteLength,
-    contentType
+    contentType,
+    hasAudioTrack: mp4HasAudioTrack(arrayBuffer),
   };
 }
 

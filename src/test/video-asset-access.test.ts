@@ -58,13 +58,15 @@ test("only this project's video-assets URLs map to a storage path", () => {
 
 test("the job API returns 1h signed playback/download URLs instead of the stored public URL", async () => {
   db.seed("production_jobs", [{ id: "job-1", user_id: "u1", status: "completed", request_id: "r", provider_response: {} }]);
-  db.seed("video_assets", [{ id: "a1", production_job_id: "job-1", user_id: "u1", storage_path: "u1/job-1.mp4", video_url: "https://proj.supabase.co/storage/v1/object/public/video-assets/u1/job-1.mp4" }]);
+  db.seed("video_assets", [{ id: "a1", production_job_id: "job-1", user_id: "u1", storage_path: "u1/job-1.mp4", video_url: "https://proj.supabase.co/storage/v1/object/public/video-assets/u1/job-1.mp4", metadata: { has_audio_track: false, requestId: "hf-secret-req" } }]);
   const res = await videoJob(new Request("https://app.test/api/video/jobs/job-1"), { params: Promise.resolve({ id: "job-1" }) } as never);
   const body = await res.json();
   assert.equal(res.status, 200, JSON.stringify(body));
   assert.match(body.asset.video_url, /\/object\/sign\/video-assets\/u1\/job-1\.mp4\?token=/);
   assert.ok(!String(body.asset.video_url).includes("/object/public/"));
   assert.match(body.asset.download_url, /token=/);
+  assert.equal(body.asset.has_audio_track, false, "silent output is reported to the UI");
+  assert.equal(body.asset.metadata, undefined, "provider metadata stays server-side");
   assert.deepEqual(signed.map((s) => [s.bucket, s.ttl, s.download ?? null]), [["video-assets", 3600, null], ["video-assets", 3600, "ai-acquisition-video.mp4"]]);
 });
 

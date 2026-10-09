@@ -69,6 +69,13 @@ export function videoAssetPathFromUrl(url: string, supabaseUrl = process.env.NEX
 
 type AssetRow = { video_url?: unknown; storage_path?: unknown; [key: string]: unknown };
 
+// Expose only the audio-track probe from metadata (it also holds the provider request id).
+function publicAsset<T extends AssetRow>(asset: T) {
+  const { metadata, ...rest } = asset;
+  const meta = metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {};
+  return { ...rest, has_audio_track: typeof meta.has_audio_track === "boolean" ? meta.has_audio_track : null };
+}
+
 /**
  * Replace the stored URL with fresh signed playback/download URLs. Rows whose
  * path does not belong to the user are not signed (defense in depth on top of
@@ -77,11 +84,11 @@ type AssetRow = { video_url?: unknown; storage_path?: unknown; [key: string]: un
 export async function withSignedVideoUrls<T extends AssetRow>(db: StorageClient, userId: string, asset: T | null) {
   if (!asset) return null;
   if (!isOwnedVideoPath(userId, asset.storage_path)) {
-    return { ...asset, video_url: null, download_url: null, url_expires_in: null };
+    return { ...publicAsset(asset), video_url: null, download_url: null, url_expires_in: null };
   }
   const [videoUrl, downloadUrl] = await Promise.all([
     signVideoAsset(db, asset.storage_path),
     signVideoAsset(db, asset.storage_path, { download: "ai-acquisition-video.mp4" }),
   ]);
-  return { ...asset, video_url: videoUrl, download_url: downloadUrl, url_expires_in: PLAYBACK_URL_TTL_SECONDS };
+  return { ...publicAsset(asset), video_url: videoUrl, download_url: downloadUrl, url_expires_in: PLAYBACK_URL_TTL_SECONDS };
 }

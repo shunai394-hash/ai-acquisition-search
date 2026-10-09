@@ -31,7 +31,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
     if (job.status === "completed" || job.status === "failed") {
       const { data: asset } = await admin.from("video_assets")
-        .select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,created_at")
+        .select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,metadata,created_at")
         .eq("production_job_id", job.id).maybeSingle();
       return NextResponse.json({ ok: true, job: publicJob(job), asset: await withSignedVideoUrls(admin, user.id, asset ?? null) });
     }
@@ -64,7 +64,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       if (!videoUrl) throw new Error("Higgsfield completed but video URL was not returned.");
 
       const { data: existingAsset } = await admin.from("video_assets")
-        .select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,created_at")
+        .select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,metadata,created_at")
         .eq("production_job_id", job.id).maybeSingle();
 
       if (existingAsset) {
@@ -81,12 +81,12 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         user_id: user.id, production_job_id: job.id, creative_id: job.creative_id, social_post_id: job.social_post_id,
         provider: "higgsfield", model: job.model, storage_bucket: stored.bucket, storage_path: stored.path, video_url: stored.url,
         prompt: job.prompt, duration: job.duration, resolution: job.resolution, aspect_ratio: job.aspect_ratio,
-        metadata: { bytes: stored.bytes, contentType: stored.contentType, requestId: job.request_id }
-      }).select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,created_at").single();
+        metadata: { bytes: stored.bytes, contentType: stored.contentType, requestId: job.request_id, has_audio_track: stored.hasAudioTrack }
+      }).select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,metadata,created_at").single();
 
       if (assetError?.code === "23505") {
         const { data: concurrentAsset, error: concurrentAssetError } = await admin.from("video_assets")
-          .select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,created_at")
+          .select("id,video_url,storage_path,provider,model,duration,resolution,aspect_ratio,metadata,created_at")
           .eq("production_job_id", job.id).maybeSingle();
         if (concurrentAssetError || !concurrentAsset) {
           try { await deleteVideoFromStorage(stored.path); } catch {}
