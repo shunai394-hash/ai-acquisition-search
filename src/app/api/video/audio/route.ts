@@ -28,8 +28,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "durationは2〜30秒で指定してください。" }, { status: 400 });
     }
     const duration = requestedDuration;
-    if (text.length > 10_000) {
-      return NextResponse.json({ error: "ナレーション本文は10,000文字以内で指定してください。" }, { status: 400 });
+    if (text.length > 8_000) {
+      return NextResponse.json({ error: "ナレーション本文は8,000文字以内で指定してください。" }, { status: 400 });
     }
     if (bgmPrompt.length > 500) {
       return NextResponse.json({ error: "BGMプロンプトは500文字以内で指定してください。" }, { status: 400 });
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     const { data: buckets } = await admin.storage.listBuckets();
     if (!buckets?.some((bucket) => bucket.name === BUCKET)) {
       const created = await admin.storage.createBucket(BUCKET, {
-        public: true,
+        public: false,
         fileSizeLimit: MAX_BYTES,
         allowedMimeTypes: ["audio/wav"],
       });
@@ -99,6 +99,8 @@ export async function POST(request: Request) {
         throw new Error(created.error.message);
       }
     }
+    const privacyUpdate = await admin.storage.updateBucket(BUCKET, { public: false });
+    if (privacyUpdate.error) throw new Error(`Audio bucket privacy update failed: ${privacyUpdate.error.message}`);
 
     const path = user.id + "/" + crypto.randomUUID() + ".wav";
     const uploaded = await admin.storage.from(BUCKET).upload(path, Buffer.from(audio), {
@@ -108,10 +110,18 @@ export async function POST(request: Request) {
     });
     if (uploaded.error) throw new Error(uploaded.error.message);
 
-    const publicUrl = admin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    const signed = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 60);
+    if (signed.error || !signed.data?.signedUrl) {
+      // Do not leave orphaned private audio when the client cannot receive its signed URL.
+      const cleanup = await admin.storage.from(BUCKET).remove([path]);
+      if (cleanup.error) console.error("audio upload cleanup failed after signed URL error", { userId, path, error: cleanup.error.message });
+      throw new Error(signed.error?.message || "Audio signed URL could not be created.");
+    }
     return NextResponse.json({
       ok: true,
-      url: publicUrl,
+      url: signed.data.signedUrl,
+      path,
+      bucket: BUCKET,
       mimeType: "audio/wav",
       bytes: audio.byteLength,
       narrationModel: narrationModel || undefined,
@@ -120,8 +130,18 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (usageEventId) {
-      try { await refundMonthlyUsage(userId, "narration_generation", usageEventId); } catch {}
+      try {
+        const refund = await refundMonthlyUsage(userId, "narration_generation", usageEventId);
+        if (!refund.refunded) {
+          console.error("video audio quota refund was not applied", {
+            userId, usageEventId, reason: refund.reason,
+          });
+        }
+      } catch (refundError) {
+        console.error("video audio quota refund failed", { userId, usageEventId, error: refundError });
+      }
     }
+    console.error("video audio generation failed", { userId, error });
     return NextResponse.json({ error: error instanceof Error ? error.message : "音声生成に失敗しました。" }, { status: 502 });
   }
 }

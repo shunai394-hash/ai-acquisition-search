@@ -16,6 +16,12 @@ function matchesImageSignature(bytes: Uint8Array, mime: string) {
 
 export async function POST(request: Request) {
   try {
+    // Reject oversized multipart bodies before parsing them into memory.
+    const declaredLength = Number(request.headers.get("content-length") || 0);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BYTES + 256 * 1024) {
+      return NextResponse.json({ error: "画像アップロードのリクエストが大きすぎます。画像は8MB以下にしてください。" }, { status: 413 });
+    }
+
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
 
@@ -34,9 +40,11 @@ export async function POST(request: Request) {
 
     const { data: buckets } = await admin.storage.listBuckets();
     if (!buckets?.some((bucket) => bucket.name === BUCKET)) {
-      const created = await admin.storage.createBucket(BUCKET, { public: true, fileSizeLimit: MAX_BYTES, allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"] });
+      const created = await admin.storage.createBucket(BUCKET, { public: false, fileSizeLimit: MAX_BYTES, allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"] });
       if (created.error && !created.error.message.toLowerCase().includes("already exists")) throw new Error(created.error.message);
     }
+    const privacyUpdate = await admin.storage.updateBucket(BUCKET, { public: false });
+    if (privacyUpdate.error) throw new Error("Image bucket privacy update failed: " + privacyUpdate.error.message);
 
     const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
     const path = user.id + "/" + crypto.randomUUID() + "." + ext;
@@ -44,8 +52,14 @@ export async function POST(request: Request) {
     const uploaded = await admin.storage.from(BUCKET).upload(path, buffer, { contentType: file.type, upsert: false, cacheControl: "3600" });
     if (uploaded.error) throw new Error(uploaded.error.message);
 
-    const publicUrl = admin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
-    return NextResponse.json({ ok: true, url: publicUrl });
+    const signed = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 60);
+    if (signed.error || !signed.data?.signedUrl) {
+      // Avoid orphaned private uploads if the response cannot be used by the client.
+      const cleanup = await admin.storage.from(BUCKET).remove([path]);
+      if (cleanup.error) console.error("image upload cleanup failed after signed URL error", { userId: user.id, path, error: cleanup.error.message });
+      throw new Error(signed.error?.message || "Image signed URL could not be created.");
+    }
+    return NextResponse.json({ ok: true, url: signed.data.signedUrl, path, bucket: BUCKET });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "画像アップロードに失敗しました。" }, { status: 500 });
   }

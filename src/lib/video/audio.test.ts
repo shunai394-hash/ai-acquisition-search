@@ -22,6 +22,21 @@ function pcmToWav(pcm: Int16Array, sampleRate = 24_000, channels = 1) {
   return new Uint8Array(buffer);
 }
 
+function toneWav(durationSeconds: number, frequency = 440) {
+  const samples = durationSeconds * 24_000;
+  const pcm = new Int16Array(samples);
+  for (let i = 0; i < samples; i++) {
+    pcm[i] = Math.round(Math.sin((2 * Math.PI * frequency * i) / 24_000) * 6_000);
+  }
+  return pcmToWav(pcm);
+}
+
+function readPcm(bytes: Uint8Array) {
+  const buffer = Buffer.from(bytes);
+  const count = buffer.readUInt32LE(40) / 2;
+  return Int16Array.from({ length: count }, (_, i) => buffer.readInt16LE(44 + i * 2));
+}
+
 test("generated BGM can be wrapped as a narration-compatible WAV", () => {
   const bgm = pcmToWav(generateBgm(3, "warm acoustic"));
   assert.ok(bgm.byteLength > 44);
@@ -29,16 +44,30 @@ test("generated BGM can be wrapped as a narration-compatible WAV", () => {
   assert.equal(isSupportedNarrationWav(bgm), true);
 });
 
-test("narration + BGM mix preserves a valid WAV contract", () => {
-  const source = pcmToWav(generateBgm(2, "lofi"));
+test("narration + BGM mix preserves the speech signal and valid WAV duration", () => {
+  // A stable speech-band test signal is more meaningful than using generated BGM as narration.
+  const source = toneWav(2);
   const mixed = mixNarrationWithBgm(source, 2, "warm acoustic");
-  assert.ok(mixed.byteLength > source.byteLength * 0.9);
   assert.equal(isSupportedNarrationWav(mixed), true);
+
+  const originalPcm = readPcm(source);
+  const mixedPcm = readPcm(mixed);
+  assert.equal(mixedPcm.length, 24_000 * 2);
+
+  let dot = 0;
+  let originalPower = 0;
+  let mixedPower = 0;
+  for (let i = 0; i < originalPcm.length; i++) {
+    dot += originalPcm[i] * mixedPcm[i];
+    originalPower += originalPcm[i] * originalPcm[i];
+    mixedPower += mixedPcm[i] * mixedPcm[i];
+  }
+  const correlation = dot / Math.sqrt(originalPower * mixedPower);
+  assert.ok(correlation > 0.9, `speech signal correlation should remain high, got ${correlation}`);
 });
 
-
 test("duration fitting trims long narration with a valid WAV and expected sample count", () => {
-  const source = pcmToWav(generateBgm(5, "speech bed"));
+  const source = toneWav(5);
   const fitted = fitWavToDuration(source, 2);
   assert.equal(isSupportedNarrationWav(fitted), true);
   const sampleRate = Buffer.from(fitted).readUInt32LE(24);
@@ -47,9 +76,8 @@ test("duration fitting trims long narration with a valid WAV and expected sample
   assert.equal(dataBytes / 2, 24_000 * 2);
 });
 
-
 test("audio helpers reject non-finite durations instead of returning empty audio", () => {
   assert.throws(() => generateBgm(Number.NaN, "test"), /有限の数値/);
-  assert.throws(() => fitWavToDuration(pcmToWav(generateBgm(2, "test")), Number.POSITIVE_INFINITY), /有限の数値/);
-  assert.throws(() => mixNarrationWithBgm(pcmToWav(generateBgm(2, "test")), Number.NaN), /有限の数値/);
+  assert.throws(() => fitWavToDuration(toneWav(2), Number.POSITIVE_INFINITY), /有限の数値/);
+  assert.throws(() => mixNarrationWithBgm(toneWav(2), Number.NaN), /有限の数値/);
 });

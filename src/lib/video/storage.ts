@@ -86,3 +86,42 @@ export async function deleteVideoFromStorage(path: string) {
     throw new Error(`Supabase Storage cleanup failed: ${error.message}`);
   }
 }
+
+export async function saveAudioToStorage(input: {
+  userId: string;
+  jobId: string;
+  bytes: Uint8Array;
+}) {
+  const supabase = adminClient();
+  const audioBucket = "video-audio";
+  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+  if (listError) throw new Error(`Supabase Storage bucket listing failed: ${listError.message}`);
+
+  if (!buckets?.some((item) => item.name === audioBucket)) {
+    const created = await supabase.storage.createBucket(audioBucket, {
+      public: false,
+      fileSizeLimit: 16 * 1024 * 1024,
+      allowedMimeTypes: ["audio/wav"],
+    });
+    if (created.error && !created.error.message.toLowerCase().includes("already exists")) {
+      throw new Error(`Supabase audio bucket creation failed: ${created.error.message}`);
+    }
+  }
+  const privacyUpdate = await supabase.storage.updateBucket(audioBucket, { public: false });
+  if (privacyUpdate.error) throw new Error(`Supabase audio bucket privacy update failed: ${privacyUpdate.error.message}`);
+
+  const path = `${input.userId}/${input.jobId}.wav`;
+  const { error: uploadError } = await supabase.storage.from(audioBucket).upload(path, input.bytes, {
+    contentType: "audio/wav",
+    upsert: true,
+    cacheControl: "3600",
+  });
+  if (uploadError) throw new Error(`Supabase audio upload failed: ${uploadError.message}`);
+
+  const signed = await supabase.storage.from(audioBucket).createSignedUrl(path, 60 * 60);
+  if (signed.error || !signed.data?.signedUrl) {
+    throw new Error(`Supabase audio signed URL creation failed: ${signed.error?.message || "unknown error"}`);
+  }
+  return { bucket: audioBucket, path, url: signed.data.signedUrl, bytes: input.bytes.byteLength, contentType: "audio/wav" };
+}
+

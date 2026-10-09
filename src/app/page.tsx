@@ -91,6 +91,13 @@ export default function Home() {
       if (response.ok) setTiktokConsent(body.consented === true);
     }).catch(() => {});
   }, []);
+
+  // Release temporary browser object URLs whenever the selected image changes or this page unmounts.
+  useEffect(() => {
+    if (!studioImagePreview) return;
+    return () => URL.revokeObjectURL(studioImagePreview);
+  }, [studioImagePreview]);
+
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -134,37 +141,43 @@ export default function Home() {
         decision?.format ? "形式: " + decision.format : "9:16 short-form ad",
         "Natural UGC-style product advertising, clear first 3 seconds, factual claims only, no watermark.",
       ].filter(Boolean).join("\n"));
+      // Show the primary analysis immediately; enrichment is independent and should not
+      // keep the main action in a loading state while secondary research is still running.
       setEcPulse(null);
       setEcPulseLoading(true);
-      try {
-        const researchToken = await getAccessToken();
-        const researchRes = await fetch("/api/ec-pulse-research", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${researchToken}` },
-          body: JSON.stringify({ url }),
-        });
-        const researchData = await researchRes.json();
-        setEcPulse(researchData);
-      } catch {
-        setEcPulse({ connected: false, research: null, products: [], error: "EC Pulseリサーチに接続できませんでした。" });
-      } finally {
-        setEcPulseLoading(false);
-      }
+      void (async () => {
+        try {
+          const researchToken = await getAccessToken();
+          const researchRes = await fetch("/api/ec-pulse-research", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${researchToken}` },
+            body: JSON.stringify({ url }),
+          });
+          const researchData = await researchRes.json();
+          setEcPulse(researchData);
+        } catch {
+          setEcPulse({ connected: false, research: null, products: [], error: "EC Pulseリサーチに接続できませんでした。" });
+        } finally {
+          setEcPulseLoading(false);
+        }
+      })();
 
       setHistoryLoading(true);
-      try {
-        const historyToken = await getAccessToken();
-        const historyResponse = await fetch("/api/ec-pulse-research/history?url=" + encodeURIComponent(url) + "&limit=8", {
-          headers: { Authorization: `Bearer ${historyToken}` },
-          cache: "no-store"
-        });
-        const historyData = await historyResponse.json().catch(() => ({}));
-        setResearchHistory(historyData.runs || []);
-      } catch {
-        setResearchHistory([]);
-      } finally {
-        setHistoryLoading(false);
-      }
+      void (async () => {
+        try {
+          const historyToken = await getAccessToken();
+          const historyResponse = await fetch("/api/ec-pulse-research/history?url=" + encodeURIComponent(url) + "&limit=8", {
+            headers: { Authorization: `Bearer ${historyToken}` },
+            cache: "no-store"
+          });
+          const historyData = await historyResponse.json().catch(() => ({}));
+          setResearchHistory(historyData.runs || []);
+        } catch {
+          setResearchHistory([]);
+        } finally {
+          setHistoryLoading(false);
+        }
+      })();
     } catch (err) {
       setError(err instanceof Error ? err.message : "分析に失敗しました。");
     } finally {
@@ -220,13 +233,20 @@ export default function Home() {
         if (currentSocialPostId) setSocialPostId(currentSocialPostId);
       }
       let imageUrl = "";
+      let imagePath = "";
+      let imageBucket = "";
       let audioUrl = "";
+      let audioPath = "";
+      let audioBucket = "";
       if (studioImage) {
         const form = new FormData(); form.append("file", studioImage);
         const upload = await fetch("/api/video/upload", { method: "POST", headers: { Authorization: "Bearer " + token }, body: form });
         const body = await upload.json().catch(() => ({}));
         if (!upload.ok) throw new Error(body.error || "画像のアップロードに失敗しました。");
         imageUrl = String(body.url || "");
+        imagePath = String(body.path || "");
+        imageBucket = String(body.bucket || "");
+        if (!imageUrl || !imagePath || !imageBucket) throw new Error("画像のURLまたは保存先情報を取得できませんでした。");
       }
       if (studioAudio !== "off" || studioMusic) {
         setStudioStage("audio");
@@ -263,7 +283,9 @@ export default function Home() {
         const audioBody = await audioResponse.json().catch(() => ({}));
         if (!audioResponse.ok) throw new Error(audioBody.error || "音声の生成に失敗しました。");
         audioUrl = String(audioBody.url || "");
-        if (!audioUrl) throw new Error("生成音声URLを取得できませんでした。");
+        audioPath = String(audioBody.path || "");
+        audioBucket = String(audioBody.bucket || "");
+        if (!audioUrl || !audioPath || !audioBucket) throw new Error("生成音声のURLまたは保存先情報を取得できませんでした。");
       }
 
       setStudioStage("visual");
@@ -284,7 +306,11 @@ export default function Home() {
               : ""
           ].filter(Boolean).join("\n"),
           imageUrl: imageUrl || undefined,
+          imagePath: imagePath || undefined,
+          imageBucket: imageBucket || undefined,
           audioUrl: audioUrl || undefined,
+          audioPath: audioPath || undefined,
+          audioBucket: audioBucket || undefined,
           socialPostId: currentSocialPostId || undefined,
           duration: studioDuration,
           resolution: studioResolution,
@@ -472,7 +498,7 @@ export default function Home() {
   }
 
   return (
-    <main className="shell">
+    <main id="main-content" className="shell">
       {tiktokNotice && <div className="integration-notice" role="status" aria-live="polite">{tiktokNotice}</div>}
       <header className="topbar">
         <div>
@@ -544,7 +570,7 @@ export default function Home() {
             <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","UGC広告","商品CM","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","UGC広告":"自然なスマホ撮影感のあるUGC動画。冒頭2秒で視線を引き、リアルな人物の動きを重視。","商品CM":"高級ブランドCMのような商品映像。質感、照明、カメラの動きを美しく見せる。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
             <textarea id="studio-prompt" value={studioPrompt} onChange={(e)=>setStudioPrompt(e.target.value)} rows={8}
               placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この商品画像を使って、20代女性が自然に商品を紹介するUGC風広告。最初の2秒で視線を引き、夕方の柔らかな光。縦9:16、リアルなスマホ撮影感。"} />
-            <div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · AUDIO</span><div className="studio-audio-grid">{([["off","OFF"],["auto","AUTO"],["custom","CUSTOM"]] as const).map(([value,label]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} onClick={()=>setStudioAudio(value)} aria-pressed={studioAudio === value}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option value="Kore">日本語 · Firm</option><option value="Leda">日本語 · Youthful</option><option value="Charon">日本語 · Informative</option><option value="Aoede">日本語 · Breezy</option><option value="Puck">English · Upbeat</option><option value="Achird">English · Friendly</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> BGMを自動生成</label>{studioMusic && <input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="BGMの雰囲気（例：minimal electronic / warm acoustic）" aria-label="BGMの雰囲気" />}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
+            <div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · AUDIO</span><div className="studio-audio-grid">{([["off","OFF"],["auto","AUTO"],["custom","CUSTOM"]] as const).map(([value,label]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} onClick={()=>setStudioAudio(value)} aria-pressed={studioAudio === value}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option value="Kore">日本語 · Firm</option><option value="Leda">日本語 · Youthful</option><option value="Charon">日本語 · Informative</option><option value="Aoede">日本語 · Breezy</option><option value="Puck">English · Upbeat</option><option value="Achird">English · Friendly</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> 簡易BGMを追加</label>{studioMusic && <><p className="studio-music-note">現在は軽量な合成BGMです。AI作曲によるフル楽曲ではありません。</p><input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="雰囲気のヒント（例：lofi / calm / upbeat）" aria-label="BGMの雰囲気" /></>}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
               {([["prepare","PREPARE","素材"],["visual","VISUAL","映像設計"],["motion","MOTION","モーション"],["audio","AUDIO","音"],["render","RENDER","仕上げ"]] as const).map(([key,label,ja], index) => {
                 const order = ["idle","prepare","visual","motion","audio","render"] as const;
                 const active = order.indexOf(studioStage) >= order.indexOf(key);
@@ -552,11 +578,11 @@ export default function Home() {
               })}
             </div><div className="studio-actions">
               <button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating || studioPrompt.trim().length < 8 || (studioAudio === "custom" && !studioNarration.trim() && !studioMusic)} aria-busy={studioGenerating}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
-              {studioStatus && <span className="video-status">{studioStatus}</span>}
+              {studioStatus && <span className="video-status" role="status" aria-live="polite">{studioStatus}</span>}
             </div>
           </div>
         </div>
-        {studioError && <p className="error">{studioError}</p>}
+        {studioError && <p className="error" role="alert">{studioError}</p>}
         {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>↻ Regenerate</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>✦ Remix</button><a href={studioUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></div></div>}
       </section>
       )}
