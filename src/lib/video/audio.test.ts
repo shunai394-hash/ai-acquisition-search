@@ -46,3 +46,10 @@ test("duration fitting trims long narration with a valid WAV and expected sample
   assert.equal(sampleRate, 24_000);
   assert.equal(dataBytes / 2, 24_000 * 2);
 });
+
+
+test("audio helpers reject non-finite durations instead of returning empty audio", () => {
+  assert.throws(() => generateBgm(Number.NaN, "test"), /有限の数値/);
+  assert.throws(() => fitWavToDuration(pcmToWav(generateBgm(2, "test")), Number.POSITIVE_INFINITY), /有限の数値/);
+  assert.throws(() => mixNarrationWithBgm(pcmToWav(generateBgm(2, "test")), Number.NaN), /有限の数値/);
+});
