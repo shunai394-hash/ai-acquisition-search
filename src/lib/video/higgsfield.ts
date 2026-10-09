@@ -101,7 +101,7 @@ export async function generateHiggsfieldVideo(
     );
   }
 
-  if (hasImage && !isImageToVideo) {
+  if (hasImage && !isImageToVideo && !isReferenceToVideo) {
     throw new Error(
       `The selected Higgsfield model does not support image-to-video: ${model}`
     );
