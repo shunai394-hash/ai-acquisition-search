@@ -115,6 +115,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       url: signed.data.signedUrl,
+      path,
+      bucket: BUCKET,
       mimeType: "audio/wav",
       bytes: audio.byteLength,
       narrationModel: narrationModel || undefined,
