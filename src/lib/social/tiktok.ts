@@ -178,6 +178,15 @@ export type TikTokPublishInput = {
   videoCoverTimestampMs?: number;
 };
 
+const TIKTOK_PRIVACY_LEVELS = ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"] as const;
+
+export function configuredTikTokPrivacyLevel(): NonNullable<TikTokPublishInput["privacyLevel"]> {
+  const value = String(process.env.TIKTOK_PRIVACY_LEVEL || "SELF_ONLY").trim().toUpperCase();
+  return (TIKTOK_PRIVACY_LEVELS as readonly string[]).includes(value)
+    ? value as NonNullable<TikTokPublishInput["privacyLevel"]>
+    : "SELF_ONLY";
+}
+
 export async function queryTikTokCreator(accessToken = getAccessToken()) {
   const response = await fetch(`${TIKTOK_API_BASE}/post/publish/creator_info/query/`, {
     method: "POST",
@@ -193,7 +202,10 @@ export async function publishTikTokVideo(input: TikTokPublishInput) {
   if (!input.videoUrl.startsWith("https://")) throw new Error("TikTokのPULL_FROM_URL投稿にはHTTPSの公開動画URLが必要です。");
   const creator = await queryTikTokCreator(input.accessToken || getAccessToken());
   const options = Array.isArray(creator.privacy_level_options) ? creator.privacy_level_options : [];
-  const privacy = input.privacyLevel || (options.includes("PUBLIC_TO_EVERYONE") ? "PUBLIC_TO_EVERYONE" : options[0] || "SELF_ONLY");
+  // Never silently pick PUBLIC: unaudited TikTok apps may only post SELF_ONLY,
+  // and TikTok's Direct Post guidelines require the visibility to be chosen
+  // explicitly. Public posting needs an audited app and TIKTOK_PRIVACY_LEVEL.
+  const privacy = input.privacyLevel || configuredTikTokPrivacyLevel();
   if (!options.includes(privacy)) throw new Error(`指定されたprivacyLevelはこのTikTokアカウントでは使用できません: ${privacy}`);
 
   const response = await fetch(`${TIKTOK_API_BASE}/post/publish/video/init/`, {

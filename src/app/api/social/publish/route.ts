@@ -242,7 +242,7 @@ export async function POST(request: Request) {
             externalPublishSucceeded = true;
             externalPostId = resolved.videoId ?? r.publishId;
             externalPostUrl = typeof resolved.share_url === "string" ? resolved.share_url : null;
-            const saved = await complete(rowId,platform,externalPostId,externalPostUrl,{publishId:r.publishId,publishStatus:resolved.status,creatorUsername:r.creatorUsername,publicVideoId:resolved.videoId ?? null});
+            const saved = await complete(rowId,platform,externalPostId,externalPostUrl,{publishId:r.publishId,publishStatus:resolved.status,creatorUsername:r.creatorUsername,privacyLevel:r.privacyLevel,publicVideoId:resolved.videoId ?? null});
             results.push({platform,ok:true,postId:saved.external_post_id ?? externalPostId,url:saved.post_url ?? externalPostUrl ?? undefined});
           } else if (platform === "instagram") {
             const r = await publishInstagramReel({videoUrl,caption});
