@@ -93,3 +93,21 @@ test("raw PCM from TTS is wrapped into a mixable WAV; WAV input is kept as-is", 
   assert.equal(ensureWavBase64(already), already);
   assert.throws(() => ensureWavBase64(""), /空の音声/);
 });
+
+test("BGM ducks under narration and stays audible where nobody speaks", () => {
+  const rmsDb = (pcm: Int16Array) => {
+    let sum = 0;
+    for (const value of pcm) sum += value * value;
+    return 20 * Math.log10(Math.sqrt(sum / pcm.length) / 32768);
+  };
+  const mixed = readPcm(mixNarrationWithBgm(toneWav(3), 8, "calm"));
+  const bgmOnly = mixed.subarray(24_000 * 4, 24_000 * 7);
+  const bgmLevel = rmsDb(bgmOnly);
+  assert.ok(bgmLevel > -30 && bgmLevel < -18, `BGM after narration should be audible but moderate, got ${bgmLevel.toFixed(1)} dBFS`);
+
+  // Under speech the music contribution must be clearly below the voice.
+  const speechPart = mixed.subarray(24_000 * 1, 24_000 * 2);
+  const voice = readPcm(toneWav(3)).subarray(24_000 * 1, 24_000 * 2);
+  const residual = Int16Array.from(speechPart, (value, i) => value - Math.round(voice[i] * 0.98));
+  assert.ok(rmsDb(voice) - rmsDb(residual) >= 9, `music under speech should be ≥9 dB below voice, got ${(rmsDb(voice) - rmsDb(residual)).toFixed(1)} dB`);
+});

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getUserFromBearer, consumeMonthlyUsage, refundMonthlyUsage } from "@/lib/billing";
 import { generateNarration } from "@/lib/video/gemini-tts";
-import { generateBgm, mixNarrationWithBgm, pcmToWav, fitWavToDuration } from "@/lib/video/audio";
+import { bgmOnlyWav, mixNarrationWithBgm, fitWavToDuration } from "@/lib/video/audio";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       const narrationWav = new Uint8Array(Buffer.from(narration.audioBase64, "base64"));
       audio = bgm ? mixNarrationWithBgm(narrationWav, duration, bgmPrompt) : fitWavToDuration(narrationWav, duration);
     } else {
-      audio = pcmToWav(generateBgm(duration, bgmPrompt));
+      audio = bgmOnlyWav(duration, bgmPrompt);
     }
 
     if (audio.byteLength > MAX_BYTES) {
