@@ -111,7 +111,12 @@ export async function POST(request: Request) {
     if (uploaded.error) throw new Error(uploaded.error.message);
 
     const signed = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 60);
-    if (signed.error || !signed.data?.signedUrl) throw new Error(signed.error?.message || "Audio signed URL could not be created.");
+    if (signed.error || !signed.data?.signedUrl) {
+      // Do not leave orphaned private audio when the client cannot receive its signed URL.
+      const cleanup = await admin.storage.from(BUCKET).remove([path]);
+      if (cleanup.error) console.error("audio upload cleanup failed after signed URL error", { userId, path, error: cleanup.error.message });
+      throw new Error(signed.error?.message || "Audio signed URL could not be created.");
+    }
     return NextResponse.json({
       ok: true,
       url: signed.data.signedUrl,
