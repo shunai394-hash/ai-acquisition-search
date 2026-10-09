@@ -1,0 +1,15 @@
+# Keep large local test media out of Git
+*.mp4
+*.mov
+*.m4v
+*.webm
+*.avi
+*.mkv
+*.mpeg
+*.mpg
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.flac
+*.ogg
