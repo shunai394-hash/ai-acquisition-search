@@ -198,9 +198,120 @@ export async function queryTikTokCreator(accessToken = getAccessToken()) {
   return payload.data;
 }
 
+const MAX_TIKTOK_UPLOAD_BYTES = 100 * 1024 * 1024;
+const TIKTOK_CHUNK_BYTES = 10 * 1024 * 1024;
+
+async function readVideoForTikTok(videoUrl: string) {
+  const response = await fetch(videoUrl, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (!response.ok) throw new Error(`TikTok fallback could not download the video (HTTP ${response.status}).`);
+
+  const rawType = (response.headers.get("content-type") || "video/mp4").split(";")[0].trim().toLowerCase();
+  const contentType = rawType === "application/octet-stream" ? "video/mp4" : rawType;
+  if (!["video/mp4", "video/quicktime", "video/webm"].includes(contentType)) {
+    throw new Error("TikTok file upload supports MP4, MOV, or WebM video only.");
+  }
+
+  const declaredSize = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredSize) && declaredSize > MAX_TIKTOK_UPLOAD_BYTES) {
+    throw new Error("The video exceeds the 100 MB TikTok upload safety limit.");
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.byteLength > MAX_TIKTOK_UPLOAD_BYTES) throw new Error("The video exceeds the 100 MB TikTok upload safety limit.");
+    if (!bytes.byteLength) throw new Error("The video file is empty.");
+    return { bytes, contentType };
+  }
+
+  const chunks: Buffer[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_TIKTOK_UPLOAD_BYTES) {
+      await reader.cancel().catch(() => undefined);
+      throw new Error("The video exceeds the 100 MB TikTok upload safety limit.");
+    }
+    chunks.push(Buffer.from(value));
+  }
+  if (!total) throw new Error("The video file is empty.");
+  return { bytes: Buffer.concat(chunks, total), contentType };
+}
+
+async function uploadTikTokVideoFile(
+  input: TikTokPublishInput,
+  accessToken: string,
+  postInfo: Record<string, unknown>,
+) {
+  const { bytes, contentType } = await readVideoForTikTok(input.videoUrl);
+  const chunkSize = Math.min(TIKTOK_CHUNK_BYTES, bytes.byteLength);
+  const totalChunkCount = Math.ceil(bytes.byteLength / chunkSize);
+  const initResponse = await fetch(`${TIKTOK_API_BASE}/post/publish/video/init/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json; charset=UTF-8" },
+    body: JSON.stringify({
+      post_info: postInfo,
+      source_info: {
+        source: "FILE_UPLOAD",
+        video_size: bytes.byteLength,
+        chunk_size: chunkSize,
+        total_chunk_count: totalChunkCount,
+      },
+    }),
+  });
+  const initPayload = await initResponse.json().catch(() => ({}));
+  if (!initResponse.ok || initPayload?.error?.code !== "ok") {
+    throw new Error(initPayload?.error?.message || `TikTok file upload initialization failed: ${initResponse.status}`);
+  }
+
+  const publishId = initPayload?.data?.publish_id;
+  const uploadUrlValue = initPayload?.data?.upload_url;
+  if (typeof publishId !== "string" || !publishId || typeof uploadUrlValue !== "string") {
+    throw new Error("TikTok did not return a publish ID and upload URL for FILE_UPLOAD.");
+  }
+  let uploadUrl: URL;
+  try {
+    uploadUrl = new URL(uploadUrlValue);
+  } catch {
+    throw new Error("TikTok returned an invalid file upload URL.");
+  }
+  if (uploadUrl.protocol !== "https:" || uploadUrl.hostname !== "open-upload.tiktokapis.com") {
+    throw new Error("TikTok returned an unexpected file upload host.");
+  }
+
+  for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
+    const chunk = bytes.subarray(offset, Math.min(offset + chunkSize, bytes.byteLength));
+    const lastByte = offset + chunk.byteLength - 1;
+    const uploadResponse = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType,
+        "Content-Length": String(chunk.byteLength),
+        "Content-Range": `bytes ${offset}-${lastByte}/${bytes.byteLength}`,
+      },
+      body: chunk,
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!uploadResponse.ok) {
+      throw new Error(`TikTok rejected a video upload chunk (HTTP ${uploadResponse.status}).`);
+    }
+  }
+
+  return {
+    publishId,
+    privacyLevel: input.privacyLevel || configuredTikTokPrivacyLevel(),
+  };
+}
+
 export async function publishTikTokVideo(input: TikTokPublishInput) {
-  if (!input.videoUrl.startsWith("https://")) throw new Error("TikTokのPULL_FROM_URL投稿にはHTTPSの公開動画URLが必要です。");
-  const creator = await queryTikTokCreator(input.accessToken || getAccessToken());
+  if (!input.videoUrl.startsWith("https://")) throw new Error("TikTok投稿にはHTTPSの動画URLが必要です。");
+  const accessToken = input.accessToken || getAccessToken();
+  const creator = await queryTikTokCreator(accessToken);
   const options = Array.isArray(creator.privacy_level_options) ? creator.privacy_level_options : [];
   // Never silently pick PUBLIC: unaudited TikTok apps may only post SELF_ONLY,
   // and TikTok's Direct Post guidelines require the visibility to be chosen
@@ -208,25 +319,36 @@ export async function publishTikTokVideo(input: TikTokPublishInput) {
   const privacy = input.privacyLevel || configuredTikTokPrivacyLevel();
   if (!options.includes(privacy)) throw new Error(`指定されたprivacyLevelはこのTikTokアカウントでは使用できません: ${privacy}`);
 
+  const postInfo = {
+    title: input.title.slice(0, 2200),
+    privacy_level: privacy,
+    disable_comment: input.disableComment ?? false,
+    disable_duet: input.disableDuet ?? false,
+    disable_stitch: input.disableStitch ?? false,
+    is_aigc: input.isAigc ?? true,
+    brand_organic_toggle: input.brandOrganicToggle ?? false,
+    ...(input.videoCoverTimestampMs == null ? {} : { video_cover_timestamp_ms: input.videoCoverTimestampMs }),
+  };
+
   const response = await fetch(`${TIKTOK_API_BASE}/post/publish/video/init/`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${input.accessToken || getAccessToken()}`, "Content-Type": "application/json; charset=UTF-8" },
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json; charset=UTF-8" },
     body: JSON.stringify({
-      post_info: {
-        title: input.title.slice(0, 2200),
-        privacy_level: privacy,
-        disable_comment: input.disableComment ?? false,
-        disable_duet: input.disableDuet ?? false,
-        disable_stitch: input.disableStitch ?? false,
-        is_aigc: input.isAigc ?? true,
-        brand_organic_toggle: input.brandOrganicToggle ?? false,
-        ...(input.videoCoverTimestampMs == null ? {} : { video_cover_timestamp_ms: input.videoCoverTimestampMs }),
-      },
+      post_info: postInfo,
       source_info: { source: "PULL_FROM_URL", video_url: input.videoUrl },
     }),
   });
-  const payload = await response.json();
-  if (!response.ok || payload?.error?.code !== "ok") throw new Error(payload?.error?.message || `TikTok publish failed: ${response.status}`);
+  const payload = await response.json().catch(() => ({}));
+  if (payload?.error?.code === "url_ownership_unverified") {
+    // Supabase signed URLs cannot be used for PULL_FROM_URL unless their URL
+    // prefix is verified with TikTok. Fall back to the documented FILE_UPLOAD
+    // flow so publishing does not depend on a custom verified media domain.
+    const uploaded = await uploadTikTokVideoFile(input, accessToken, postInfo);
+    return { ...uploaded, creatorUsername: creator.creator_username };
+  }
+  if (!response.ok || payload?.error?.code !== "ok") {
+    throw new Error(payload?.error?.message || `TikTok publish initialization failed: ${response.status}`);
+  }
 
   const publishId = payload?.data?.publish_id;
   if (typeof publishId !== "string" || !publishId) {
