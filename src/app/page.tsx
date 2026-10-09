@@ -91,6 +91,13 @@ export default function Home() {
       if (response.ok) setTiktokConsent(body.consented === true);
     }).catch(() => {});
   }, []);
+
+  // Release temporary browser object URLs whenever the selected image changes or this page unmounts.
+  useEffect(() => {
+    if (!studioImagePreview) return;
+    return () => URL.revokeObjectURL(studioImagePreview);
+  }, [studioImagePreview]);
+
   async function getAccessToken() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -565,11 +572,11 @@ export default function Home() {
               })}
             </div><div className="studio-actions">
               <button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating || studioPrompt.trim().length < 8 || (studioAudio === "custom" && !studioNarration.trim() && !studioMusic)} aria-busy={studioGenerating}>{studioGenerating ? "生成中…" : "動画を生成 →"}</button>
-              {studioStatus && <span className="video-status">{studioStatus}</span>}
+              {studioStatus && <span className="video-status" role="status" aria-live="polite">{studioStatus}</span>}
             </div>
           </div>
         </div>
-        {studioError && <p className="error">{studioError}</p>}
+        {studioError && <p className="error" role="alert">{studioError}</p>}
         {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>↻ Regenerate</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>✦ Remix</button><a href={studioUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></div></div>}
       </section>
       )}
