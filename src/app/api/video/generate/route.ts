@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { consumeMonthlyUsage, getUserFromBearer, refundMonthlyUsage } from "@/lib/billing";
 import { generateVideo } from "@/lib/video/router";
+import { generateNarration } from "@/lib/video/gemini-tts";
+import { fitWavToDuration, mixNarrationWithBgm } from "@/lib/video/audio";
+import { saveAudioToStorage } from "@/lib/video/storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -31,10 +34,19 @@ export async function POST(request: Request) {
     const prompt = String(body.prompt || "").trim();
     imageUrl = body.imageUrl ? String(body.imageUrl) : undefined;
     audioUrl = body.audioUrl ? String(body.audioUrl) : undefined;
+    const narrationText = typeof body.narrationText === "string" ? body.narrationText.trim() : "";
+    const includeBgm = body.includeBgm !== false;
+    const narrationVoice = typeof body.narrationVoice === "string" ? body.narrationVoice.trim() : undefined;
+    const narrationStyle = typeof body.narrationStyle === "string" ? body.narrationStyle.trim() : undefined;
+    const bgmPrompt = typeof body.bgmPrompt === "string" ? body.bgmPrompt.trim() : "";
     if (imageUrl && !/^https:\/\//i.test(imageUrl)) return NextResponse.json({ error: "imageUrl must be an HTTPS URL" }, { status: 400 });
     if (audioUrl && !/^https:\/\//i.test(audioUrl)) return NextResponse.json({ error: "audioUrl must be an HTTPS URL" }, { status: 400 });
     if (!prompt) return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     if (prompt.length > 10000) return NextResponse.json({ error: "prompt is too long" }, { status: 400 });
+    if (narrationText.length > 8000) return NextResponse.json({ error: "narrationText must be 8,000 characters or fewer" }, { status: 400 });
+    if (narrationVoice && narrationVoice.length > 100) return NextResponse.json({ error: "narrationVoice is too long" }, { status: 400 });
+    if (narrationStyle && narrationStyle.length > 500) return NextResponse.json({ error: "narrationStyle is too long" }, { status: 400 });
+    if (bgmPrompt.length > 500) return NextResponse.json({ error: "bgmPrompt is too long" }, { status: 400 });
 
     const model = body.model ? String(body.model) : undefined;
     const duration = Number(body.duration ?? 5);
@@ -79,7 +91,7 @@ export async function POST(request: Request) {
       social_post_id: socialPostId,
       creative_id: creativeId,
       provider: process.env.VIDEO_ENGINE ?? "higgsfield",
-      model: model ?? (imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
+      model: model ?? ((audioUrl || narrationText) ? process.env.HF_AUDIO_VIDEO_MODEL ?? "alibaba/wan-3.0/reference-to-video" : imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
       status: "queued",
       prompt,
       duration,
@@ -92,10 +104,20 @@ export async function POST(request: Request) {
     if (jobError || !job) throw new Error(jobError?.message || "production jobの作成に失敗しました。");
     jobId = job.id;
 
+    if (narrationText) {
+      const narration = await generateNarration({ text: narrationText, voice: narrationVoice, style: narrationStyle });
+      const narrationWav = Buffer.from(narration.audioBase64, "base64");
+      const audioWav = includeBgm
+        ? mixNarrationWithBgm(narrationWav, duration, bgmPrompt)
+        : fitWavToDuration(narrationWav, duration);
+      const savedAudio = await saveAudioToStorage({ userId: user.id, jobId: job.id, bytes: audioWav });
+      audioUrl = savedAudio.url;
+    }
+
     // エンジン選択はRouterに集約する。現在の既定値はHiggsfield。
     const started = await generateVideo({
       prompt,
-      model: model ?? (audioUrl ? process.env.HF_AUDIO_VIDEO_MODEL ?? "alibaba/wan-3.0/reference-to-video" : imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
+      model: model ?? ((audioUrl || narrationText) ? process.env.HF_AUDIO_VIDEO_MODEL ?? "alibaba/wan-3.0/reference-to-video" : imageUrl ? "alibaba/wan-3.0-prime/image-to-video" : process.env.HF_VIDEO_MODEL ?? "alibaba/wan-3.0/text-to-video"),
       duration,
       resolution,
       aspectRatio,
