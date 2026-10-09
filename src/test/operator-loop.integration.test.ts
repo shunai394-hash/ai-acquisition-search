@@ -159,7 +159,7 @@ test("video retry reuses the original reference image", async () => {
     generate_audio: false,
     provider_response: {
       retry_count: 1,
-      input_image_url: "https://storage.test/product-reference.webp",
+      input_image_url: "https://8.8.8.8/product-reference.webp",
     },
     error: "temporary provider failure",
     created_at: iso(-2 * HOUR),
@@ -170,9 +170,9 @@ test("video retry reuses the original reference image", async () => {
   const jobResult = body.results.find((x: { jobId?: string }) => x.jobId === "job-image-retry");
   assert.equal(jobResult.status, "running", JSON.stringify(body.results));
   assert.equal(stub.higgsfieldCalls, 1);
-  assert.equal(stub.higgsfieldBodies[0].image_url, "https://storage.test/product-reference.webp");
+  assert.equal(stub.higgsfieldBodies[0].image_url, "https://8.8.8.8/product-reference.webp");
   const retryJob = db.table("production_jobs")[0] as { provider_response: Record<string, unknown> };
-  assert.equal(retryJob.provider_response.input_image_url, "https://storage.test/product-reference.webp");
+  assert.equal(retryJob.provider_response.input_image_url, "https://8.8.8.8/product-reference.webp");
 });
 
 test("next creative carries the reference image into the queued video job", async () => {
@@ -180,7 +180,7 @@ test("next creative carries the reference image into the queued video job", asyn
   const creative = db.table("creatives").find((x) => x.id === "c1");
   creative!.scenario = {
     ...(creative!.scenario as Record<string, unknown>),
-    input_image_url: "https://storage.test/product-reference.webp",
+    input_image_url: "https://8.8.8.8/product-reference.webp",
   };
 
   const res = await nextCreative(internal("/api/operator/next-creative", {
@@ -193,7 +193,7 @@ test("next creative carries the reference image into the queued video job", asyn
   assert.equal(res.status, 201, JSON.stringify(body));
   const job = db.table("production_jobs")[0];
   assert.equal(job.model, "alibaba/wan-3.0-prime/image-to-video");
-  assert.equal((job.provider_response as Record<string, unknown>).input_image_url, "https://storage.test/product-reference.webp");
+  assert.equal((job.provider_response as Record<string, unknown>).input_image_url, "https://8.8.8.8/product-reference.webp");
   assert.equal(body.video.imageReference, true);
 });
 
