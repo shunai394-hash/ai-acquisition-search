@@ -112,6 +112,7 @@ export async function POST(request: Request) {
       provider_response: {
         engine: started.engine,
         started_response: started.raw,
+        ...(usageEventId ? { usage_event_id: usageEventId } : {}),
         ...(imageUrl ? { input_image_url: imageUrl } : {}),
         ...(audioUrl ? { input_audio_url: audioUrl } : {}),
       },
