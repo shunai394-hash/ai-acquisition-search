@@ -23,6 +23,7 @@ function builder(table: string) {
     then(resolve: (value: unknown) => unknown) {
       const match = rows.filter((row) => filters.every(([col, value]) => row[col] === value));
       if (op === "insert") {
+        if (table === "usage_events" && usageInsertFailure) return Promise.resolve({ data: null, error: { code: "XX000", message: "simulated usage event persistence failure" } }).then(resolve);
         if (table === "stripe_webhook_events" && rows.some((row) => row.event_id === payload.event_id)) return Promise.resolve({ data: null, error: { code: "23505", message: "duplicate key" } }).then(resolve);
         rows.push({ ...(table === "stripe_webhook_events" ? { received_at: new Date().toISOString() } : {}), ...payload });
         return Promise.resolve({ data: { event_id: payload.event_id }, error: null }).then(resolve);
@@ -42,6 +43,7 @@ process.env.STRIPE_SECRET_KEY = "sk_test";
 let stripeSubscription: Row = {};
 let stripeDown = false;
 let stripeFetches = 0;
+let usageInsertFailure = false;
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
@@ -74,6 +76,7 @@ beforeEach(() => {
   upserts.length = 0;
   stripeDown = false;
   stripeFetches = 0;
+  usageInsertFailure = false;
   stripeSubscription = { id: "sub_1", customer: "cus_1", status: "canceled", items: { data: [{ current_period_end: 1893456000 }] } };
 });
 
@@ -162,6 +165,21 @@ test("concurrent duplicate invoice deliveries create one usage event", async () 
   const event = { id: "evt_inv_conc", type: "invoice.payment_failed", data: { object: { id: "in_1", customer: "cus_1" } } };
   const [a, b] = await Promise.all([webhook(signed(event)), webhook(signed(event))]);
   assert.deepEqual([a.status, b.status], [200, 200]);
+  assert.equal(tables.usage_events?.length, 1);
+});
+
+test("billing usage-event persistence failure is retried by Stripe", async () => {
+  tables.billing_customers = [{ stripe_customer_id: "cus_1", user_id: "u1" }];
+  const event = { id: "evt_inv_retry", type: "invoice.payment_failed", data: { object: { id: "in_retry", customer: "cus_1" } } };
+  usageInsertFailure = true;
+  const failed = await webhook(signed(event));
+  assert.equal(failed.status, 500);
+  assert.equal(tables.stripe_webhook_events[0].status, "failed");
+  assert.equal(tables.usage_events?.length ?? 0, 0);
+
+  usageInsertFailure = false;
+  const retried = await webhook(signed(event));
+  assert.equal(retried.status, 200, await retried.clone().text());
   assert.equal(tables.usage_events?.length, 1);
 });
 
