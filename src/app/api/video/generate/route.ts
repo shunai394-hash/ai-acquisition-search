@@ -227,7 +227,13 @@ export async function POST(request: Request) {
             completed_at: new Date().toISOString()
           }).eq("id", jobId).eq("user_id", userId);
         }
-      } catch {}
+      } catch (statePersistError) {
+        console.error("failed to persist video job recovery state", {
+          jobId,
+          userId,
+          error: statePersistError instanceof Error ? statePersistError.message : String(statePersistError),
+        });
+      }
     }
     if (narrationUsageEventId && !narrationAudioSaved) {
       try {
