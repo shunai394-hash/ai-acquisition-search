@@ -16,6 +16,12 @@ function matchesImageSignature(bytes: Uint8Array, mime: string) {
 
 export async function POST(request: Request) {
   try {
+    // Reject oversized multipart bodies before parsing them into memory.
+    const declaredLength = Number(request.headers.get("content-length") || 0);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BYTES + 256 * 1024) {
+      return NextResponse.json({ error: "画像アップロードのリクエストが大きすぎます。画像は8MB以下にしてください。" }, { status: 413 });
+    }
+
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
 
