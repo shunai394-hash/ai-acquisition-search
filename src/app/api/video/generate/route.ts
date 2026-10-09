@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     if (!Number.isFinite(duration) || duration < 2 || duration > 30) return NextResponse.json({ error: "duration must be between 2 and 30 seconds" }, { status: 400 });
     const resolution = body.resolution === "480p" || body.resolution === "720p" || body.resolution === "1080p" ? body.resolution : "1080p";
     const aspectRatio = ["16:9","4:3","1:1","3:4","9:16","adaptive"].includes(body.aspectRatio) ? body.aspectRatio : "9:16";
-    const generateAudio = Boolean(body.generateAudio ?? false);
+    const generateAudio = body.generateAudio === true;
     const socialPostId = body.socialPostId ? String(body.socialPostId) : null;
     const { admin } = clients();
 
