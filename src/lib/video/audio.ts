@@ -6,6 +6,11 @@ function clamp16(value: number) {
   return Math.max(-32768, Math.min(32767, Math.round(value)));
 }
 
+function normalizeDuration(seconds: number) {
+  if (!Number.isFinite(seconds)) throw new Error("動画尺は有限の数値で指定してください。");
+  return Math.max(2, Math.min(30, seconds));
+}
+
 export function pcmToWav(pcm: Int16Array) {
   const dataBytes = pcm.length * 2;
   const buffer = Buffer.alloc(44 + dataBytes);
@@ -59,7 +64,7 @@ function readWavPcm(bytes: Uint8Array) {
  * This avoids shipping a large audio binary or an unlicensed music track.
  */
 export function generateBgm(durationSeconds: number, prompt = "") {
-  const seconds = Math.max(2, Math.min(30, durationSeconds));
+  const seconds = normalizeDuration(durationSeconds);
   const samples = Math.ceil(seconds * SAMPLE_RATE);
   const pcm = new Int16Array(samples);
   const lower = prompt.toLowerCase();
@@ -112,7 +117,7 @@ export function generateBgm(durationSeconds: number, prompt = "") {
 }
 export function fitWavToDuration(wav: Uint8Array, durationSeconds: number) {
   const pcm = readWavPcm(wav);
-  const target = Math.max(2, Math.min(30, durationSeconds)) * SAMPLE_RATE;
+  const target = normalizeDuration(durationSeconds) * SAMPLE_RATE;
   if (pcm.length <= target) return wav;
 
   const output = new Int16Array(target);
