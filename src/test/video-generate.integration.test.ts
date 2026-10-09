@@ -39,7 +39,7 @@ mock.module("../lib/video/gemini-tts.ts", {
       if (tts === "error") throw new Error("TTS unavailable");
       // 1 second of 24kHz mono 16-bit silence as a WAV file.
       const pcm = new Int16Array(24_000);
-      const { pcmToWav } = await import("../lib/video/audio.ts");
+      const { pcmToWav } = await import("../lib/video/audio");
       return { model: "tts", voice: "Kore", mimeType: "audio/wav", audioBase64: Buffer.from(pcmToWav(pcm)).toString("base64") };
     },
   },

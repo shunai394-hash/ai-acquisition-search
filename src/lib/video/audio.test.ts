@@ -81,3 +81,15 @@ test("audio helpers reject non-finite durations instead of returning empty audio
   assert.throws(() => fitWavToDuration(toneWav(2), Number.POSITIVE_INFINITY), /有限の数値/);
   assert.throws(() => mixNarrationWithBgm(toneWav(2), Number.NaN), /有限の数値/);
 });
+
+test("raw PCM from TTS is wrapped into a mixable WAV; WAV input is kept as-is", async () => {
+  const { ensureWavBase64 } = await import("@/lib/video/gemini-tts");
+  const pcm = Buffer.alloc(24_000 * 2);
+  for (let i = 0; i < 24_000; i++) pcm.writeInt16LE(Math.round(Math.sin(i / 10) * 8000), i * 2);
+  const wrapped = Buffer.from(ensureWavBase64(pcm.toString("base64")), "base64");
+  assert.equal(wrapped.toString("ascii", 0, 4), "RIFF");
+  assert.equal(isSupportedNarrationWav(new Uint8Array(wrapped)), true);
+  const already = wrapped.toString("base64");
+  assert.equal(ensureWavBase64(already), already);
+  assert.throws(() => ensureWavBase64(""), /空の音声/);
+});

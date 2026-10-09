@@ -99,7 +99,7 @@ export async function POST(request: Request) {
         throw new Error(created.error.message);
       }
     }
-    const privacyUpdate = await admin.storage.updateBucket(BUCKET, { public: false });
+    const privacyUpdate = await admin.storage.updateBucket(BUCKET, { public: false, fileSizeLimit: MAX_BYTES, allowedMimeTypes: ["audio/wav"] });
     if (privacyUpdate.error) throw new Error(`Audio bucket privacy update failed: ${privacyUpdate.error.message}`);
 
     const path = user.id + "/" + crypto.randomUUID() + ".wav";

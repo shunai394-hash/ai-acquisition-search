@@ -107,7 +107,11 @@ export async function saveAudioToStorage(input: {
       throw new Error(`Supabase audio bucket creation failed: ${created.error.message}`);
     }
   }
-  const privacyUpdate = await supabase.storage.updateBucket(audioBucket, { public: false });
+  const privacyUpdate = await supabase.storage.updateBucket(audioBucket, {
+    public: false,
+    fileSizeLimit: 16 * 1024 * 1024,
+    allowedMimeTypes: ["audio/wav"],
+  });
   if (privacyUpdate.error) throw new Error(`Supabase audio bucket privacy update failed: ${privacyUpdate.error.message}`);
 
   const path = `${input.userId}/${input.jobId}.wav`;
