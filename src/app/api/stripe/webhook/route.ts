@@ -126,12 +126,13 @@ async function handleEvent(event: StripeObject) {
       const userId = await userIdForCustomer(customerId);
       if (userId) {
         const supabase = getAdminSupabase();
-        await supabase.from("usage_events").insert({
+        const { error: usageEventError } = await supabase.from("usage_events").insert({
           user_id: userId,
           event_type: event.type === "invoice.paid" ? "billing_paid" : "billing_payment_failed",
           units: 1,
           metadata: { invoice_id: object.id, customer_id: customerId },
         });
+        if (usageEventError) throw usageEventError;
       }
       break;
     }
