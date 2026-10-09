@@ -65,7 +65,22 @@ export async function POST(request: Request) {
     }
 
     if (audio.byteLength > MAX_BYTES) {
-      return NextResponse.json({ error: "生成音声が大きすぎます。" }, { status: 413 });
+      if (usageEventId) {
+        try {
+          const refund = await refundMonthlyUsage(userId, "narration_generation", usageEventId);
+          if (!refund.refunded) {
+            console.error("narration quota refund was not applied after output size rejection", {
+              userId, usageEventId, reason: refund.reason,
+            });
+          }
+        } catch (refundError) {
+          console.error("narration quota refund failed after output size rejection", {
+            userId, usageEventId, error: refundError,
+          });
+        }
+        usageEventId = "";
+      }
+      return NextResponse.json({ error: "生成音声が大きすぎます。本文を短くして再試行してください。" }, { status: 413 });
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
