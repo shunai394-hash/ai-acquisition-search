@@ -192,6 +192,7 @@ export async function queryTikTokCreator(accessToken = getAccessToken()) {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json; charset=UTF-8" },
     body: "{}",
+    signal: AbortSignal.timeout(15_000),
   });
   const payload = await response.json();
   if (!response.ok || payload?.error?.code !== "ok") throw new Error(payload?.error?.message || `TikTok creator query failed: ${response.status}`);
@@ -263,6 +264,7 @@ async function uploadTikTokVideoFile(
         total_chunk_count: totalChunkCount,
       },
     }),
+    signal: AbortSignal.timeout(15_000),
   });
   const initPayload = await initResponse.json().catch(() => ({}));
   if (!initResponse.ok || initPayload?.error?.code !== "ok") {
@@ -337,6 +339,7 @@ export async function publishTikTokVideo(input: TikTokPublishInput) {
       post_info: postInfo,
       source_info: { source: "PULL_FROM_URL", video_url: input.videoUrl },
     }),
+    signal: AbortSignal.timeout(15_000),
   });
   const payload = await response.json().catch(() => ({}));
   if (payload?.error?.code === "url_ownership_unverified") {
@@ -367,6 +370,7 @@ export async function getTikTokPublishStatus(publishId: string, accessToken = ge
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json; charset=UTF-8" },
     body: JSON.stringify({ publish_id: publishId }),
+    signal: AbortSignal.timeout(15_000),
   });
   const payload = await response.json();
   if (!response.ok || payload?.error?.code !== "ok") throw new Error(payload?.error?.message || `TikTok status failed: ${response.status}`);
