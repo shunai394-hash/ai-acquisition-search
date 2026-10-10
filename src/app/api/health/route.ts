@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   const videoAssetsBucket = await check(async () => {
     const { data, error } = await getAdminSupabase().storage.getBucket("video-assets");
     if (error) throw new Error(error.message);
-    return { public: Boolean(data?.public) };
+    return { public: data?.public === true, known: typeof data?.public === "boolean" };
   });
   const ecPulse = await check(async () => {
     const response = await ecPulseFetch("/health", { method: "GET", timeoutMs: 6000 });
