@@ -774,14 +774,14 @@ export default function Home() {
         <div className="studio-grid">
           <label className="studio-upload">
             <span className="eyebrow">01 · REFERENCE <em>OPTIONAL</em></span>
-            <input type="file" aria-label="商品画像をアップロード（JPG / PNG / WebP、8MBまで）" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
+            <input type="file" aria-label="参照画像をアップロード（JPG / PNG / WebP、8MBまで）" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
               const input = e.target;
               const file = input.files?.[0] || null;
               void (async () => {
                 if (!file) { setStudioError(""); setStudioImage(null); setStudioImagePreview(""); return; }
-                if (!["image/jpeg","image/png","image/webp"].includes(file.type)) { setStudioError("商品画像は JPG / PNG / WebP を選んでください。"); input.value = ""; return; }
+                if (!["image/jpeg","image/png","image/webp"].includes(file.type)) { setStudioError("参照画像は JPG / PNG / WebP を選んでください。"); input.value = ""; return; }
                 if (file.size === 0) { setStudioError("画像ファイルが空です。別のファイルを選んでください。"); input.value = ""; return; }
-                if (file.size > 8 * 1024 * 1024) { setStudioError("商品画像は8MB以下にしてください。"); input.value = ""; return; }
+                if (file.size > 8 * 1024 * 1024) { setStudioError("参照画像は8MB以下にしてください。"); input.value = ""; return; }
                 try {
                   const bitmap = await createImageBitmap(file);
                   bitmap.close();
