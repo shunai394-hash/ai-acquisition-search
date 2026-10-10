@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { mock, test } from "node:test";
 import { assertPublicUrl } from "./public-url";
 
 test("blocks localhost and private IPv4 ranges", async () => {
@@ -44,4 +44,21 @@ test("rejects unsafe schemes and embedded credentials", async () => {
 
 test("allows ordinary public URL syntax", async () => {
   await assert.doesNotReject(() => assertPublicUrl("https://example.com/"));
+});
+
+test("public URL fetch supplies a default timeout signal", async () => {
+  let receivedSignal: AbortSignal | null | undefined;
+  mock.method(globalThis, "fetch", async (_input: string | URL | Request, init?: RequestInit) => {
+    receivedSignal = init?.signal;
+    return new Response("ok", { status: 200 });
+  });
+  try {
+    const { fetchPublicUrl } = await import("./public-url");
+    const response = await fetchPublicUrl("https://8.8.8.8/video.mp4");
+    assert.equal(response.status, 200);
+    assert.ok(receivedSignal instanceof AbortSignal);
+    assert.equal(receivedSignal.aborted, false);
+  } finally {
+    mock.restoreAll();
+  }
 });
