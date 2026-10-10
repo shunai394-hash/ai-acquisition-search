@@ -732,33 +732,36 @@ export default function Home() {
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-grid">
           <div className="hero-copy">
-            <p className="eyebrow">AI VIDEO STUDIO · IMAGE TO VIDEO</p>
-            <h1 id="hero-title">写真とプロンプトから、<br /><span>動画をつくる。</span></h1>
-            <p className="lead">商品紹介だけに限らない。シネマティックな映像も、人物の動きも、SNS向けショートも。画像を選び、作りたい映像を自分の言葉で指示して、動画を生成します。</p>
-            <a className="hero-primary" href="#video-studio">動画をつくる <span aria-hidden="true">↗</span></a>
+            <p className="eyebrow hero-eyebrow"><span className="hero-eyebrow-mark" aria-hidden="true"></span> AI VIDEO DIRECTION / 01</p>
+            <h1 id="hero-title">最初の0.5秒から、<br /><span>映像を設計する。</span></h1>
+            <p className="lead">写真1枚でも、言葉だけでも。作りたい世界を伝えれば、動き・カメラ・光まで指示できる動画スタジオ。派手な映像も、静かなシネマも、あなたの意図から始まります。</p>
+            <div className="hero-actions">
+              <a className="hero-primary" href="#video-studio">スタジオでつくる <span aria-hidden="true">↗</span></a>
+              <a className="hero-text-link" href="#how-it-works">制作の流れを見る <span aria-hidden="true">↓</span></a>
+            </div>
             <div className="hero-proof">
-              <div><b>01 / INPUT</b><strong>画像を選ぶ</strong><span>写真や参照画像をアップロード。画像なしでもプロンプトから制作できます。</span></div>
-              <div><b>02 / DIRECT</b><strong>映像を言葉で指示</strong><span>被写体、動き、カメラ、光、雰囲気を自由に指定できます。</span></div>
-              <div><b>03 / OUTPUT</b><strong>動画として書き出す</strong><span>尺・画角・解像度を選び、完成動画をプレビューして保存します。</span></div>
+              <div><b>01 / OPENING</b><strong>冒頭の一瞬</strong><span>0.5秒の見せ方を選び、最初の構図と動きを演出します。</span></div>
+              <div><b>02 / DIRECTION</b><strong>言葉で演出</strong><span>被写体・カメラ・光・空気感を自由なプロンプトで指定。</span></div>
+              <div><b>03 / FINISH</b><strong>自分の設定で生成</strong><span>尺・画角・解像度を調整。完成動画を確認して保存。</span></div>
             </div>
           </div>
-          <div className="hero-video-visual" aria-label="動画制作のプレビューイメージ">
-            <div className="video-visual-top"><span><i /> VIDEO STUDIO</span><span>IMAGE → MOTION</span></div>
+          <div className="hero-video-visual" aria-label="動画演出のコンセプトビジュアル">
+            <div className="video-visual-top"><span><i /> VIDEO STUDIO</span><span>ART DIRECTION / 01</span></div>
             <div className="video-visual-frame">
               <div className="visual-sun" />
               <div className="visual-horizon" />
               <div className="visual-subject"><span /></div>
               <div className="visual-light-streak" />
-              <div className="visual-frame-label"><span>SCENE 01</span><strong>Make it move.</strong><small>YOUR IDEA, IN MOTION</small></div>
-              <span className="visual-timecode">00:00 / 00:05</span>
-              <span className="visual-play" aria-hidden="true">▶</span>
+              <div className="visual-frame-label"><span>THE OPENING / 00.5 SEC</span><strong>Make them look.</strong><small>FRAMING · MOTION · LIGHT</small></div>
+              <span className="visual-timecode">FIRST FRAME / 00:00.5</span>
+              <span className="visual-first-frame">FIRST 0.5 SEC</span>
             </div>
-            <div className="video-visual-bottom"><span>01 <b>REFERENCE</b></span><i>→</i><span>02 <b>PROMPT</b></span><i>→</i><span>03 <b>VIDEO</b></span></div>
-            <div className="visual-caption"><span>YOUR PROMPT</span><strong>Light · Movement · Camera · Mood</strong><span className="visual-caption-status">CREATIVE CONTROL / 01</span></div>
+            <div className="video-visual-bottom"><span>01 <b>INTENTION</b></span><i>→</i><span>02 <b>MOTION</b></span><i>→</i><span>03 <b>STORY</b></span></div>
+            <div className="visual-caption"><span>OPENING DIRECTION</span><strong>Contrast · Movement · Curiosity</strong><span className="visual-caption-status">A CREATIVE CHOICE, NOT A GUARANTEE</span></div>
           </div>
         </div>
-        <div className="hero-loop" aria-label="動画制作の流れ"><span>画像</span><i>+</i><span>プロンプト</span><i>→</i><span>映像生成</span><i>→</i><span>音声</span><i>→</i><span>動画ファイル</span></div>
-        <p className="hint">まずは動画制作。商品URL分析やSNS投稿は、必要な人向けの別機能です。</p>
+        <div id="how-it-works" className="hero-loop" aria-label="動画制作の流れ"><span>IDEA</span><i>→</i><span>DIRECT</span><i>→</i><span>GENERATE</span><i>→</i><span>REVIEW</span><i>→</i><span>REFINE</span></div>
+        <p className="hero-note">冒頭演出は生成プロンプトに反映されます。視聴維持率そのものを保証する機能ではありません。</p>
       </section>
 
       <section id="video-studio" className="video-studio" aria-labelledby="video-studio-title">
