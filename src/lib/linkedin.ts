@@ -55,6 +55,7 @@ export async function exchangeLinkedInCode(code: string, redirectUri: string) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error_description || data.error || "LinkedIn OAuth token exchange failed");
@@ -65,6 +66,7 @@ export async function getLinkedInUserInfo(accessToken: string) {
   const response = await fetch("https://api.linkedin.com/v2/userinfo", {
     headers: { Authorization: "Bearer " + accessToken },
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.sub) throw new Error(data.message || "LinkedIn userinfo failed");
@@ -88,6 +90,7 @@ export async function createLinkedInPost(accessToken: string, author: string, co
       lifecycleState: "PUBLISHED",
       isReshareDisabledByAuthor: false,
     }),
+    signal: AbortSignal.timeout(30_000),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || data.errorDetail || "LinkedIn post failed");
@@ -112,6 +115,7 @@ export async function getLinkedInMemberPostAnalytics(accessToken: string, postUr
         "X-Restli-Protocol-Version": "2.0.0",
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
     },
   );
   const data = await response.json().catch(() => ({}));
@@ -141,6 +145,7 @@ export async function createLinkedInVideoPost(
         uploadThumbnail: false,
       },
     }),
+    signal: AbortSignal.timeout(30_000),
   });
   const initData = await initResponse.json().catch(() => ({}));
   if (!initResponse.ok) {
@@ -163,6 +168,7 @@ export async function createLinkedInVideoPost(
       method: "PUT",
       headers: { "Content-Type": "application/octet-stream" },
       body: chunk,
+      signal: AbortSignal.timeout(120_000),
     });
     if (!uploadResponse.ok) {
       throw new Error(`LinkedIn video upload failed: HTTP ${uploadResponse.status}`);
@@ -187,6 +193,7 @@ export async function createLinkedInVideoPost(
         uploadedPartIds: etags,
       },
     }),
+    signal: AbortSignal.timeout(30_000),
   });
   const finalizeData = await finalizeResponse.json().catch(() => ({}));
   if (!finalizeResponse.ok) {
@@ -239,6 +246,7 @@ export async function createLinkedInVideoPost(
       lifecycleState: "PUBLISHED",
       isReshareDisabledByAuthor: false,
     }),
+    signal: AbortSignal.timeout(30_000),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || data.errorDetail || "LinkedIn video post failed");
