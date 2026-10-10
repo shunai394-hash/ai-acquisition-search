@@ -246,6 +246,10 @@ export async function POST(request: Request) {
             const resolved = await resolveTikTokVideoId(r.publishId, accessToken);
             if (resolved.pending) {
               const { data: pendingRow, error: pendingSaveError } = await supabase.from("social_posts").update({
+                // The cron reconciler selects pending TikTok rows by external_post_id.
+                // Persist TikTok's publish ID here so the accepted post can be polled
+                // to completion instead of becoming permanently stuck in pending.
+                external_post_id: r.publishId,
                 status: "pending",
                 metadata: { source_social_post_id: socialPostId, publishId: r.publishId, publishStatus: resolved.status },
                 updated_at: new Date().toISOString(),
