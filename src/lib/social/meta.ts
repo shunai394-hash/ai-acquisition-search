@@ -25,7 +25,7 @@ function getFacebookPageId() {
 }
 
 async function graph(path: string, init?: RequestInit) {
-  const response = await fetch(`${GRAPH}${path}`, init);
+  const response = await fetch(`${GRAPH}${path}`, { ...init, signal: init?.signal ?? AbortSignal.timeout(30_000) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload?.error) {
     throw new Error(payload?.error?.message || `Meta Graph API error: ${response.status}`);
@@ -103,6 +103,7 @@ export async function publishFacebookReel(input: InstagramReelInput) {
       Authorization: `OAuth ${token}`,
       file_url: input.videoUrl,
     },
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!transfer.ok) {
