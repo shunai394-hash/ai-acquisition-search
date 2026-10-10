@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generateBgm, isSupportedNarrationWav, mixNarrationWithBgm, fitWavToDuration } from "@/lib/video/audio";
+import { generateBgm, isSupportedNarrationWav, mixNarrationWithBgm, fitWavToDuration, wavHasAudibleSamples, bgmOnlyWav } from "@/lib/video/audio";
 
 function pcmToWav(pcm: Int16Array, sampleRate = 24_000, channels = 1) {
   const dataBytes = pcm.length * 2;
@@ -74,6 +74,12 @@ test("duration fitting trims long narration with a valid WAV and expected sample
   const dataBytes = Buffer.from(fitted).readUInt32LE(40);
   assert.equal(sampleRate, 24_000);
   assert.equal(dataBytes / 2, 24_000 * 2);
+});
+
+test("silent WAV is rejected and generated BGM is audible", () => {
+  assert.equal(wavHasAudibleSamples(pcmToWav(new Int16Array(24_000))), false);
+  assert.equal(wavHasAudibleSamples(bgmOnlyWav(2, "warm acoustic")), true);
+  assert.equal(wavHasAudibleSamples(mixNarrationWithBgm(toneWav(2), 2, "lofi")), true);
 });
 
 test("audio helpers reject non-finite durations instead of returning empty audio", () => {

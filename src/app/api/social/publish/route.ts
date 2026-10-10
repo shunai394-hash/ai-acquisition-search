@@ -247,6 +247,8 @@ export async function POST(request: Request) {
             if (resolved.pending) {
               const { data: pendingRow, error: pendingSaveError } = await supabase.from("social_posts").update({
                 status: "pending",
+                // The operator loop only revisits pending rows that already have a provider id.
+                external_post_id: r.publishId,
                 metadata: { source_social_post_id: socialPostId, publishId: r.publishId, publishStatus: resolved.status },
                 updated_at: new Date().toISOString(),
               }).eq("id", rowId).eq("user_id", user.id).eq("status", "publishing").select("id").maybeSingle();

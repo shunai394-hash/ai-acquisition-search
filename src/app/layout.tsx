@@ -10,8 +10,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "AI Acquisition Search | AI集客検索エンジン",
-  description: "商品・市場・顧客・競合・実績を分析し、次に取るべき集客アクションを判断するAIシステム。",
+  title: "AI Acquisition Search | 写真と一文から広告動画",
+  description: "商品画像と自由な文章、または商品URLから短い広告動画を作ります。ナレーションと簡易BGM、接続したSNSへの投稿まで進められます。",
   applicationName: "AI Acquisition Search",
   category: "business",
   icons: {
@@ -23,14 +23,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ja_JP",
-    title: "AI Acquisition Search | AI集客検索エンジン",
-    description: "市場の声から、次の商品と広告を決める。分析・動画・SNS運用をひとつの意思決定ループにつなぐAI集客OS。",
+    title: "AI Acquisition Search | 写真と一文から広告動画",
+    description: "商品画像と文章、または商品URLから短い広告動画を作り、接続したSNSへ進めます。",
     siteName: "AI Acquisition Search",
   },
   twitter: {
     card: "summary",
-    title: "AI Acquisition Search | AI集客検索エンジン",
-    description: "市場の声から、次の商品と広告を決めるAI集客OS。",
+    title: "AI Acquisition Search | 写真と一文から広告動画",
+    description: "商品画像と文章、または商品URLから短い広告動画を作ります。",
   },
 };
 

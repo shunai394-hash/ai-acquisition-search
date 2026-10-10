@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
-import { mock, test } from "node:test";
-import { assertPublicUrl } from "./public-url";
+import test from "node:test";
+import { EventEmitter } from "node:events";
+import http from "node:http";
+import { Readable } from "node:stream";
+import { assertPublicUrl, pinnedDnsLookup, publicFetchTransport } from "./public-url";
 
 test("blocks localhost and private IPv4 ranges", async () => {
   for (const host of [
@@ -46,19 +49,43 @@ test("allows ordinary public URL syntax", async () => {
   await assert.doesNotReject(() => assertPublicUrl("https://example.com/"));
 });
 
-test("public URL fetch supplies a default timeout signal", async () => {
-  let receivedSignal: AbortSignal | null | undefined;
-  mock.method(globalThis, "fetch", async (_input: string | URL | Request, init?: RequestInit) => {
-    receivedSignal = init?.signal;
-    return new Response("ok", { status: 200 });
-  });
+test("blocks cloud metadata hostnames before DNS resolution", async () => {
+  await assert.rejects(() => assertPublicUrl("http://metadata.google.internal/computeMetadata/v1/"));
+  await assert.rejects(() => assertPublicUrl("http://service.internal/secret"));
+});
+
+test("pinned DNS lookup ignores a rebinding hostname and refuses private addresses", () => {
+  const lookup = pinnedDnsLookup(["8.8.8.8"]);
+  let seen = "";
+  lookup("rebinding.example", {}, (_err, address) => { seen = address; });
+  assert.equal(seen, "8.8.8.8");
+  assert.throws(() => pinnedDnsLookup(["169.254.169.254"]));
+  assert.throws(() => pinnedDnsLookup([]));
+});
+
+test("public URL fetch supplies a default timeout signal and pins DNS", async () => {
+  const original = publicFetchTransport.request;
+  let receivedSignal: AbortSignal | undefined;
+  let lookupHost = "";
+  publicFetchTransport.request = (_protocol, _url, options, callback) => {
+    receivedSignal = options.signal ?? undefined;
+    const report = (_err: NodeJS.ErrnoException | null, address: string) => { lookupHost = address; };
+    options.lookup?.("rebinding.example", {}, report as never);
+    const incoming = Object.assign(Readable.from(["ok"]), { statusCode: 200, headers: { "content-type": "video/mp4" } });
+    queueMicrotask(() => callback(incoming as unknown as http.IncomingMessage));
+    const req = new EventEmitter();
+    const client = req as EventEmitter & { end: () => void };
+    client.end = () => {};
+    return client as unknown as ReturnType<typeof original>;
+  };
   try {
     const { fetchPublicUrl } = await import("./public-url");
     const response = await fetchPublicUrl("https://8.8.8.8/video.mp4");
     assert.equal(response.status, 200);
     assert.ok(receivedSignal instanceof AbortSignal);
     assert.equal(receivedSignal.aborted, false);
+    assert.equal(lookupHost, "8.8.8.8");
   } finally {
-    mock.restoreAll();
+    publicFetchTransport.request = original;
   }
 });

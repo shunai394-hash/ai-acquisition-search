@@ -39,7 +39,7 @@
       "bundler": "metro"
     },
     "extra": {
-      "webAppUrl": "https://ai-acquisition-search-naitoshyuichirou-6935.vercel.app"
+      "webAppUrl": "https://ai-acquisition-search.vercel.app"
     },
     "backgroundColor": "#080809",
     "primaryColor": "#080809",

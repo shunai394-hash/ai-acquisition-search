@@ -7,12 +7,21 @@ mock.module("../billing.ts", {
   },
 });
 
-const { providerJobTimeoutMs } = await import("./job-recovery");
+const { providerJobTimeoutMs, redactSensitiveText } = await import("./job-recovery");
 
 test("provider timeout uses a finite default when configuration is malformed", () => {
   assert.equal(providerJobTimeoutMs(undefined), 180 * 60_000);
   assert.equal(providerJobTimeoutMs(""), 180 * 60_000);
   assert.equal(providerJobTimeoutMs("not-a-number"), 180 * 60_000);
+});
+
+test("stored provider payloads drop signed URLs", () => {
+  const redacted = redactSensitiveText({
+    status: "completed",
+    video: { url: "https://cdn.example/video.mp4?token=secret" },
+  }) as { video: { url: string } };
+  assert.equal(redacted.video.url, "[url]");
+  assert.equal(JSON.stringify(redacted).includes("token=secret"), false);
 });
 
 test("provider timeout clamps configuration to safe operational bounds", () => {

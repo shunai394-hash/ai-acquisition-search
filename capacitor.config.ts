@@ -5,7 +5,9 @@ const config: CapacitorConfig = {
   appName: "AI Acquisition Search",
   webDir: "public",
   server: {
-    url: process.env.CAPACITOR_SERVER_URL || "https://ai-acquisition-search-naitoshyuichirou-6935.vercel.app",
+    // The team-scoped *.vercel.app host redirects anonymous visitors to Vercel SSO.
+    // The project alias below serves the app without Deployment Protection.
+    url: process.env.CAPACITOR_SERVER_URL || "https://ai-acquisition-search.vercel.app",
     cleartext: false,
   },
 };

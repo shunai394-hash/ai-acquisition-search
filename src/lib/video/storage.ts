@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { fetchPublicUrl } from "@/lib/security/public-url";
-import { mp4HasAudioTrack } from "@/lib/video/media-probe";
+import { isPlayableVideoContainer, mp4HasAudioTrack } from "@/lib/video/media-probe";
 
 const bucket = "video-assets";
 
@@ -58,6 +58,7 @@ export async function saveVideoToStorage(input: {
     arrayBuffer.set(chunk, offset);
     offset += chunk.byteLength;
   }
+  if (!isPlayableVideoContainer(arrayBuffer)) throw new Error("取得したファイルは動画として認識できませんでした。");
 
   const ext = input.extension ?? (contentType.includes("webm") ? "webm" : "mp4");
   const path = `${input.userId}/${input.jobId}.${ext}`;
