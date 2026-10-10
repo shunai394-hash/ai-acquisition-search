@@ -704,7 +704,7 @@ export default function Home() {
       <header className="topbar">
         <div>
           <strong>AI Acquisition Search</strong>
-          <span>自社商品の広告を、自分で試す</span>
+          <span>AI VIDEO STUDIO · IMAGE TO VIDEO</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           {result && (
@@ -723,42 +723,41 @@ export default function Home() {
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-grid">
           <div className="hero-copy">
-            <p className="eyebrow">自社商品の広告を、自分で試す</p>
-            <h1 id="hero-title">写真と一文から、<br /><span>広告動画を作る。</span></h1>
-            <p className="lead">商品画像と自由なプロンプトで短い動画を始められます。ナレーションと簡易BGMも選べます。商品URLからは、市場の声を読んで訴求を決められます。</p>
-            <a className="hero-primary" href="#video-studio">画像と文章から動画を作る</a>
-            <p className="hero-secondary-label">または、商品URLから市場を読む</p>
-            <form onSubmit={analyze} className="search" aria-label="商品分析">
-              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="商品URLを入力  /  https://example.com/product" type="url" required aria-label="分析する商品URL" />
-              <button disabled={loading} aria-busy={loading}>{loading ? "分析中…" : "市場を読む →"}</button>
-            </form>
-            {error && <div className="hero-error" role="alert"><span>ANALYSIS INTERRUPTED</span><strong>{error}</strong></div>}
-            {loading && <div className="analysis-progress" role="status" aria-live="polite"><span className="analysis-spinner" aria-hidden="true" /><div><strong>{loadingPhase}</strong><small>RESEARCH → EVIDENCE → DECISION</small></div><div className="analysis-progress-track"><i /></div></div>}
+            <p className="eyebrow">AI VIDEO STUDIO · IMAGE TO VIDEO</p>
+            <h1 id="hero-title">写真とプロンプトから、<br /><span>動画をつくる。</span></h1>
+            <p className="lead">商品紹介だけに限らない。シネマティックな映像も、人物の動きも、SNS向けショートも。画像を選び、作りたい映像を自分の言葉で指示して、動画を生成します。</p>
+            <a className="hero-primary" href="#video-studio">動画をつくる <span aria-hidden="true">↗</span></a>
             <div className="hero-proof">
-              <div><b>01</b><strong>画像と文章</strong><span>商品写真は任意。プロンプトは8文字以上で生成できます。</span></div>
-              <div><b>02</b><strong>声と音</strong><span>自動台本、自分の原稿、簡易BGMを選べます。AI作曲のフル楽曲ではありません。</span></div>
-              <div><b>03</b><strong>接続したSNS</strong><span>未接続のサービスには投稿しません。TikTokは同意と審査状態に従います。</span></div>
+              <div><b>01 / INPUT</b><strong>画像を選ぶ</strong><span>写真や参照画像をアップロード。画像なしでもプロンプトから制作できます。</span></div>
+              <div><b>02 / DIRECT</b><strong>映像を言葉で指示</strong><span>被写体、動き、カメラ、光、雰囲気を自由に指定できます。</span></div>
+              <div><b>03 / OUTPUT</b><strong>動画として書き出す</strong><span>尺・画角・解像度を選び、完成動画をプレビューして保存します。</span></div>
             </div>
           </div>
-          <div className="hero-instrument" aria-label="AI Acquisition Search decision loop">
-            <div className="instrument-grid" aria-hidden="true"></div>
-            <div className="signal-orbit orbit-one"></div><div className="signal-orbit orbit-two"></div><div className="signal-orbit orbit-three"></div>
-            <div className="signal-core"><span>AI</span><strong>DECIDE</strong><small>FROM SIGNAL → ACTION</small></div>
-            <div className="signal-node node-a"><b>01</b><span>RESEARCH</span></div><div className="signal-node node-b"><b>02</b><span>TENSION</span></div>
-            <div className="signal-node node-c"><b>03</b><span>DECISION</span></div><div className="signal-node node-d"><b>04</b><span>CREATIVE</span></div>
-            <div className="instrument-caption"><span>TWO STARTS</span><strong>画像かURLか。入口は二つです。</strong></div>
+          <div className="hero-video-visual" aria-label="動画制作のプレビューイメージ">
+            <div className="video-visual-top"><span><i /> VIDEO STUDIO</span><span>IMAGE → MOTION</span></div>
+            <div className="video-visual-frame">
+              <div className="visual-sun" />
+              <div className="visual-horizon" />
+              <div className="visual-subject"><span /></div>
+              <div className="visual-light-streak" />
+              <div className="visual-frame-label"><span>SCENE 01</span><strong>Make it move.</strong><small>YOUR IDEA, IN MOTION</small></div>
+              <span className="visual-timecode">00:00 / 00:05</span>
+              <span className="visual-play" aria-hidden="true">▶</span>
+            </div>
+            <div className="video-visual-bottom"><span>01 <b>REFERENCE</b></span><i>→</i><span>02 <b>PROMPT</b></span><i>→</i><span>03 <b>VIDEO</b></span></div>
+            <div className="visual-caption"><span>YOUR PROMPT</span><strong>Light · Movement · Camera · Mood</strong><span className="visual-caption-status">CREATIVE CONTROL / 01</span></div>
           </div>
         </div>
-        <div className="hero-loop" aria-label="制作の流れ"><span>写真</span><i>→</i><span>文章</span><i>→</i><span>動画</span><i>→</i><span>投稿</span><i>→</i><span>学習</span></div>
-        <p className="hint">生成、保存、投稿にはログインが必要です。未接続のSNSや未設定の外部APIは、成功したことにはなりません。</p>
+        <div className="hero-loop" aria-label="動画制作の流れ"><span>画像</span><i>+</i><span>プロンプト</span><i>→</i><span>映像生成</span><i>→</i><span>音声</span><i>→</i><span>動画ファイル</span></div>
+        <p className="hint">まずは動画制作。商品URL分析やSNS投稿は、必要な人向けの別機能です。</p>
       </section>
 
       <section id="video-studio" className="video-studio" aria-labelledby="video-studio-title">
         <div className="studio-kicker-row"><span className="studio-live-dot" aria-hidden="true"></span><span>動画スタジオ</span><span className="studio-divider">/</span><span>画像と文章</span></div>
         <div className="studio-copy">
-          <p className="eyebrow">動画スタジオ · Higgsfield</p>
-          <h2 id="video-studio-title">作りたい映像を、そのまま書く。</h2>
-          <p>画像を置いて、あなたのプロンプトを書く。尺・画角・音を決めて生成します。商品URLを分析したあとも、このスタジオから画像と独自プロンプトで作れます。</p>
+          <p className="eyebrow">CREATE · IMAGE / PROMPT / MOTION</p>
+          <h2 id="video-studio-title">あなたのイメージを、動画にする。</h2>
+          <p>画像を追加するか、文章だけで始める。被写体の動き、カメラワーク、光、テンポまで自由に指示し、尺・画角・解像度・音声を設定して生成します。</p>
         </div>
         <div className="studio-grid">
           <label className="studio-upload">
@@ -785,9 +784,9 @@ export default function Home() {
             {studioImagePreview ? <Image src={studioImagePreview} alt="動画生成に使う画像のプレビュー" width={640} height={640} unoptimized /> : <span className="upload-empty">＋ 画像・商品写真を追加<br /><small>人物 / 商品 / 写真 / イラスト / 参照素材</small></span>}
           </label>
           <div className="studio-prompt">
-            <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","UGC広告","商品CM","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","UGC広告":"自然なスマホ撮影感のあるUGC動画。冒頭2秒で視線を引き、リアルな人物の動きを重視。","商品CM":"高級ブランドCMのような商品映像。質感、照明、カメラの動きを美しく見せる。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
+            <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","人物・UGC風","商品映像","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","人物・UGC風":"自然なスマホ撮影感のある人物中心の動画。リアルな表情と自然な動きを重視。","商品映像":"質感、照明、カメラの動きを美しく見せる、シネマティックな商品映像。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
             <textarea id="studio-prompt" value={studioPrompt} onChange={(e)=>setStudioPrompt(e.target.value)} rows={8}
-              placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この商品画像を使って、20代女性が自然に商品を紹介するUGC風広告。最初の2秒で視線を引き、夕方の柔らかな光。縦9:16、リアルなスマホ撮影感。"} />
+              placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この写真の人物が夕方の街を歩き出す。カメラはゆっくり並走し、髪と服が風に揺れる。柔らかな逆光、シネマティック、縦9:16。"} />
             <span className="eyebrow">03 · FORMAT</span><div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · 音声</span><div className="studio-audio-grid">{([["off","なし","ナレーションなし"],["auto","自動","台本を自動で作る"],["custom","原稿","自分の原稿を読む"]] as const).map(([value,label,name]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} onClick={()=>setStudioAudio(value)} aria-pressed={studioAudio === value} aria-label={name}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option value="Kore">日本語 · Firm</option><option value="Leda">日本語 · Youthful</option><option value="Charon">日本語 · Informative</option><option value="Aoede">日本語 · Breezy</option><option value="Puck">English · Upbeat</option><option value="Achird">English · Friendly</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> 簡易BGMを追加</label>{studioMusic && <><p className="studio-music-note">現在は軽量な合成BGMです。AI作曲によるフル楽曲ではありません。</p><input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="雰囲気のヒント（例：lofi / calm / upbeat）" aria-label="BGMの雰囲気" /></>}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
               {([["prepare","PREPARE","素材"],["audio","AUDIO","音声"],["visual","VISUAL","映像設計"],["motion","MOTION","生成"],["render","RENDER","完成"]] as const).map(([key,label,ja], index) => {
                 // Same order as generateStudioVideo(): upload → narration/BGM → request → provider → result.
@@ -811,6 +810,21 @@ export default function Home() {
         {videoUrl && !result && <div className="studio-result"><video src={videoUrl} controls playsInline preload="metadata" aria-label="前回復元した動画のプレビュー" /><p><a href={videoUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></p></div>}
         {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline preload="metadata" aria-label="生成した動画のプレビュー" onError={() => { void refreshStudioVideoUrl(); }} /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>同じ条件でもう一度</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>画角と光を変えて再生成</button><a href={studioUrl} target="_blank" rel="noreferrer">新しいタブで開く →</a><a href={downloadUrl(studioUrl)} download>動画を保存 ↓</a></div></div>}
       </section>
+
+      <section className="url-analysis-secondary" aria-labelledby="url-analysis-title">
+        <div>
+          <p className="eyebrow">OPTIONAL TOOL</p>
+          <h2 id="url-analysis-title">商品URLから始めたい場合</h2>
+          <p>動画制作とは別に、商品ページの情報を整理したい場合はこちら。動画を作るためにURL分析は必要ありません。</p>
+        </div>
+            
+            <form onSubmit={analyze} className="search" aria-label="商品URL分析">
+              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="商品ページURL / https://example.com/product" type="url" required aria-label="分析する商品URL" />
+              <button disabled={loading} aria-busy={loading}>{loading ? "分析中…" : "URLを分析 →"}</button>
+            </form>
+            {error && <div className="hero-error" role="alert"><span>ANALYSIS INTERRUPTED</span><strong>{error}</strong></div>}
+            {loading && <div className="analysis-progress" role="status" aria-live="polite"><span className="analysis-spinner" aria-hidden="true" /><div><strong>{loadingPhase}</strong><small>RESEARCH → EVIDENCE → DECISION</small></div><div className="analysis-progress-track"><i /></div></div>}
+                </section>
 
       {result && (
         <div className="results">

@@ -10,8 +10,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "AI Acquisition Search | 写真と一文から広告動画",
-  description: "商品画像と自由な文章、または商品URLから短い広告動画を作ります。ナレーションと簡易BGM、接続したSNSへの投稿まで進められます。",
+  title: "AI Acquisition Search | 写真とプロンプトから動画をつくる",
+  description: "画像と自由なプロンプトから動画を生成。シネマティックな映像、人物動画、商品映像など、作りたい動画を自分の言葉で指示できます。",
   applicationName: "AI Acquisition Search",
   category: "business",
   icons: {
@@ -23,14 +23,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ja_JP",
-    title: "AI Acquisition Search | 写真と一文から広告動画",
-    description: "商品画像と文章、または商品URLから短い広告動画を作り、接続したSNSへ進めます。",
+    title: "AI Acquisition Search | 写真とプロンプトから動画をつくる",
+    description: "画像と自由なプロンプトから動画を生成。作りたい映像を自分の言葉で指示できます。",
     siteName: "AI Acquisition Search",
   },
   twitter: {
     card: "summary",
-    title: "AI Acquisition Search | 写真と一文から広告動画",
-    description: "商品画像と文章、または商品URLから短い広告動画を作ります。",
+    title: "AI Acquisition Search | 写真とプロンプトから動画をつくる",
+    description: "画像と自由なプロンプトから動画を生成。作りたい映像を自分の言葉で指示できます。",
   },
 };
 
