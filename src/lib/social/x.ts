@@ -10,6 +10,7 @@ async function request(path: string, init?: RequestInit) {
   const response = await fetch(API + path, {
     ...init,
     headers: { Authorization: `Bearer ${getToken()}`, "Content-Type": "application/json", ...(init?.headers || {}) },
+    signal: init?.signal ?? AbortSignal.timeout(30_000),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload?.errors) {
@@ -40,6 +41,7 @@ async function uploadXVideo(video: Uint8Array) {
       method: "POST",
       headers: { Authorization: `Bearer ${getToken()}` },
       body: form,
+      signal: AbortSignal.timeout(120_000),
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));

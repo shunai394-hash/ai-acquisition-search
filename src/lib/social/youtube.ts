@@ -49,6 +49,7 @@ export async function uploadYouTubeVideo(input: YouTubeUploadInput) {
       "X-Upload-Content-Length": String(file.byteLength),
     },
     body: JSON.stringify(metadata),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!init.ok) {
@@ -68,6 +69,7 @@ export async function uploadYouTubeVideo(input: YouTubeUploadInput) {
       "Content-Length": String(file.byteLength),
     },
     body: file,
+    signal: AbortSignal.timeout(120_000),
   });
 
   const payload = await upload.json().catch(() => ({}));
@@ -89,6 +91,7 @@ export async function getYouTubeVideoStatus(videoId: string) {
     `${API}/videos?part=snippet,status,statistics,processingDetails&id=${encodeURIComponent(videoId)}`,
     {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15_000),
     },
   );
 
