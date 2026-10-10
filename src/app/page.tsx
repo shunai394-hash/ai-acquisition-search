@@ -1099,9 +1099,9 @@ export default function Home() {
             <button type="button" onClick={generateVideo} disabled={videoGenerating || !videoPrompt.trim()}>
               {videoGenerating ? "動画生成中..." : "決定したシナリオから動画を生成"}
             </button>
-            {videoStatus && <p className="hint">{videoStatus}</p>}
+            {videoStatus && <p className="hint" role="status" aria-live="polite">{videoStatus}</p>}
             {videoJobId && <small className="hint">Job: {videoJobId}</small>}
-            {videoError && <p className="error">{videoError}</p>}
+            {videoError && <p className="error" role="alert">{videoError}</p>}
             {videoUrl && (
               <div style={{ marginTop: 16 }}>
                 <video src={videoUrl} controls playsInline style={{ width: "100%", maxWidth: 420, borderRadius: 16, background: "#000" }} />
