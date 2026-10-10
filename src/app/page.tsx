@@ -819,14 +819,12 @@ export default function Home() {
         </div>
             
             <form onSubmit={analyze} className="search" aria-label="商品URL分析">
-              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="商品URLを入力（任意） / https://example.com/product" type="url" required aria-label="分析する商品URL（任意）" />
+              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="商品ページURL / https://example.com/product" type="url" required aria-label="分析する商品URL" />
               <button disabled={loading} aria-busy={loading}>{loading ? "分析中…" : "URLを分析 →"}</button>
             </form>
             {error && <div className="hero-error" role="alert"><span>ANALYSIS INTERRUPTED</span><strong>{error}</strong></div>}
             {loading && <div className="analysis-progress" role="status" aria-live="polite"><span className="analysis-spinner" aria-hidden="true" /><div><strong>{loadingPhase}</strong><small>RESEARCH → EVIDENCE → DECISION</small></div><div className="analysis-progress-track"><i /></div></div>}
-          {error && <div className="hero-error" role="alert"><span>ANALYSIS INTERRUPTED</span><strong>{error}</strong></div>}
-          {loading && <div className="analysis-progress" role="status" aria-live="polite"><span className="analysis-spinner" aria-hidden="true" /><div><strong>{loadingPhase}</strong><small>RESEARCH → EVIDENCE → DECISION</small></div><div className="analysis-progress-track"><i /></div></div>}
-      </section>
+                </section>
 
       {result && (
         <div className="results">
