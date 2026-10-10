@@ -51,6 +51,13 @@ function getTiktokNotice() {
   return "";
 }
 
+const OPENING_DIRECTIONS = {
+  auto: "OPENING DIRECTION: Design the first 0.5 seconds deliberately for this video's genre and mood. Make the subject and visual intention immediately legible, begin with purposeful visual energy, and avoid a blank lead-in or default fade-in. Do not force a loud or shocking effect if it conflicts with the concept.",
+  motion: "OPENING DIRECTION: In the first 0.5 seconds, begin with a clear, purposeful movement that reads instantly: a decisive camera move, subject action, or environmental motion. Avoid a static hold before the action starts.",
+  reveal: "OPENING DIRECTION: In the first 0.5 seconds, open on a visually intriguing detail or unusual composition, then begin revealing the subject or scene. Keep the image readable and the reveal motivated by the concept.",
+  quiet: "OPENING DIRECTION: Make the first 0.5 seconds visually intentional and immediately readable, using restrained movement, precise framing, light, and atmosphere. Preserve a quiet, cinematic mood without an empty or accidental-looking opening.",
+} as const;
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<AcquisitionAnalyzeResult | null>(null);
@@ -82,6 +89,7 @@ export default function Home() {
   const [videoError, setVideoError] = useState("");
   const [, setVideoEngine] = useState("");
   const [studioPrompt, setStudioPrompt] = useState("");
+  const [studioOpening, setStudioOpening] = useState<keyof typeof OPENING_DIRECTIONS>("auto");
   const [studioImage, setStudioImage] = useState<File | null>(null);
   const [studioImagePreview, setStudioImagePreview] = useState("");
   const [studioGenerating, setStudioGenerating] = useState(false);
@@ -448,7 +456,7 @@ export default function Home() {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
             body: JSON.stringify({
-              prompt: studioPrompt.trim(),
+              prompt: [studioPrompt.trim(), OPENING_DIRECTIONS[studioOpening]].join("\n\n"),
               hook: result?.analysis?.nextPosts?.[selectedScenario]?.hook || "",
               valueProposition: result?.analysis?.decision?.valueProposition || "",
               duration: studioDuration,
@@ -487,6 +495,7 @@ export default function Home() {
           prompt: [
             [
               studioPrompt.trim(),
+              OPENING_DIRECTIONS[studioOpening],
               remixHint ? "REMIX DIRECTION: " + remixHint + ". Preserve the product identity and core concept while changing the visual execution." : ""
             ].filter(Boolean).join("\n"),
             audioUrl
