@@ -625,7 +625,7 @@ export default function Home() {
             <div className="hero-proof">
               <div><b>01</b><strong>市場を読む</strong><span>レビュー・コメントから「繰り返される声」を抽出</span></div>
               <div><b>02</b><strong>矛盾を見つける</strong><span>痛点と競合の隙間から機会を定義</span></div>
-              <div><b>03</b><strong>次を試す</strong><span>訴求・動画・テストまで一本の仮説にする</span></div>
+              <div><b>03</b><strong>施策を実行する</strong><span>目的に合う施策を選び、検証できる形にする</span></div>
             </div>
           </div>
           <div className="hero-instrument" aria-label="AI Acquisition Search decision loop">
@@ -637,17 +637,17 @@ export default function Home() {
             <div className="instrument-caption"><span>LIVE SYSTEM</span><strong>ONE INPUT → MANY SIGNALS → ONE NEXT MOVE</strong></div>
           </div>
         </div>
-        <div className="hero-loop" aria-label="Acquisition loop"><span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>AD TEST</span><i>→</i><span>LEARN</span></div>
-        <p className="hint">分析結果はレポートで終わらない。判断を、次のクリエイティブとテストへ接続します。</p>
+        <div className="hero-loop" aria-label="Acquisition loop"><span>RESEARCH</span><i>→</i><span>PAIN POINT</span><i>→</i><span>PRODUCT</span><i>→</i><span>ACTION TEST</span><i>→</i><span>LEARN</span></div>
+        <p className="hint">分析レポートで終わらず、施策の実行・効果測定・改善につなげます。</p>
       </section>
 
-      {!result && (
+      {result && (
       <section className="video-studio" aria-labelledby="video-studio-title">
-        <div className="studio-kicker-row"><span className="studio-live-dot" aria-hidden="true"></span><span>CREATIVE LAB</span><span className="studio-divider">/</span><span>TEXT + IMAGE → VIDEO</span></div>
+        <div className="studio-kicker-row"><span className="studio-live-dot" aria-hidden="true"></span><span>施策の実行手段</span><span className="studio-divider">/</span><span>OPTIONAL CREATIVE TOOL</span></div>
         <div className="studio-copy">
-          <p className="eyebrow">VIDEO STUDIO · HIGGSFIELD</p>
-          <h2 id="video-studio-title">作りたい映像を、そのまま書く。</h2>
-          <p>画像を置いて、あなたのプロンプトを書く。尺・画角・音を決めて生成します。シナリオ作成は不要です。</p>
+          <p className="eyebrow">OPTIONAL EXECUTION · VIDEO</p>
+          <h2 id="video-studio-title">必要な場合だけ、動画施策を作成する。</h2>
+          <p>市場分析の結果を踏まえ、動画が有効な施策だと判断した場合に使う制作機能です。AI Acquisition Searchの中心は市場分析・戦略判断・施策の実行と改善です。</p>
         </div>
         <div className="studio-grid">
           <label className="studio-upload">
@@ -662,9 +662,9 @@ export default function Home() {
             {studioImagePreview ? <Image src={studioImagePreview} alt="動画生成に使う画像のプレビュー" width={640} height={640} unoptimized /> : <span className="upload-empty">＋ 画像・商品写真を追加<br /><small>人物 / 商品 / 写真 / イラスト / 参照素材</small></span>}
           </label>
           <div className="studio-prompt">
-            <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","UGC広告","商品CM","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","UGC広告":"自然なスマホ撮影感のあるUGC動画。冒頭2秒で視線を引き、リアルな人物の動きを重視。","商品CM":"高級ブランドCMのような商品映像。質感、照明、カメラの動きを美しく見せる。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
+            <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","UGC風","商品紹介","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","UGC風":"自然なスマホ撮影感。リアルな人物の動きと日常の使用シーンを重視。","商品紹介":"商品の特徴や使用場面を、誇張せず分かりやすく伝える映像。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
             <textarea id="studio-prompt" value={studioPrompt} onChange={(e)=>setStudioPrompt(e.target.value)} rows={8}
-              placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この商品画像を使って、20代女性が自然に商品を紹介するUGC風広告。最初の2秒で視線を引き、夕方の柔らかな光。縦9:16、リアルなスマホ撮影感。"} />
+              placeholder={"必要な動画施策の内容や見せ方を入力してください。\n\n例：商品の使い方を15秒で伝える。実際の特徴だけを使い、自然光の中で使用シーンを見せる。"} />
             <span className="eyebrow">03 · FORMAT</span><div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · AUDIO</span><div className="studio-audio-grid">{([["off","OFF"],["auto","AUTO"],["custom","CUSTOM"]] as const).map(([value,label]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} onClick={()=>setStudioAudio(value)} aria-pressed={studioAudio === value}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option value="Kore">日本語 · Firm</option><option value="Leda">日本語 · Youthful</option><option value="Charon">日本語 · Informative</option><option value="Aoede">日本語 · Breezy</option><option value="Puck">English · Upbeat</option><option value="Achird">English · Friendly</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> 簡易BGMを追加</label>{studioMusic && <><p className="studio-music-note">現在は軽量な合成BGMです。AI作曲によるフル楽曲ではありません。</p><input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="雰囲気のヒント（例：lofi / calm / upbeat）" aria-label="BGMの雰囲気" /></>}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
               {([["prepare","PREPARE","素材"],["audio","AUDIO","音声"],["visual","VISUAL","映像設計"],["motion","MOTION","生成"],["render","RENDER","完成"]] as const).map(([key,label,ja], index) => {
                 // Same order as generateStudioVideo(): upload → narration/BGM → request → provider → result.
@@ -1092,7 +1092,7 @@ export default function Home() {
           <section id="decision" className="next video-generator">
             <p className="eyebrow">CREATIVE EXECUTION · HIGGSFIELD</p>
             <h2>決めた一手を、そのまま広告にする</h2>
-            <p className="hint">分析結果をもとに9:16広告動画をHiggsfield APIで生成します。HiggsfieldやCloud Codeをユーザー側で起動する必要はありません。</p>
+            <p className="hint">動画が必要な施策向けの任意機能です。Higgsfield APIで生成します。HiggsfieldやCloud Codeをユーザー側で起動する必要はありません。</p>
             <textarea
               value={videoPrompt}
               readOnly
