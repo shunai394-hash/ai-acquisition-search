@@ -18,6 +18,11 @@ export const PLAYBACK_URL_TTL_SECONDS = 60 * 60;
  */
 export const SNS_INGEST_URL_TTL_SECONDS = 6 * 60 * 60;
 
+/** A bucket lookup must succeed and explicitly report public=false. */
+export function isVideoBucketPrivate(check: { ok: boolean; public?: boolean }) {
+  return check.ok && check.public === false;
+}
+
 // Minimal surface so tests can pass a stub instead of a full client.
 type StorageClient = Pick<SupabaseClient, "storage">;
 
