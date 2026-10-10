@@ -274,14 +274,19 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
       const publicId = resolved.videoId ?? String(pending.external_post_id);
       const shareUrl = typeof resolved.share_url === "string" ? resolved.share_url : null;
       const metadata = pending.metadata && typeof pending.metadata === "object" ? pending.metadata as Record<string, unknown> : {};
-      await db.from("social_posts").update({
+      const { data: updatedPending, error: updatePendingError } = await db.from("social_posts").update({
         status: "published",
         external_post_id: publicId,
         post_url: shareUrl,
         published_at: new Date().toISOString(),
         metadata: { ...metadata, publishStatus: resolved.status, publicVideoId: resolved.videoId ?? null, resolved_at: new Date().toISOString() },
         updated_at: new Date().toISOString(),
-      }).eq("id", pending.id).eq("user_id", pending.user_id).eq("status", "pending");
+      }).eq("id", pending.id).eq("user_id", pending.user_id).eq("status", "pending").select("id").maybeSingle();
+      if (updatePendingError) throw updatePendingError;
+      if (!updatedPending) {
+        results.push({ postId: pending.id, step: "tiktok-pending", status: "skipped", reason: "row changed before reconciliation" });
+        continue;
+      }
       results.push({ postId: pending.id, step: "tiktok-pending", status: "published", externalPostId: publicId });
     } catch (error) {
       results.push({ postId: pending.id, step: "tiktok-pending", status: "error", error: error instanceof Error ? error.message : String(error) });
