@@ -289,7 +289,36 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
       }
       results.push({ postId: pending.id, step: "tiktok-pending", status: "published", externalPostId: publicId });
     } catch (error) {
-      results.push({ postId: pending.id, step: "tiktok-pending", status: "error", error: error instanceof Error ? error.message : String(error) });
+      const message = error instanceof Error ? error.message : String(error);
+      const terminalStatus = message.startsWith("TikTok publish failed: FAILED:")
+        ? "FAILED"
+        : message.startsWith("TikTok publish failed: PUBLISH_CANCELLED:")
+          ? "PUBLISH_CANCELLED"
+          : null;
+
+      if (terminalStatus) {
+        const currentMetadata = pending.metadata && typeof pending.metadata === "object"
+          ? pending.metadata as Record<string, unknown>
+          : {};
+        const { error: terminalUpdateError } = await db.from("social_posts").update({
+          status: "failed",
+          metadata: {
+            ...currentMetadata,
+            publishStatus: terminalStatus,
+            publish_error: message,
+            terminal_failure_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        }).eq("id", pending.id).eq("user_id", pending.user_id).eq("status", "pending");
+        results.push(terminalUpdateError
+          ? { postId: pending.id, step: "tiktok-pending", status: "error", error: terminalUpdateError.message }
+          : { postId: pending.id, step: "tiktok-pending", status: "failed", error: message });
+        continue;
+      }
+
+      // Transient status API errors stay pending; retrying the publish itself
+      // could duplicate a post that TikTok has already accepted.
+      results.push({ postId: pending.id, step: "tiktok-pending", status: "error", error: message });
     }
   }
 
