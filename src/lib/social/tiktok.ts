@@ -89,6 +89,7 @@ export async function exchangeTikTokCode(code: string) {
     headers: { "Content-Type": "application/x-www-form-urlencoded", "Cache-Control": "no-cache" },
     body,
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.access_token || !data.refresh_token) throw new Error(data.error_description || data.error || "TikTok OAuth token exchange failed");
@@ -99,6 +100,7 @@ export async function saveTikTokAccount(userId: string, token: Awaited<ReturnTyp
   const response = await fetch(`${TIKTOK_API_BASE}/user/info/?fields=open_id,display_name,avatar_url`, {
     headers: { Authorization: "Bearer " + token.access_token },
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload?.error?.code !== "ok") throw new Error(payload?.error?.message || "TikTok user info failed");
@@ -386,6 +388,7 @@ export async function getTikTokVideoMetrics(videoId: string, accessToken = getAc
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json; charset=UTF-8" },
       body: JSON.stringify({ filters: { video_ids: [videoId] } }),
+      signal: AbortSignal.timeout(15_000),
     },
   );
   const payload = await response.json();
