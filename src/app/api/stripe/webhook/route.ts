@@ -126,12 +126,13 @@ async function handleEvent(event: StripeObject) {
       const userId = await userIdForCustomer(customerId);
       if (userId) {
         const supabase = getAdminSupabase();
-        await supabase.from("usage_events").insert({
+        const { error: usageEventError } = await supabase.from("usage_events").insert({
           user_id: userId,
           event_type: event.type === "invoice.paid" ? "billing_paid" : "billing_payment_failed",
           units: 1,
           metadata: { invoice_id: object.id, customer_id: customerId },
         });
+        if (usageEventError) throw usageEventError;
       }
       break;
     }
@@ -177,24 +178,48 @@ export async function POST(request: Request) {
     if (!inserted) {
       const { data: existing, error: existingError } = await supabase
         .from("stripe_webhook_events")
-        .select("status")
+        .select("status,received_at")
         .eq("event_id", eventId)
         .maybeSingle();
       if (existingError) throw existingError;
+      if (!existing) throw new Error("Stripe webhook event row could not be loaded");
 
-      if (existing?.status === "processed") {
+      if (existing.status === "processed") {
         return NextResponse.json({ received: true, reused: true });
       }
 
-      // A previous failed/processing delivery is retried by Stripe. Do not
-      // silently acknowledge an event whose first attempt did not finish.
-      await supabase
+      const staleBefore = new Date(Date.now() - 5 * 60_000).toISOString();
+      if (existing.status === "processing") {
+        const receivedAt = Date.parse(String(existing.received_at ?? ""));
+        // A concurrent delivery must not execute a non-idempotent side effect
+        // (for example, adding a billing usage event) while the first request
+        // is still handling the same Stripe event.
+        if (!Number.isFinite(receivedAt) || receivedAt >= Date.parse(staleBefore)) {
+          return NextResponse.json({ received: true, inProgress: true });
+        }
+      }
+
+      // Failed events may be retried immediately. Stale processing rows may be
+      // reclaimed after five minutes. The status + timestamp filters are a
+      // compare-and-swap so only one duplicate delivery can claim the event.
+      let claim = supabase
         .from("stripe_webhook_events")
         .update({
           status: "processing",
+          received_at: new Date().toISOString(),
           error_message: null,
         })
         .eq("event_id", eventId);
+      if (existing.status === "failed") {
+        claim = claim.eq("status", "failed");
+      } else if (existing.status === "processing") {
+        claim = claim.eq("status", "processing").lt("received_at", staleBefore);
+      } else {
+        return NextResponse.json({ received: true, inProgress: true });
+      }
+      const { data: claimed, error: claimError } = await claim.select("event_id").maybeSingle();
+      if (claimError) throw claimError;
+      if (!claimed) return NextResponse.json({ received: true, inProgress: true });
     }
 
     try {

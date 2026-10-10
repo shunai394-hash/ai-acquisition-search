@@ -11,22 +11,25 @@ function builder(table: string) {
   const rows = (tables[table] ||= []);
   let op: "select" | "insert" | "update" = "select";
   let payload: Row = {};
-  const filters: Array<[string, unknown]> = [];
+  let returning = false;
+  const filters: Array<[string, unknown, "eq" | "lt"]> = [];
   const api = {
     insert(row: Row) { op = "insert"; payload = row; return api; },
     update(row: Row) { op = "update"; payload = row; return api; },
     upsert(row: Row) { upserts.push({ table, row }); return Promise.resolve({ data: null, error: null }); },
-    select() { return api; },
-    eq(col: string, value: unknown) { filters.push([col, value]); return api; },
+    select() { if (op === "update") returning = true; return api; },
+    eq(col: string, value: unknown) { filters.push([col, value, "eq"]); return api; },
+    lt(col: string, value: unknown) { filters.push([col, value, "lt"]); return api; },
     maybeSingle() { return api; },
     then(resolve: (value: unknown) => unknown) {
-      const match = rows.filter((row) => filters.every(([col, value]) => row[col] === value));
+      const match = rows.filter((row) => filters.every(([col, value, op]) => op === "lt" ? String(row[col] ?? "") < String(value) : row[col] === value));
       if (op === "insert") {
+        if (table === "usage_events" && usageInsertFailure) return Promise.resolve({ data: null, error: { code: "XX000", message: "simulated usage event persistence failure" } }).then(resolve);
         if (table === "stripe_webhook_events" && rows.some((row) => row.event_id === payload.event_id)) return Promise.resolve({ data: null, error: { code: "23505", message: "duplicate key" } }).then(resolve);
-        rows.push({ ...payload });
+        rows.push({ ...(table === "stripe_webhook_events" ? { received_at: new Date().toISOString() } : {}), ...payload });
         return Promise.resolve({ data: { event_id: payload.event_id }, error: null }).then(resolve);
       }
-      if (op === "update") { match.forEach((row) => Object.assign(row, payload)); return Promise.resolve({ data: null, error: null }).then(resolve); }
+      if (op === "update") { match.forEach((row) => Object.assign(row, payload)); return Promise.resolve({ data: returning ? match[0] ?? null : null, error: null }).then(resolve); }
       return Promise.resolve({ data: match[0] ?? null, error: null }).then(resolve);
     },
   };
@@ -41,6 +44,7 @@ process.env.STRIPE_SECRET_KEY = "sk_test";
 let stripeSubscription: Row = {};
 let stripeDown = false;
 let stripeFetches = 0;
+let usageInsertFailure = false;
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
@@ -73,6 +77,7 @@ beforeEach(() => {
   upserts.length = 0;
   stripeDown = false;
   stripeFetches = 0;
+  usageInsertFailure = false;
   stripeSubscription = { id: "sub_1", customer: "cus_1", status: "canceled", items: { data: [{ current_period_end: 1893456000 }] } };
 });
 
@@ -120,6 +125,20 @@ test("an already processed event is acknowledged without touching Stripe or the 
   assert.equal(upserts.length, upsertsAfterFirst);
 });
 
+test("a stale processing event is reclaimed after five minutes", async () => {
+  tables.stripe_webhook_events = [{
+    event_id: "evt_stale",
+    event_type: "customer.subscription.updated",
+    status: "processing",
+    received_at: new Date(Date.now() - 6 * 60_000).toISOString(),
+    payload: staleActiveEvent,
+  }];
+  const res = await webhook(signed({ ...staleActiveEvent, id: "evt_stale" }));
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal(tables.stripe_webhook_events[0].status, "processed");
+  assert.equal(upserts.filter((u) => u.table === "subscriptions").length, 1);
+});
+
 test("concurrent duplicate deliveries both succeed and converge on the same state", async () => {
   stripeSubscription = { ...stripeSubscription, status: "active" };
   const [a, b] = await Promise.all([
@@ -140,6 +159,29 @@ test("subscription.deleted and past_due both drop the user to the free plan", as
   await webhook(signed(subscriptionEvent("evt_pd", "customer.subscription.updated", "past_due")));
   const subs = upserts.filter((u) => u.table === "subscriptions").map((u) => [u.row.status, u.row.plan]);
   assert.deepEqual(subs, [["canceled", "free"], ["past_due", "free"]]);
+});
+
+test("concurrent duplicate invoice deliveries create one usage event", async () => {
+  tables.billing_customers = [{ stripe_customer_id: "cus_1", user_id: "u1" }];
+  const event = { id: "evt_inv_conc", type: "invoice.payment_failed", data: { object: { id: "in_1", customer: "cus_1" } } };
+  const [a, b] = await Promise.all([webhook(signed(event)), webhook(signed(event))]);
+  assert.deepEqual([a.status, b.status], [200, 200]);
+  assert.equal(tables.usage_events?.length, 1);
+});
+
+test("billing usage-event persistence failure is retried by Stripe", async () => {
+  tables.billing_customers = [{ stripe_customer_id: "cus_1", user_id: "u1" }];
+  const event = { id: "evt_inv_retry", type: "invoice.payment_failed", data: { object: { id: "in_retry", customer: "cus_1" } } };
+  usageInsertFailure = true;
+  const failed = await webhook(signed(event));
+  assert.equal(failed.status, 500);
+  assert.equal(tables.stripe_webhook_events[0].status, "failed");
+  assert.equal(tables.usage_events?.length ?? 0, 0);
+
+  usageInsertFailure = false;
+  const retried = await webhook(signed(event));
+  assert.equal(retried.status, 200, await retried.clone().text());
+  assert.equal(tables.usage_events?.length, 1);
 });
 
 test("invoice.payment_failed records an event but does not change the plan", async () => {
