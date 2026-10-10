@@ -46,9 +46,10 @@ beforeEach(() => {
 });
 
 test("private video bucket health gate fails closed", () => {
-  assert.equal(isVideoBucketPrivate({ ok: true, public: false }), true);
-  assert.equal(isVideoBucketPrivate({ ok: true, public: true }), false);
-  assert.equal(isVideoBucketPrivate({ ok: false }), false);
+  assert.equal(isVideoBucketPrivate({ ok: true, known: true, public: false }), true);
+  assert.equal(isVideoBucketPrivate({ ok: true, known: true, public: true }), false);
+  assert.equal(isVideoBucketPrivate({ ok: false, known: false }), false);
+  assert.equal(isVideoBucketPrivate({ ok: true, known: false, public: false }), false);
   assert.equal(isVideoBucketPrivate({ ok: true }), false);
 });
 
