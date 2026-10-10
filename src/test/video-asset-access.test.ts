@@ -27,11 +27,12 @@ mock.module("../lib/billing.ts", {
   },
 });
 const tiktokUrls: string[] = [];
+let tiktokPending = false;
 mock.module("../lib/social/tiktok.ts", {
   namedExports: {
     getTikTokAccessToken: async () => "tt-token",
     publishTikTokVideo: async ({ videoUrl }: { videoUrl: string }) => { tiktokUrls.push(videoUrl); return { publishId: "pub-1", privacyLevel: "SELF_ONLY", creatorUsername: "me" }; },
-    resolveTikTokVideoId: async () => ({ videoId: "vid-1", status: "PUBLISH_COMPLETE" }),
+    resolveTikTokVideoId: async () => tiktokPending ? ({ pending: true, status: "PROCESSING" }) : ({ videoId: "vid-1", status: "PUBLISH_COMPLETE" }),
   },
 });
 
@@ -43,6 +44,7 @@ beforeEach(() => {
   db = new FakeSupabase();
   signed.length = 0;
   tiktokUrls.length = 0;
+  tiktokPending = false;
 });
 
 test("private video bucket health gate fails closed", () => {
@@ -103,6 +105,19 @@ test("publishing our own video hands TikTok a fresh 6h signed URL, not the calle
   assert.equal(tiktokUrls.length, 1, JSON.stringify(body));
   assert.match(tiktokUrls[0], /\/object\/sign\/video-assets\/u1\/job-1\.mp4\?token=t1$/);
   assert.equal(signed[0].ttl, 6 * 60 * 60);
+});
+
+test("TikTok pending publish is persisted as non-retryable", async () => {
+  db.seed("social_posts", [{ id: "post-1", user_id: "u1", network: "tiktok", status: "planned", metadata: {} }]);
+  db.seed("tiktok_publish_consents", [{ user_id: "u1", consented_at: new Date().toISOString() }]);
+  tiktokPending = true;
+  const res = await publish(publishRequest("https://proj.supabase.co/storage/v1/object/public/video-assets/u1/job-1.mp4"));
+  const body = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.results[0].pending, true);
+  const reservation = db.table("social_posts").find((row) => (row.metadata as Record<string, unknown>)?.source_social_post_id === "post-1");
+  assert.equal(reservation?.status, "pending");
+  assert.equal(reservation?.metadata && (reservation.metadata as Record<string, unknown>).publishId, "pub-1");
 });
 
 test("publishing another user's stored video is refused before any SNS call", async () => {
