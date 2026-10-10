@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import Image from "next/image";
 import GoogleSignIn from "@/components/GoogleSignIn";
 import BillingButton from "@/components/BillingButton";
 import Link from "next/link";
@@ -35,6 +36,18 @@ function downloadUrl(url: string) {
   } catch {
     return url;
   }
+}
+
+function subscribeToSearchParams(callback: () => void) {
+  window.addEventListener("popstate", callback);
+  return () => window.removeEventListener("popstate", callback);
+}
+
+function getTiktokNotice() {
+  const value = new URLSearchParams(window.location.search).get("tiktok");
+  if (value === "connected") return "TikTokアカウントを接続しました。自動投稿を利用できます。";
+  if (value === "error") return "TikTok接続に失敗しました。もう一度接続してください。";
+  return "";
 }
 
 export default function Home() {
@@ -93,11 +106,8 @@ export default function Home() {
   const [publishGenerating, setPublishGenerating] = useState(false);
   const [publishStatus, setPublishStatus] = useState("");
   const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; pending?: boolean; url?: string; error?: string }>>([]);
-  const [tiktokNotice, setTiktokNotice] = useState("");
+  const tiktokNotice = useSyncExternalStore(subscribeToSearchParams, getTiktokNotice, () => "");
   useEffect(() => {
-    const value = new URLSearchParams(window.location.search).get("tiktok");
-    if (value === "connected") setTiktokNotice("TikTokアカウントを接続しました。自動投稿を利用できます。");
-    if (value === "error") setTiktokNotice("TikTok接続に失敗しました。もう一度接続してください。");
     getAccessToken().then(async (token) => {
       const response = await fetch("/api/social/tiktok-consent", {
         headers: { Authorization: "Bearer " + token },
@@ -644,7 +654,7 @@ export default function Home() {
               if (file && file.size > 8 * 1024 * 1024) { setStudioError("商品画像は8MB以下にしてください。"); e.target.value = ""; return; }
               setStudioError(""); setStudioImage(file); setStudioImagePreview(file ? URL.createObjectURL(file) : "");
             }} />
-            {studioImagePreview ? <img src={studioImagePreview} alt="動画生成に使う画像のプレビュー" /> : <span className="upload-empty">＋ 画像・商品写真を追加<br /><small>人物 / 商品 / 写真 / イラスト / 参照素材</small></span>}
+            {studioImagePreview ? <Image src={studioImagePreview} alt="動画生成に使う画像のプレビュー" width={640} height={640} unoptimized /> : <span className="upload-empty">＋ 画像・商品写真を追加<br /><small>人物 / 商品 / 写真 / イラスト / 参照素材</small></span>}
           </label>
           <div className="studio-prompt">
             <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","UGC広告","商品CM","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","UGC広告":"自然なスマホ撮影感のあるUGC動画。冒頭2秒で視線を引き、リアルな人物の動きを重視。","商品CM":"高級ブランドCMのような商品映像。質感、照明、カメラの動きを美しく見せる。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
