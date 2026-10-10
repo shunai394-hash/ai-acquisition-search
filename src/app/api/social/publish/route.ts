@@ -245,11 +245,20 @@ export async function POST(request: Request) {
             const r = await publishTikTokVideo({accessToken,videoUrl,title:caption,isAigc:true});
             const resolved = await resolveTikTokVideoId(r.publishId, accessToken);
             if (resolved.pending) {
-              await supabase.from("social_posts").update({
+              const { data: pendingRow, error: pendingSaveError } = await supabase.from("social_posts").update({
                 status: "pending",
                 metadata: { source_social_post_id: socialPostId, publishId: r.publishId, publishStatus: resolved.status },
                 updated_at: new Date().toISOString(),
-              }).eq("id", rowId).eq("user_id", user.id).eq("status", "publishing");
+              }).eq("id", rowId).eq("user_id", user.id).eq("status", "publishing").select("id").maybeSingle();
+              if (pendingSaveError || !pendingRow) {
+                // TikTok has accepted the request. Keep the reservation non-retryable
+                // and surface manual recovery rather than risking a duplicate post.
+                results.push({
+                  platform, ok: false, pending: true, postId: r.publishId, manualRecoveryRequired: true,
+                  error: "TikTokは投稿を受け付けましたが、処理中状態を保存できませんでした。二重投稿防止のため自動再投稿は行いません。",
+                });
+                continue;
+              }
               results.push({platform,ok:false,pending:true,postId:r.publishId,error:"TikTok側で処理中です。公開完了まで自動再投稿は行いません。"});
               continue;
             }
