@@ -51,6 +51,13 @@ function getTiktokNotice() {
   return "";
 }
 
+const OPENING_DIRECTIONS = {
+  auto: "OPENING DIRECTION: Design the first 0.5 seconds deliberately for this video's genre and mood. Make the subject and visual intention immediately legible, begin with purposeful visual energy, and avoid a blank lead-in or default fade-in. Do not force a loud or shocking effect if it conflicts with the concept.",
+  motion: "OPENING DIRECTION: In the first 0.5 seconds, begin with a clear, purposeful movement that reads instantly: a decisive camera move, subject action, or environmental motion. Avoid a static hold before the action starts.",
+  reveal: "OPENING DIRECTION: In the first 0.5 seconds, open on a visually intriguing detail or unusual composition, then begin revealing the subject or scene. Keep the image readable and the reveal motivated by the concept.",
+  quiet: "OPENING DIRECTION: Make the first 0.5 seconds visually intentional and immediately readable, using restrained movement, precise framing, light, and atmosphere. Preserve a quiet, cinematic mood without an empty or accidental-looking opening.",
+} as const;
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<AcquisitionAnalyzeResult | null>(null);
@@ -82,6 +89,7 @@ export default function Home() {
   const [videoError, setVideoError] = useState("");
   const [, setVideoEngine] = useState("");
   const [studioPrompt, setStudioPrompt] = useState("");
+  const [studioOpening, setStudioOpening] = useState<keyof typeof OPENING_DIRECTIONS>("auto");
   const [studioImage, setStudioImage] = useState<File | null>(null);
   const [studioImagePreview, setStudioImagePreview] = useState("");
   const [studioGenerating, setStudioGenerating] = useState(false);
@@ -448,7 +456,7 @@ export default function Home() {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
             body: JSON.stringify({
-              prompt: studioPrompt.trim(),
+              prompt: [studioPrompt.trim(), OPENING_DIRECTIONS[studioOpening]].join("\n\n"),
               hook: result?.analysis?.nextPosts?.[selectedScenario]?.hook || "",
               valueProposition: result?.analysis?.decision?.valueProposition || "",
               duration: studioDuration,
@@ -487,6 +495,7 @@ export default function Home() {
           prompt: [
             [
               studioPrompt.trim(),
+              OPENING_DIRECTIONS[studioOpening],
               remixHint ? "REMIX DIRECTION: " + remixHint + ". Preserve the product identity and core concept while changing the visual execution." : ""
             ].filter(Boolean).join("\n"),
             audioUrl
@@ -723,33 +732,36 @@ export default function Home() {
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-grid">
           <div className="hero-copy">
-            <p className="eyebrow">AI VIDEO STUDIO · IMAGE TO VIDEO</p>
-            <h1 id="hero-title">写真とプロンプトから、<br /><span>動画をつくる。</span></h1>
-            <p className="lead">商品紹介だけに限らない。シネマティックな映像も、人物の動きも、SNS向けショートも。画像を選び、作りたい映像を自分の言葉で指示して、動画を生成します。</p>
-            <a className="hero-primary" href="#video-studio">動画をつくる <span aria-hidden="true">↗</span></a>
+            <p className="eyebrow hero-eyebrow"><span className="hero-eyebrow-mark" aria-hidden="true"></span> AI VIDEO DIRECTION / 01</p>
+            <h1 id="hero-title">最初の0.5秒から、<br /><span>映像を設計する。</span></h1>
+            <p className="lead">写真1枚でも、言葉だけでも。作りたい世界を伝えれば、動き・カメラ・光まで指示できる動画スタジオ。派手な映像も、静かなシネマも、あなたの意図から始まります。</p>
+            <div className="hero-actions">
+              <a className="hero-primary" href="#video-studio">スタジオでつくる <span aria-hidden="true">↗</span></a>
+              <a className="hero-text-link" href="#how-it-works">制作の流れを見る <span aria-hidden="true">↓</span></a>
+            </div>
             <div className="hero-proof">
-              <div><b>01 / INPUT</b><strong>画像を選ぶ</strong><span>写真や参照画像をアップロード。画像なしでもプロンプトから制作できます。</span></div>
-              <div><b>02 / DIRECT</b><strong>映像を言葉で指示</strong><span>被写体、動き、カメラ、光、雰囲気を自由に指定できます。</span></div>
-              <div><b>03 / OUTPUT</b><strong>動画として書き出す</strong><span>尺・画角・解像度を選び、完成動画をプレビューして保存します。</span></div>
+              <div><b>01 / OPENING</b><strong>冒頭の一瞬</strong><span>0.5秒の見せ方を選び、最初の構図と動きを演出します。</span></div>
+              <div><b>02 / DIRECTION</b><strong>言葉で演出</strong><span>被写体・カメラ・光・空気感を自由なプロンプトで指定。</span></div>
+              <div><b>03 / FINISH</b><strong>自分の設定で生成</strong><span>尺・画角・解像度を調整。完成動画を確認して保存。</span></div>
             </div>
           </div>
-          <div className="hero-video-visual" aria-label="動画制作のプレビューイメージ">
-            <div className="video-visual-top"><span><i /> VIDEO STUDIO</span><span>IMAGE → MOTION</span></div>
+          <div className="hero-video-visual" aria-label="動画演出のコンセプトビジュアル">
+            <div className="video-visual-top"><span><i /> VIDEO STUDIO</span><span>ART DIRECTION / 01</span></div>
             <div className="video-visual-frame">
               <div className="visual-sun" />
               <div className="visual-horizon" />
               <div className="visual-subject"><span /></div>
               <div className="visual-light-streak" />
-              <div className="visual-frame-label"><span>SCENE 01</span><strong>Make it move.</strong><small>YOUR IDEA, IN MOTION</small></div>
-              <span className="visual-timecode">00:00 / 00:05</span>
-              <span className="visual-play" aria-hidden="true">▶</span>
+              <div className="visual-frame-label"><span>THE OPENING / 00.5 SEC</span><strong>Make them look.</strong><small>FRAMING · MOTION · LIGHT</small></div>
+              <span className="visual-timecode">FIRST FRAME / 00:00.5</span>
+              <span className="visual-first-frame">FIRST 0.5 SEC</span>
             </div>
-            <div className="video-visual-bottom"><span>01 <b>REFERENCE</b></span><i>→</i><span>02 <b>PROMPT</b></span><i>→</i><span>03 <b>VIDEO</b></span></div>
-            <div className="visual-caption"><span>YOUR PROMPT</span><strong>Light · Movement · Camera · Mood</strong><span className="visual-caption-status">CREATIVE CONTROL / 01</span></div>
+            <div className="video-visual-bottom"><span>01 <b>INTENTION</b></span><i>→</i><span>02 <b>MOTION</b></span><i>→</i><span>03 <b>STORY</b></span></div>
+            <div className="visual-caption"><span>OPENING DIRECTION</span><strong>Contrast · Movement · Curiosity</strong><span className="visual-caption-status">A CREATIVE CHOICE, NOT A GUARANTEE</span></div>
           </div>
         </div>
-        <div className="hero-loop" aria-label="動画制作の流れ"><span>画像</span><i>+</i><span>プロンプト</span><i>→</i><span>映像生成</span><i>→</i><span>音声</span><i>→</i><span>動画ファイル</span></div>
-        <p className="hint">まずは動画制作。商品URL分析やSNS投稿は、必要な人向けの別機能です。</p>
+        <div id="how-it-works" className="hero-loop" aria-label="動画制作の流れ"><span>IDEA</span><i>→</i><span>DIRECT</span><i>→</i><span>GENERATE</span><i>→</i><span>REVIEW</span><i>→</i><span>REFINE</span></div>
+        <p className="hero-note">冒頭演出は生成プロンプトに反映されます。視聴維持率そのものを保証する機能ではありません。</p>
       </section>
 
       <section id="video-studio" className="video-studio" aria-labelledby="video-studio-title">
@@ -762,14 +774,14 @@ export default function Home() {
         <div className="studio-grid">
           <label className="studio-upload">
             <span className="eyebrow">01 · REFERENCE <em>OPTIONAL</em></span>
-            <input type="file" aria-label="商品画像をアップロード（JPG / PNG / WebP、8MBまで）" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
+            <input type="file" aria-label="参照画像をアップロード（JPG / PNG / WebP、8MBまで）" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
               const input = e.target;
               const file = input.files?.[0] || null;
               void (async () => {
                 if (!file) { setStudioError(""); setStudioImage(null); setStudioImagePreview(""); return; }
-                if (!["image/jpeg","image/png","image/webp"].includes(file.type)) { setStudioError("商品画像は JPG / PNG / WebP を選んでください。"); input.value = ""; return; }
+                if (!["image/jpeg","image/png","image/webp"].includes(file.type)) { setStudioError("参照画像は JPG / PNG / WebP を選んでください。"); input.value = ""; return; }
                 if (file.size === 0) { setStudioError("画像ファイルが空です。別のファイルを選んでください。"); input.value = ""; return; }
-                if (file.size > 8 * 1024 * 1024) { setStudioError("商品画像は8MB以下にしてください。"); input.value = ""; return; }
+                if (file.size > 8 * 1024 * 1024) { setStudioError("参照画像は8MB以下にしてください。"); input.value = ""; return; }
                 try {
                   const bitmap = await createImageBitmap(file);
                   bitmap.close();
@@ -787,7 +799,23 @@ export default function Home() {
             <div className="studio-prompt-head"><label className="eyebrow" htmlFor="studio-prompt">02 · PROMPT</label><div className="studio-presets">{["シネマティック","人物・UGC風","商品映像","自由制作"].map((preset) => <button key={preset} type="button" onClick={() => setStudioPrompt((current) => current || ({ "シネマティック":"映画のワンシーンのような、光とカメラワークにこだわった映像。","人物・UGC風":"自然なスマホ撮影感のある人物中心の動画。リアルな表情と自然な動きを重視。","商品映像":"質感、照明、カメラの動きを美しく見せる、シネマティックな商品映像。","自由制作":"" } as Record<string,string>)[preset] || "")}>{preset}</button>)}</div></div>
             <textarea id="studio-prompt" value={studioPrompt} onChange={(e)=>setStudioPrompt(e.target.value)} rows={8}
               placeholder={"どんな動画を作りたいか自由に書いてください。\n\n例：この写真の人物が夕方の街を歩き出す。カメラはゆっくり並走し、髪と服が風に揺れる。柔らかな逆光、シネマティック、縦9:16。"} />
-            <span className="eyebrow">03 · FORMAT</span><div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">04 · 音声</span><div className="studio-audio-grid">{([["off","なし","ナレーションなし"],["auto","自動","台本を自動で作る"],["custom","原稿","自分の原稿を読む"]] as const).map(([value,label,name]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} onClick={()=>setStudioAudio(value)} aria-pressed={studioAudio === value} aria-label={name}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option value="Kore">日本語 · Firm</option><option value="Leda">日本語 · Youthful</option><option value="Charon">日本語 · Informative</option><option value="Aoede">日本語 · Breezy</option><option value="Puck">English · Upbeat</option><option value="Achird">English · Friendly</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> 簡易BGMを追加</label>{studioMusic && <><p className="studio-music-note">現在は軽量な合成BGMです。AI作曲によるフル楽曲ではありません。</p><input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="雰囲気のヒント（例：lofi / calm / upbeat）" aria-label="BGMの雰囲気" /></>}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
+            <div className="opening-director" role="group" aria-labelledby="opening-director-title">
+              <div className="opening-director-head"><div><span className="eyebrow">03 · OPENING DIRECTION</span><strong id="opening-director-title">冒頭の0.5秒を演出する</strong></div><span className="opening-director-time">00.0—00.5s</span></div>
+              <div className="opening-options">
+                {([
+                  ["auto", "自動演出", "作品の意図に合う導入"],
+                  ["motion", "動きで惹く", "最初から動きを見せる"],
+                  ["reveal", "意外な見せ方", "ディテールから見せる"],
+                  ["quiet", "静かな導入", "光と構図で引き込む"],
+                ] as const).map(([value, label, description]) => (
+                  <button key={value} type="button" className={studioOpening === value ? "opening-option selected" : "opening-option"} onClick={() => setStudioOpening(value)} aria-pressed={studioOpening === value}>
+                    <strong>{label}</strong><span>{description}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="opening-director-note">選んだ演出を動画生成と自動ナレーション用の指示に反映します。結果はモデルや素材によって変わります。</p>
+            </div>
+            <span className="eyebrow">04 · FORMAT</span><div className="studio-controls"><label>尺<select aria-label="動画の長さ" value={studioDuration} onChange={(e)=>setStudioDuration(Number(e.target.value))}><option value={5}>5s</option><option value={10}>10s</option><option value={15}>15s</option></select></label><label>比率<select aria-label="動画のアスペクト比" value={studioAspect} onChange={(e)=>setStudioAspect(e.target.value as "9:16" | "16:9" | "1:1")}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label><label>解像度<select aria-label="動画の解像度" value={studioResolution} onChange={(e)=>setStudioResolution(e.target.value as "720p" | "1080p")}><option value="1080p">1080p</option><option value="720p">720p</option></select></label></div><div className="studio-audio-settings"><span className="eyebrow">05 · SOUND / 音声</span><div className="studio-audio-grid">{([["off","なし","ナレーションなし"],["auto","自動","台本を自動で作る"],["custom","原稿","自分の原稿を読む"]] as const).map(([value,label,name]) => <button key={value} type="button" className={studioAudio===value ? "selected" : ""} onClick={()=>setStudioAudio(value)} aria-pressed={studioAudio === value} aria-label={name}>{label}</button>)}</div>{studioAudio !== "off" && <div className="studio-audio-options"><label>VOICE<select aria-label="ナレーション音声" value={studioVoice} onChange={(e)=>setStudioVoice(e.target.value)}><option value="Kore">日本語 · Firm</option><option value="Leda">日本語 · Youthful</option><option value="Charon">日本語 · Informative</option><option value="Aoede">日本語 · Breezy</option><option value="Puck">English · Upbeat</option><option value="Achird">English · Friendly</option></select></label>{studioAudio === "custom" && <textarea value={studioNarration} onChange={(e)=>setStudioNarration(e.target.value)} rows={3} placeholder="ナレーション原稿（任意）" aria-label="ナレーション原稿" />}</div>}<label className="studio-music-toggle"><input type="checkbox" checked={studioMusic} onChange={(e)=>setStudioMusic(e.target.checked)} /> 簡易BGMを追加</label>{studioMusic && <><p className="studio-music-note">現在は軽量な合成BGMです。AI作曲によるフル楽曲ではありません。</p><input className="studio-music-prompt" value={studioMusicPrompt} onChange={(e)=>setStudioMusicPrompt(e.target.value)} placeholder="雰囲気のヒント（例：lofi / calm / upbeat）" aria-label="BGMの雰囲気" /></>}</div><div className="studio-stage-rail" aria-label="動画生成ステップ">
               {([["prepare","PREPARE","素材"],["audio","AUDIO","音声"],["visual","VISUAL","映像設計"],["motion","MOTION","生成"],["render","RENDER","完成"]] as const).map(([key,label,ja], index) => {
                 // Same order as generateStudioVideo(): upload → narration/BGM → request → provider → result.
                 const order = ["idle","prepare","audio","visual","motion","render"] as const;
