@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       })
       .eq("id", post.id)
       .eq("user_id", user.id)
-      .in("status", ["publishing", "failed"])
+      .in("status", ["publishing", "pending", "failed"])
       .select("id,status,external_post_id,post_url")
       .single();
 
