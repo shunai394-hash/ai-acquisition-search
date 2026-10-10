@@ -35,7 +35,7 @@ mock.module("../lib/social/tiktok.ts", {
   },
 });
 
-const { videoAssetPathFromUrl, isOwnedVideoPath } = await import("../lib/video/asset-access");
+const { videoAssetPathFromUrl, isOwnedVideoPath, isVideoBucketPrivate } = await import("../lib/video/asset-access");
 const { GET: videoJob } = await import("../app/api/video/jobs/[id]/route");
 const { POST: publish } = await import("../app/api/social/publish/route");
 
@@ -43,6 +43,13 @@ beforeEach(() => {
   db = new FakeSupabase();
   signed.length = 0;
   tiktokUrls.length = 0;
+});
+
+test("private video bucket health gate fails closed", () => {
+  assert.equal(isVideoBucketPrivate({ ok: true, public: false }), true);
+  assert.equal(isVideoBucketPrivate({ ok: true, public: true }), false);
+  assert.equal(isVideoBucketPrivate({ ok: false }), false);
+  assert.equal(isVideoBucketPrivate({ ok: true }), false);
 });
 
 test("only this project's video-assets URLs map to a storage path", () => {
