@@ -55,7 +55,10 @@ export async function assertPublicUrl(input: string, allowedProtocols: readonly 
 export async function fetchPublicUrl(input: string, init: RequestInit = {}) {
   let url = await assertPublicUrl(input);
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
-    const response = await fetch(url.toString(), { ...init, redirect: "manual" });
+    // SNS media downloads can otherwise occupy a serverless function indefinitely.
+    // Callers may provide a tighter signal for operations with known limits.
+    const signal = init.signal ?? AbortSignal.timeout(120_000);
+    const response = await fetch(url.toString(), { ...init, signal, redirect: "manual" });
     if (response.status < 300 || response.status >= 400) return response;
     const location = response.headers.get("location");
     if (!location || redirect === MAX_REDIRECTS) throw new Error("動画URLのリダイレクト回数が上限を超えました。");
