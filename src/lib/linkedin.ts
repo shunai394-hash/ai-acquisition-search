@@ -211,6 +211,7 @@ export async function createLinkedInVideoPost(
           "X-Restli-Protocol-Version": "2.0.0",
         },
         cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
       },
     );
     const statusData = await statusResponse.json().catch(() => ({}));
