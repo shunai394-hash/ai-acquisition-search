@@ -3,6 +3,7 @@ import { getAdminSupabase } from "@/lib/billing";
 import { ecPulseConfig, ecPulseFetch } from "@/lib/ec-pulse/client";
 import { DECISION_LOGIC_VERSION } from "@/lib/decision/engine";
 import { cronSecret, verifyCronRequest } from "@/lib/security/cron-auth";
+import { isVideoBucketPrivate } from "@/lib/video/asset-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,8 +56,9 @@ export async function GET(request: Request) {
 
   // The lease table is required for safe cron/operator execution, so its
   // availability is part of overall health rather than a diagnostic-only check.
-  const ok = database.ok && leaseTable.ok && ecPulse.ok;
-  const summary = { ok, commit, logicVersion: DECISION_LOGIC_VERSION, database: database.ok, operatorLeases: leaseTable.ok, ecPulse: ecPulse.ok, checkedAt: new Date().toISOString() };
+  const videoAssetsPrivate = isVideoBucketPrivate(videoAssetsBucket);
+  const ok = database.ok && leaseTable.ok && ecPulse.ok && videoAssetsPrivate;
+  const summary = { ok, commit, logicVersion: DECISION_LOGIC_VERSION, database: database.ok, operatorLeases: leaseTable.ok, ecPulse: ecPulse.ok, videoAssetsPrivate, checkedAt: new Date().toISOString() };
   const ec = ecPulseConfig();
   return NextResponse.json({
     ...summary,
