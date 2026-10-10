@@ -71,3 +71,9 @@ export function summarizeProviderPayload(payload: Record<string, unknown>) {
   const text = typeof detail === "string" ? detail : JSON.stringify(detail ?? null);
   return text.replace(/https?:\/\/\S+/g, "[url]").slice(0, 300);
 }
+
+/** Drop signed media URLs before a provider payload is stored on the job row. */
+export function redactSensitiveText(value: unknown) {
+  const json = JSON.stringify(value ?? null);
+  return JSON.parse(json.replace(/https?:\/\/[^"\\\s]+/g, "[url]")) as unknown;
+}

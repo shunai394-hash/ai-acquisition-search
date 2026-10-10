@@ -118,6 +118,7 @@ test("TikTok pending publish is persisted as non-retryable", async () => {
   assert.equal(body.results[0].pending, true);
   const reservation = db.table("social_posts").find((row) => (row.metadata as Record<string, unknown>)?.source_social_post_id === "post-1");
   assert.equal(reservation?.status, "pending");
+  assert.equal(reservation?.external_post_id, "pub-1");
   assert.equal(reservation?.metadata && (reservation.metadata as Record<string, unknown>).publishId, "pub-1");
 });
 

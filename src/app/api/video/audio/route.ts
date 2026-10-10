@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getUserFromBearer, consumeMonthlyUsage, refundMonthlyUsage } from "@/lib/billing";
 import { generateNarration } from "@/lib/video/gemini-tts";
-import { bgmOnlyWav, mixNarrationWithBgm, fitWavToDuration } from "@/lib/video/audio";
+import { bgmOnlyWav, mixNarrationWithBgm, fitWavToDuration, wavHasAudibleSamples } from "@/lib/video/audio";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -62,6 +62,25 @@ export async function POST(request: Request) {
       audio = bgm ? mixNarrationWithBgm(narrationWav, duration, bgmPrompt) : fitWavToDuration(narrationWav, duration);
     } else {
       audio = bgmOnlyWav(duration, bgmPrompt);
+    }
+
+    if (!wavHasAudibleSamples(audio)) {
+      if (usageEventId) {
+        try {
+          const refund = await refundMonthlyUsage(userId, "narration_generation", usageEventId);
+          if (!refund.refunded) {
+            console.error("narration quota refund was not applied after silent audio rejection", {
+              userId, usageEventId, reason: refund.reason,
+            });
+          }
+        } catch (refundError) {
+          console.error("narration quota refund failed after silent audio rejection", {
+            userId, usageEventId, error: refundError,
+          });
+        }
+        usageEventId = "";
+      }
+      return NextResponse.json({ error: "生成音声が無音でした。成功としては保存しません。本文または音声設定を変えて再試行してください。" }, { status: 502 });
     }
 
     if (audio.byteLength > MAX_BYTES) {

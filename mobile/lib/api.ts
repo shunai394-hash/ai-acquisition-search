@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 
-const defaultWebAppUrl = "https://ai-acquisition-search-naitoshyuichirou-6935.vercel.app";
+const defaultWebAppUrl = "https://ai-acquisition-search.vercel.app";
 
 export type ResearchBundle = {
   connected: boolean;

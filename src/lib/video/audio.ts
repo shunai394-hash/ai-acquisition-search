@@ -178,3 +178,14 @@ export function isSupportedNarrationWav(bytes: Uint8Array) {
     return false;
   }
 }
+
+/** Peak PCM amplitude. Near-zero output must not be stored as a finished soundtrack. */
+export function wavHasAudibleSamples(bytes: Uint8Array, minPeak = 64) {
+  const pcm = readWavPcm(bytes);
+  if (!pcm.length) return false;
+  for (let i = 0; i < pcm.length; i++) {
+    const value = pcm[i] < 0 ? -pcm[i] : pcm[i];
+    if (value >= minPeak) return true;
+  }
+  return false;
+}
