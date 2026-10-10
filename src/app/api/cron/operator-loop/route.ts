@@ -300,7 +300,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
         const currentMetadata = pending.metadata && typeof pending.metadata === "object"
           ? pending.metadata as Record<string, unknown>
           : {};
-        const { error: terminalUpdateError } = await db.from("social_posts").update({
+        const { data: failedPending, error: terminalUpdateError } = await db.from("social_posts").update({
           status: "failed",
           metadata: {
             ...currentMetadata,
@@ -309,10 +309,12 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
             terminal_failure_at: new Date().toISOString(),
           },
           updated_at: new Date().toISOString(),
-        }).eq("id", pending.id).eq("user_id", pending.user_id).eq("status", "pending");
+        }).eq("id", pending.id).eq("user_id", pending.user_id).eq("status", "pending").select("id").maybeSingle();
         results.push(terminalUpdateError
           ? { postId: pending.id, step: "tiktok-pending", status: "error", error: terminalUpdateError.message }
-          : { postId: pending.id, step: "tiktok-pending", status: "failed", error: message });
+          : failedPending
+            ? { postId: pending.id, step: "tiktok-pending", status: "failed", error: message }
+            : { postId: pending.id, step: "tiktok-pending", status: "skipped", reason: "row changed before failure reconciliation" });
         continue;
       }
 
