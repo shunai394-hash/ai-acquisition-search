@@ -12,10 +12,15 @@ import { refundMonthlyUsage } from "@/lib/billing";
  *   (quota refunded, provider rejected the content, retries exhausted, ...).
  */
 
-export const PROVIDER_JOB_TIMEOUT_MS = Math.max(
-  30,
-  Number(process.env.VIDEO_JOB_TIMEOUT_MINUTES || 180),
-) * 60_000;
+export function providerJobTimeoutMs(raw = process.env.VIDEO_JOB_TIMEOUT_MINUTES) {
+  const configured = raw == null || raw.trim() === "" ? 180 : Number(raw);
+  const minutes = Number.isFinite(configured)
+    ? Math.min(24 * 60, Math.max(30, configured))
+    : 180;
+  return minutes * 60_000;
+}
+
+export const PROVIDER_JOB_TIMEOUT_MS = providerJobTimeoutMs();
 
 export function jobMeta(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
