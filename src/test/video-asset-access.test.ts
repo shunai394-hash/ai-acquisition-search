@@ -38,6 +38,7 @@ mock.module("../lib/social/tiktok.ts", {
 const { videoAssetPathFromUrl, isOwnedVideoPath, isVideoBucketPrivate } = await import("../lib/video/asset-access");
 const { GET: videoJob } = await import("../app/api/video/jobs/[id]/route");
 const { POST: publish } = await import("../app/api/social/publish/route");
+const { POST: recoverSocialPublish } = await import("../app/api/social/publish/recover/route");
 
 beforeEach(() => {
   db = new FakeSupabase();
@@ -103,6 +104,25 @@ test("publishing our own video hands TikTok a fresh 6h signed URL, not the calle
   assert.equal(tiktokUrls.length, 1, JSON.stringify(body));
   assert.match(tiktokUrls[0], /\/object\/sign\/video-assets\/u1\/job-1\.mp4\?token=t1$/);
   assert.equal(signed[0].ttl, 6 * 60 * 60);
+});
+
+test("manual recovery can finalize a pending social post", async () => {
+  db.seed("social_posts", [{
+    id: "pending-post",
+    user_id: "u1",
+    network: "tiktok",
+    status: "pending",
+    metadata: { source_social_post_id: "source-post", publishId: "pub-1" },
+  }]);
+  const response = await recoverSocialPublish(new Request("https://app.test/api/social/publish/recover", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-user": "u1" },
+    body: JSON.stringify({ socialPostId: "pending-post", platform: "tiktok", externalPostId: "video-123", postUrl: "https://www.tiktok.com/@creator/video/video-123" }),
+  }));
+  const body = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.recovered, true);
+  assert.equal(db.table("social_posts").find((row) => row.id === "pending-post")?.status, "published");
 });
 
 test("publishing another user's stored video is refused before any SNS call", async () => {
