@@ -100,6 +100,8 @@ export default function Home() {
   const [studioUrlRefreshing, setStudioUrlRefreshing] = useState(false);
   // Bounded so an unplayable file cannot loop through fresh signed URLs forever.
   const studioUrlRefreshes = useRef(0);
+  // Prevent slower enrichment requests from overwriting a newer product analysis.
+  const analysisRequestId = useRef(0);
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["tiktok"]);
   const [publishCaption, setPublishCaption] = useState("");
   const [tiktokConsent, setTiktokConsent] = useState(false);
@@ -137,6 +139,7 @@ export default function Home() {
 
   async function analyze(e?: FormEvent) {
     e?.preventDefault();
+    const requestId = ++analysisRequestId.current;
     setLoading(true);
     setLoadingPhase("商品ページを読み取っています");
     setError("");
@@ -180,11 +183,13 @@ export default function Home() {
             body: JSON.stringify({ url }),
           });
           const researchData = await researchRes.json();
-          setEcPulse(researchData);
+          if (analysisRequestId.current === requestId) setEcPulse(researchData);
         } catch {
-          setEcPulse({ connected: false, research: null, products: [], error: "EC Pulseリサーチに接続できませんでした。" });
+          if (analysisRequestId.current === requestId) {
+            setEcPulse({ connected: false, research: null, products: [], error: "EC Pulseリサーチに接続できませんでした。" });
+          }
         } finally {
-          setEcPulseLoading(false);
+          if (analysisRequestId.current === requestId) setEcPulseLoading(false);
         }
       })();
 
@@ -197,11 +202,11 @@ export default function Home() {
             cache: "no-store"
           });
           const historyData = await historyResponse.json().catch(() => ({}));
-          setResearchHistory(historyData.runs || []);
+          if (analysisRequestId.current === requestId) setResearchHistory(historyData.runs || []);
         } catch {
-          setResearchHistory([]);
+          if (analysisRequestId.current === requestId) setResearchHistory([]);
         } finally {
-          setHistoryLoading(false);
+          if (analysisRequestId.current === requestId) setHistoryLoading(false);
         }
       })();
     } catch (err) {
