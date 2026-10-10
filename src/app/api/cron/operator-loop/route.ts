@@ -5,6 +5,7 @@ import { getTikTokAccessToken, resolveTikTokVideoId } from "@/lib/social/tiktok"
 import { acquireLease, releaseLease } from "@/lib/ops/lease";
 import { jobMeta, providerDefinitelyNotStarted, refundJobUsage } from "@/lib/video/job-recovery";
 import { cronSecret, unauthorizedCron, verifyCronRequest } from "@/lib/security/cron-auth";
+import { operatorEvaluationDelayHours } from "@/lib/ops/config";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -152,7 +153,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
   const softDeadline = loopStartedAt + SOFT_DEADLINE_MS;
   let timeBudgetExceeded = false;
   const budgetRemaining = () => Date.now() < softDeadline;
-  const evaluationDelayHours = Math.max(6, Number(process.env.OPERATOR_EVALUATION_DELAY_HOURS || 12));
+  const evaluationDelayHours = operatorEvaluationDelayHours();
   const cutoff = new Date(Date.now() - evaluationDelayHours * 60 * 60 * 1000).toISOString();
   const results: unknown[] = [];
 
