@@ -249,13 +249,17 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
   }
 
   // TikTokは投稿直後にPROCESSINGが長時間続くことがあるため、pending行を別ループで追跡する。
-  const { data: pendingTikToks } = await db.from("social_posts")
+  const { data: pendingTikToks, error: pendingTikToksError } = await db.from("social_posts")
     .select("id,user_id,external_post_id,metadata")
     .eq("status", "pending")
     .eq("network", "tiktok")
     .not("external_post_id", "is", null)
     .order("updated_at", { ascending: true })
     .limit(30);
+
+  if (pendingTikToksError) {
+    results.push({ step: "tiktok-pending-query", status: "error", error: pendingTikToksError.message });
+  }
 
   for (const pending of pendingTikToks || []) {
     if (!budgetRemaining()) { timeBudgetExceeded = true; break; }
