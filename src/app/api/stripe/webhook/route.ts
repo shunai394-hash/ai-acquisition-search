@@ -46,8 +46,16 @@ async function syncSubscription(subscription: StripeObject, fallbackUserId?: str
 
   const status = String(subscription.status ?? "inactive");
   const plan = status === "active" || status === "trialing" ? "pro" : "free";
-  const periodEnd = subscription.current_period_end
-    ? new Date(Number(subscription.current_period_end) * 1000).toISOString()
+  // Since Stripe API 2025-03-31 (this app pins 2026-08-26.dahlia) the period end
+  // lives on subscription items, not on the subscription itself.
+  const items = subscription.items && typeof subscription.items === "object"
+    ? (subscription.items as { data?: Array<{ current_period_end?: number | string | null }> }).data ?? []
+    : [];
+  const rawPeriodEnd = subscription.current_period_end
+    ?? items.map((item) => Number(item.current_period_end)).filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => b - a)[0]
+    ?? null;
+  const periodEnd = rawPeriodEnd
+    ? new Date(Number(rawPeriodEnd) * 1000).toISOString()
     : null;
 
   const supabase = getAdminSupabase();
@@ -102,9 +110,16 @@ async function handleEvent(event: StripeObject) {
     }
     case "customer.subscription.created":
     case "customer.subscription.updated":
-    case "customer.subscription.deleted":
-      await syncSubscription(object);
+    case "customer.subscription.deleted": {
+      // Webhooks can arrive out of order (an old "active" after "canceled").
+      // Sync the current state from Stripe instead of the event snapshot; if
+      // Stripe is unreachable the handler fails and Stripe retries the event.
+      const current = object.id
+        ? await stripeRequest<StripeObject>(`subscriptions/${encodeURIComponent(String(object.id))}`, { method: "GET" })
+        : object;
+      await syncSubscription({ ...current, metadata: current.metadata ?? object.metadata });
       break;
+    }
     case "invoice.paid":
     case "invoice.payment_failed": {
       const customerId = typeof object.customer === "string" ? object.customer : null;
@@ -155,7 +170,9 @@ export async function POST(request: Request) {
       .select("event_id")
       .maybeSingle();
 
-    if (insertError) throw insertError;
+    // A redelivery hits the event_id primary key (23505) rather than returning
+    // no row; treat it as "already seen" so failed events can be retried.
+    if (insertError && insertError.code !== "23505") throw insertError;
 
     if (!inserted) {
       const { data: existing, error: existingError } = await supabase

@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pcmToWav } from "@/lib/video/audio";
 
 const GEMINI_TTS_MODEL =
   process.env.GEMINI_TTS_MODEL || "gemini-3.8-flash-tts";
@@ -16,6 +17,22 @@ export type GenerateNarrationResult = {
   mimeType: string;
   audioBase64: string;
 };
+
+/**
+ * Gemini TTS commonly returns raw 24kHz mono 16-bit PCM (audio/L16) even when
+ * WAV is requested. Downstream mixing requires a WAV container, so wrap raw PCM.
+ */
+export function ensureWavBase64(audioBase64: string) {
+  const bytes = Buffer.from(audioBase64, "base64");
+  if (bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WAVE") {
+    return audioBase64;
+  }
+  const sampleCount = Math.floor(bytes.length / 2);
+  if (!sampleCount) throw new Error("Gemini TTSから空の音声データが返りました。");
+  const pcm = new Int16Array(sampleCount);
+  for (let i = 0; i < sampleCount; i++) pcm[i] = bytes.readInt16LE(i * 2);
+  return Buffer.from(pcmToWav(pcm)).toString("base64");
+}
 
 export async function generateNarration(
   input: GenerateNarrationInput,
@@ -44,6 +61,7 @@ export async function generateNarration(
     "https://generativelanguage.googleapis.com/v1beta/interactions",
     {
       method: "POST",
+      signal: AbortSignal.timeout(45_000),
       headers: {
         "x-goog-api-key": apiKey,
         "Content-Type": "application/json",
@@ -79,7 +97,7 @@ export async function generateNarration(
     },
   );
 
-  const payload = (await response.json()) as {
+  const payload = (await response.json().catch(() => ({}))) as {
     error?: { message?: string };
     output_audio?: { data?: string };
     steps?: Array<{
@@ -108,7 +126,7 @@ export async function generateNarration(
     model: GEMINI_TTS_MODEL,
     voice,
     mimeType: "audio/wav",
-    audioBase64,
+    audioBase64: ensureWavBase64(audioBase64),
   };
 }
 

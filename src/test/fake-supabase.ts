@@ -98,6 +98,10 @@ class Query implements PromiseLike<Result> {
     return this;
   }
   or(expr: string) { this.filters.push(parseOr(expr)); return this; }
+  filter(col: string, op: string, v: unknown) {
+    if (op !== "eq") throw new Error(`unsupported filter(): ${op}`);
+    return this.eq(col, v);
+  }
   order(col: string, opts?: { ascending?: boolean }) { this.orderBy.push({ col, asc: opts?.ascending !== false }); return this; }
   limit(n: number) { this.max = n; return this; }
   single() { this.mode = "single"; return this; }

@@ -3,6 +3,7 @@ import { getAdminSupabase } from "@/lib/billing";
 import { generateHiggsfieldVideo } from "@/lib/video/higgsfield";
 import { getTikTokAccessToken, resolveTikTokVideoId } from "@/lib/social/tiktok";
 import { acquireLease, releaseLease } from "@/lib/ops/lease";
+import { jobMeta, providerDefinitelyNotStarted, refundJobUsage } from "@/lib/video/job-recovery";
 import { cronSecret, unauthorizedCron, verifyCronRequest } from "@/lib/security/cron-auth";
 
 export const runtime = "nodejs";
@@ -67,6 +68,7 @@ async function publishCompletedVideo(
     .maybeSingle();
 
   if (!nextPost) return { ok: false, skipped: true, reason: "next social post not found" };
+  if (nextPost.status === "published") return { ok: true, skipped: true, reason: "already published", postId: nextPost.id };
   if (!["tiktok","instagram","facebook","youtube","x","linkedin"].includes(nextPost.network)) {
     return { ok: false, skipped: true, reason: `unsupported network: ${nextPost.network}` };
   }
@@ -282,13 +284,37 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
   }
 
   // Higgsfieldの未完了ジョブを回収し、完成したらそのままSNSへ投稿する。
-  const { data: jobs } = await db.from("production_jobs")
-    .select("id,user_id,social_post_id,status,request_id,prompt,duration,resolution,aspect_ratio,model,generate_audio,provider_response,error,created_at,started_at")
-    .in("status", ["queued","running","failed","completed"])
+  // Only fetch jobs that still need work. Terminal/manual-recovery rows and
+  // completed jobs whose publish already settled are excluded; otherwise the
+  // oldest 30 rows would occupy every slot forever and starve new jobs.
+  const jobColumns = "id,user_id,social_post_id,status,request_id,prompt,duration,resolution,aspect_ratio,model,generate_audio,provider_response,error,created_at,started_at";
+  const { data: activeJobs, error: activeJobsError } = await db.from("production_jobs")
+    .select(jobColumns)
+    .in("status", ["queued","running","failed"])
+    .is("provider_response->>terminal", null)
+    .is("provider_response->>manual_recovery_required", null)
     .order("created_at", { ascending: true })
     .limit(30);
+  if (activeJobsError) results.push({ step: "video-jobs", status: "error", error: activeJobsError.message });
+  const { data: publishJobs, error: publishJobsError } = await db.from("production_jobs")
+    .select(jobColumns)
+    .eq("status", "completed")
+    .not("social_post_id", "is", null)
+    .is("provider_response->>publish_settled", null)
+    .is("provider_response->>manual_recovery_required", null)
+    .order("created_at", { ascending: true })
+    .limit(10);
+  if (publishJobsError) results.push({ step: "video-publish-jobs", status: "error", error: publishJobsError.message });
+  const jobs = [...(activeJobs || []), ...(publishJobs || [])];
 
-  for (const job of jobs || []) {
+  const settlePublish = async (job: { id: string; user_id: string; provider_response: unknown }) => {
+    await db.from("production_jobs").update({
+      provider_response: { ...jobMeta(job.provider_response), publish_settled: true, publish_settled_at: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "completed");
+  };
+
+  for (const job of jobs) {
     if (!budgetRemaining()) { timeBudgetExceeded = true; break; }
     if (!job.user_id) continue;
 
@@ -304,7 +330,24 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
       // 付けられることを確認できないため、自動再送はせず手動復旧対象にする。
       if (job.status === "running" && !job.request_id) {
         const startedAt = job.started_at ? new Date(job.started_at).getTime() : 0;
-        if (startedAt && startedAt < Date.now() - 15 * 60 * 1000) {
+        if (startedAt && startedAt < Date.now() - 15 * 60 * 1000 && providerDefinitelyNotStarted(providerResponse)) {
+          // The request died before calling the provider (e.g. during TTS), so
+          // nothing was generated or billed externally: refund and close the job.
+          const refund = await refundJobUsage(job.user_id, providerResponse);
+          await db.from("production_jobs")
+            .update({
+              status: "failed",
+              error: "動画生成の準備中に処理が中断されました。利用回数は返却済みです。もう一度生成してください。",
+              provider_response: { ...providerResponse, terminal: true, quota_refunded: refund, abandoned_before_provider_start: true },
+              completed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", job.id)
+            .eq("user_id", job.user_id)
+            .eq("status", "running")
+            .is("request_id", null);
+          results.push({ jobId: job.id, step: "video-abandoned", status: "refunded" });
+        } else if (startedAt && startedAt < Date.now() - 15 * 60 * 1000) {
           await db.from("production_jobs")
             .update({
               status: "failed",
@@ -351,6 +394,8 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
             },
             updated_at: new Date().toISOString(),
           }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "completed");
+        } else if (publish.ok || publish.skipped) {
+          await settlePublish(job);
         }
         results.push({
           jobId: job.id,
@@ -366,6 +411,13 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
       // claimに勝ったCronだけがHiggsfield APIを呼ぶ。
       if (job.status === "failed" || (job.status === "queued" && !job.request_id)) {
         if (job.status === "failed" && retryCount >= 2) {
+          // Retries are exhausted: return the user's quota once and stop
+          // selecting this row so it cannot starve newer jobs.
+          const refund = await refundJobUsage(job.user_id, providerResponse);
+          await db.from("production_jobs").update({
+            provider_response: { ...providerResponse, terminal: true, quota_refunded: refund, retries_exhausted_at: new Date().toISOString() },
+            updated_at: new Date().toISOString(),
+          }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "failed");
           results.push({ jobId: job.id, step: "video-retry", status: "exhausted", retryCount });
           continue;
         }
@@ -378,6 +430,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
           ...providerResponse,
           operator_claimed_at: claimTime,
           retry_count: attemptCount,
+          provider_start_attempted: true,
         };
         const { data: claim, error: claimError } = await db.from("production_jobs")
           .update({
@@ -479,16 +532,21 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
 
       if (polled.status >= 200 && polled.status < 300 && asset?.video_url && polled.payload?.job?.status === "completed" && job.social_post_id) {
         const publish = await publishCompletedVideo(db, job.user_id, job.social_post_id, asset.video_url);
+        // Re-read: the poll merged the provider result into provider_response.
+        const { data: completedJob } = await db.from("production_jobs").select("provider_response").eq("id", job.id).eq("user_id", job.user_id).maybeSingle();
+        const completedMeta = jobMeta(completedJob?.provider_response ?? providerResponse);
         if (publish.manualRecoveryRequired) {
           await db.from("production_jobs").update({
             error: "外部SNSへの投稿結果をDBへ保存できませんでした。二重投稿防止のため自動再投稿を停止し、手動復旧が必要です。",
             provider_response: {
-              ...providerResponse,
+              ...completedMeta,
               manual_recovery_required: true,
               manual_recovery_marked_at: new Date().toISOString(),
             },
             updated_at: new Date().toISOString(),
           }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "completed");
+        } else if (publish.ok || publish.skipped) {
+          await settlePublish({ ...job, provider_response: completedMeta });
         }
         results.push({
           jobId: job.id,

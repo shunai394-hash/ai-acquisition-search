@@ -81,3 +81,33 @@ test("audio helpers reject non-finite durations instead of returning empty audio
   assert.throws(() => fitWavToDuration(toneWav(2), Number.POSITIVE_INFINITY), /有限の数値/);
   assert.throws(() => mixNarrationWithBgm(toneWav(2), Number.NaN), /有限の数値/);
 });
+
+test("raw PCM from TTS is wrapped into a mixable WAV; WAV input is kept as-is", async () => {
+  const { ensureWavBase64 } = await import("@/lib/video/gemini-tts");
+  const pcm = Buffer.alloc(24_000 * 2);
+  for (let i = 0; i < 24_000; i++) pcm.writeInt16LE(Math.round(Math.sin(i / 10) * 8000), i * 2);
+  const wrapped = Buffer.from(ensureWavBase64(pcm.toString("base64")), "base64");
+  assert.equal(wrapped.toString("ascii", 0, 4), "RIFF");
+  assert.equal(isSupportedNarrationWav(new Uint8Array(wrapped)), true);
+  const already = wrapped.toString("base64");
+  assert.equal(ensureWavBase64(already), already);
+  assert.throws(() => ensureWavBase64(""), /空の音声/);
+});
+
+test("BGM ducks under narration and stays audible where nobody speaks", () => {
+  const rmsDb = (pcm: Int16Array) => {
+    let sum = 0;
+    for (const value of pcm) sum += value * value;
+    return 20 * Math.log10(Math.sqrt(sum / pcm.length) / 32768);
+  };
+  const mixed = readPcm(mixNarrationWithBgm(toneWav(3), 8, "calm"));
+  const bgmOnly = mixed.subarray(24_000 * 4, 24_000 * 7);
+  const bgmLevel = rmsDb(bgmOnly);
+  assert.ok(bgmLevel > -30 && bgmLevel < -18, `BGM after narration should be audible but moderate, got ${bgmLevel.toFixed(1)} dBFS`);
+
+  // Under speech the music contribution must be clearly below the voice.
+  const speechPart = mixed.subarray(24_000 * 1, 24_000 * 2);
+  const voice = readPcm(toneWav(3)).subarray(24_000 * 1, 24_000 * 2);
+  const residual = Int16Array.from(speechPart, (value, i) => value - Math.round(voice[i] * 0.98));
+  assert.ok(rmsDb(voice) - rmsDb(residual) >= 9, `music under speech should be ≥9 dB below voice, got ${(rmsDb(voice) - rmsDb(residual)).toFixed(1)} dB`);
+});

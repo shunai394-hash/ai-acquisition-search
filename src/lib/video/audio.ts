@@ -115,6 +115,12 @@ export function generateBgm(durationSeconds: number, prompt = "") {
 
   return pcm;
 }
+/** BGM-only soundtrack at the same level the ducked mix uses between lines. */
+export function bgmOnlyWav(durationSeconds: number, prompt = "") {
+  const bgm = generateBgm(durationSeconds, prompt);
+  return pcmToWav(Int16Array.from(bgm, (value) => clamp16(value * 2.2)));
+}
+
 export function fitWavToDuration(wav: Uint8Array, durationSeconds: number) {
   const pcm = readWavPcm(wav);
   const target = normalizeDuration(durationSeconds) * SAMPLE_RATE;
@@ -139,10 +145,27 @@ export function mixNarrationWithBgm(narrationWav: Uint8Array, durationSeconds: n
   const length = bgm.length;
   const mixed = new Int16Array(length);
 
+  // Side-chain ducking: the bed sits ~-24 dBFS RMS where nobody speaks and
+  // drops ~11 dB under speech. A fixed 0.22 gain left it near -45 dBFS, i.e.
+  // inaudible on phone speakers, while still not adapting to pauses.
+  const openGain = 2.2;
+  const duckedGain = 0.62;
+  const window = Math.round(SAMPLE_RATE * 0.03);
+  const attack = 1 - Math.exp(-1 / (SAMPLE_RATE * 0.04));
+  const release = 1 - Math.exp(-1 / (SAMPLE_RATE * 0.35));
+  const speechThreshold = 900; // ~-31 dBFS RMS over 30ms
+  let energy = 0;
+  let duck = 0;
+
   for (let i = 0; i < length; i++) {
-    const voice = i < narration.length ? narration[i] * 0.98 : 0;
-    const music = bgm[i] * 0.22;
-    mixed[i] = clamp16(voice + music);
+    const voiceSample = i < narration.length ? narration[i] : 0;
+    energy += voiceSample * voiceSample;
+    const old = i - window >= 0 && i - window < narration.length ? narration[i - window] : 0;
+    energy -= old * old;
+    const speaking = Math.sqrt(Math.max(0, energy) / window) > speechThreshold ? 1 : 0;
+    duck += (speaking - duck) * (speaking > duck ? attack : release);
+    const music = bgm[i] * (openGain + (duckedGain - openGain) * duck);
+    mixed[i] = clamp16(voiceSample * 0.98 + music);
   }
   return pcmToWav(mixed);
 }

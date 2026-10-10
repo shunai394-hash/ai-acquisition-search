@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       const created = await admin.storage.createBucket(BUCKET, { public: false, fileSizeLimit: MAX_BYTES, allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"] });
       if (created.error && !created.error.message.toLowerCase().includes("already exists")) throw new Error(created.error.message);
     }
-    const privacyUpdate = await admin.storage.updateBucket(BUCKET, { public: false });
+    const privacyUpdate = await admin.storage.updateBucket(BUCKET, { public: false, fileSizeLimit: MAX_BYTES, allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"] });
     if (privacyUpdate.error) throw new Error("Image bucket privacy update failed: " + privacyUpdate.error.message);
 
     const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";

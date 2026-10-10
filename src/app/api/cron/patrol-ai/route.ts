@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/billing";
 import { openAiJson } from "@/lib/ai/openai-json";
 import { acquireLease, releaseLease } from "@/lib/ops/lease";
+import { providerDefinitelyNotStarted, refundJobUsage } from "@/lib/video/job-recovery";
 import { cronSecret, unauthorizedCron, verifyCronRequest } from "@/lib/security/cron-auth";
 
 export const runtime = "nodejs";
@@ -85,6 +86,23 @@ async function runPatrol(db: ReturnType<typeof getAdminSupabase>) {
       const meta = job.provider_response && typeof job.provider_response === "object" ? job.provider_response as Record<string, unknown> : {};
       if (job.request_id) {
         repairs.push({ target: "production_job", id: job.id, action: "外部生成中のため変更せず監視", status: "skipped" });
+        continue;
+      }
+      if (providerDefinitelyNotStarted(meta) && job.user_id) {
+        // The provider was never called, so refunding and closing is safe.
+        try {
+          const refund = await refundJobUsage(job.user_id, meta);
+          const { error } = await db.from("production_jobs").update({
+            status: "failed",
+            error: "動画生成の準備中に処理が中断されました。利用回数は返却済みです。もう一度生成してください。",
+            provider_response: { ...meta, patrol_repair: true, terminal: true, quota_refunded: refund, patrol_repaired_at: checkedAt },
+            completed_at: checkedAt,
+            updated_at: checkedAt,
+          }).eq("id", job.id).eq("status", "running").is("request_id", null);
+          repairs.push({ target: "production_job", id: job.id, action: "未開始の中断ジョブを返金して終了", status: error ? "failed" : "repaired", error: error?.message });
+        } catch (refundError) {
+          repairs.push({ target: "production_job", id: job.id, action: "未開始の中断ジョブを返金して終了", status: "failed", error: refundError instanceof Error ? refundError.message : String(refundError) });
+        }
         continue;
       }
       const { error } = await db.from("production_jobs").update({

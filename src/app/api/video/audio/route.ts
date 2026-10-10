@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getUserFromBearer, consumeMonthlyUsage, refundMonthlyUsage } from "@/lib/billing";
 import { generateNarration } from "@/lib/video/gemini-tts";
-import { generateBgm, mixNarrationWithBgm, pcmToWav, fitWavToDuration } from "@/lib/video/audio";
+import { bgmOnlyWav, mixNarrationWithBgm, fitWavToDuration } from "@/lib/video/audio";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       const narrationWav = new Uint8Array(Buffer.from(narration.audioBase64, "base64"));
       audio = bgm ? mixNarrationWithBgm(narrationWav, duration, bgmPrompt) : fitWavToDuration(narrationWav, duration);
     } else {
-      audio = pcmToWav(generateBgm(duration, bgmPrompt));
+      audio = bgmOnlyWav(duration, bgmPrompt);
     }
 
     if (audio.byteLength > MAX_BYTES) {
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
         throw new Error(created.error.message);
       }
     }
-    const privacyUpdate = await admin.storage.updateBucket(BUCKET, { public: false });
+    const privacyUpdate = await admin.storage.updateBucket(BUCKET, { public: false, fileSizeLimit: MAX_BYTES, allowedMimeTypes: ["audio/wav"] });
     if (privacyUpdate.error) throw new Error(`Audio bucket privacy update failed: ${privacyUpdate.error.message}`);
 
     const path = user.id + "/" + crypto.randomUUID() + ".wav";

@@ -6,6 +6,7 @@ import { publishXPost } from "@/lib/social/x";
 import { createLinkedInVideoPost, decryptLinkedInToken } from "@/lib/linkedin";
 import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
 import { assertPublicUrl, fetchPublicUrl } from "@/lib/security/public-url";
+import { isOwnedVideoPath, signVideoAsset, SNS_INGEST_URL_TTL_SECONDS, videoAssetPathFromUrl } from "@/lib/video/asset-access";
 import { writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
     const body = await request.json();
     const socialPostId = typeof body.socialPostId === "string" ? body.socialPostId.trim() : "";
-    const videoUrl = typeof body.videoUrl === "string" ? body.videoUrl.trim() : "";
+    let videoUrl = typeof body.videoUrl === "string" ? body.videoUrl.trim() : "";
     const caption = typeof body.caption === "string" ? body.caption.trim() : "";
     const supportedPlatforms: Platform[] = ["tiktok", "instagram", "facebook", "youtube", "x", "linkedin"];
     const platforms: Platform[] = Array.isArray(body.platforms)
@@ -31,15 +32,28 @@ export async function POST(request: Request) {
       : [];
     if (!socialPostId) return NextResponse.json({ error: "socialPostIdが必要です。" }, { status: 400 });
     if (!videoUrl.startsWith("https://")) return NextResponse.json({ error: "完成動画のHTTPS URLが必要です。" }, { status: 400 });
-    try {
-      await assertPublicUrl(videoUrl, ["https:"]);
-    } catch (error) {
-      return NextResponse.json({ error: error instanceof Error ? error.message : "動画URLを検証できませんでした。" }, { status: 400 });
+    const ownVideoPath = videoAssetPathFromUrl(videoUrl);
+    if (ownVideoPath === null) {
+      try {
+        await assertPublicUrl(videoUrl, ["https:"]);
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : "動画URLを検証できませんでした。" }, { status: 400 });
+      }
+    } else if (!isOwnedVideoPath(user.id, ownVideoPath)) {
+      return NextResponse.json({ error: "この動画を投稿する権限がありません。" }, { status: 403 });
     }
     if (!caption) return NextResponse.json({ error: "投稿本文が必要です。" }, { status: 400 });
     if (!platforms.length) return NextResponse.json({ error: "投稿先を1つ以上選択してください。" }, { status: 400 });
 
     const supabase = getAdminSupabase();
+
+    // Videos generated here live in the video-assets bucket. Never forward the
+    // caller's (possibly expired) link: hand the SNS a fresh signed URL that
+    // stays valid long enough for its asynchronous download.
+    if (ownVideoPath !== null) {
+      videoUrl = await signVideoAsset(supabase, ownVideoPath, { ttlSeconds: SNS_INGEST_URL_TTL_SECONDS });
+    }
+
     const { data: source, error: sourceError } = await supabase.from("social_posts")
       .select("id,creative_id").eq("id", socialPostId).eq("user_id", user.id).maybeSingle();
     if (sourceError) throw sourceError;
@@ -242,7 +256,7 @@ export async function POST(request: Request) {
             externalPublishSucceeded = true;
             externalPostId = resolved.videoId ?? r.publishId;
             externalPostUrl = typeof resolved.share_url === "string" ? resolved.share_url : null;
-            const saved = await complete(rowId,platform,externalPostId,externalPostUrl,{publishId:r.publishId,publishStatus:resolved.status,creatorUsername:r.creatorUsername,publicVideoId:resolved.videoId ?? null});
+            const saved = await complete(rowId,platform,externalPostId,externalPostUrl,{publishId:r.publishId,publishStatus:resolved.status,creatorUsername:r.creatorUsername,privacyLevel:r.privacyLevel,publicVideoId:resolved.videoId ?? null});
             results.push({platform,ok:true,postId:saved.external_post_id ?? externalPostId,url:saved.post_url ?? externalPostUrl ?? undefined});
           } else if (platform === "instagram") {
             const r = await publishInstagramReel({videoUrl,caption});

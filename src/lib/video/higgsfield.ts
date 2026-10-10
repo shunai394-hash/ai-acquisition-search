@@ -44,18 +44,39 @@ function modelPath(model: string) {
   return model.replace(/^\/+|\/+$/g, "");
 }
 
+// Official docs publish request/status endpoints per model id. The host is
+// configurable so it can be switched without a code change if Higgsfield moves it.
+function apiBase() {
+  return (process.env.HIGGSFIELD_API_BASE_URL || "https://api.higgsfield.ai").replace(/\/+$/, "");
+}
+
+/** Error detail without signed URLs or oversized payloads. */
+function errorDetail(data: unknown) {
+  const record = data && typeof data === "object" ? data as Record<string, unknown> : {};
+  const detail = record.detail ?? record.error ?? record.message ?? record.raw ?? data;
+  const text = typeof detail === "string" ? detail : JSON.stringify(detail);
+  return String(text ?? "").replace(/https?:\/\/\S+/g, "[url]").slice(0, 300);
+}
+
 async function requestHiggsfield(path: string, init: RequestInit) {
-  const response = await fetch(
-    `https://api.higgsfield.ai/${modelPath(path)}`,
-    {
-      ...init,
-      headers: {
-        Authorization: credentials(),
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-      },
-    }
-  );
+  let response: Response;
+  try {
+    response = await fetch(
+      `${apiBase()}/${modelPath(path)}`,
+      {
+        ...init,
+        signal: init.signal ?? AbortSignal.timeout(30_000),
+        headers: {
+          Authorization: credentials(),
+          "Content-Type": "application/json",
+          ...(init.headers ?? {}),
+        },
+      }
+    );
+  } catch (error) {
+    const reason = error instanceof Error && error.name === "TimeoutError" ? "timed out after 30s" : error instanceof Error ? error.message : String(error);
+    throw new Error(`Higgsfield API request failed: ${reason}`);
+  }
 
   const text = await response.text();
 
@@ -68,7 +89,7 @@ async function requestHiggsfield(path: string, init: RequestInit) {
 
   if (!response.ok) {
     throw new Error(
-      `Higgsfield API error ${response.status}: ${JSON.stringify(data)}`
+      `Higgsfield API error ${response.status}: ${errorDetail(data)}`
     );
   }
 
@@ -131,6 +152,11 @@ export async function generateHiggsfieldVideo(
 
   if (audioUrl) {
     body.audio_urls = [audioUrl];
+    // UNVERIFIED: Higgsfield's catalog describes generate_audio as "generate a
+    // native audio track for the output video" (default true) and lists audio
+    // references separately; it does not state whether a supplied reference is
+    // kept as the output soundtrack with generate_audio=false. The stored file
+    // is probed (media-probe.ts) and the UI warns when the result is silent.
     body.generate_audio = false;
   }
 
@@ -262,7 +288,7 @@ export async function waitForHiggsfieldVideo(
       status === "canceled"
     ) {
       throw new Error(
-        `Higgsfield generation ${status}: ${JSON.stringify(result)}`
+        `Higgsfield generation ${status}: ${errorDetail(result)}`
       );
     }
 
