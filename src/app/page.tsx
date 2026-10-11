@@ -345,7 +345,7 @@ export default function Home() {
         if (poll.status === 401 || poll.status === 404) throw Object.assign(new Error(data.error || "動画ジョブを確認できません。"), { fatal: true });
         if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
         consecutiveErrors = 0;
-        if (data.job?.status === "completed" && data.asset?.video_url) return { status: "completed" as const, videoUrl: String(data.asset.video_url), hasAudioTrack: typeof data.asset.has_audio_track === "boolean" ? data.asset.has_audio_track as boolean : null };
+        if (data.job?.status === "completed" && data.asset?.video_url) { const audioTrack = data.asset.has_audio_track ?? data.asset.metadata?.has_audio_track; return { status: "completed" as const, videoUrl: String(data.asset.video_url), hasAudioTrack: typeof audioTrack === "boolean" ? audioTrack as boolean : null }; }
         if (data.job?.status === "failed") return { status: "failed" as const, error: String(data.job?.error || "動画生成に失敗しました。") };
         onProgress(Math.round((Date.now() - started) / 1000), String(data.job?.provider_status || ""));
       } catch (error) {
