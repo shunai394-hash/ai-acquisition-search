@@ -48,15 +48,17 @@ This log distinguishes code review, deployment build evidence, automated tests, 
 ### Round 7 — Narration and BGM
 - Reviewed: `src/lib/video/audio.ts`, `src/lib/video/audio.test.ts`, generation route.
 - Positive evidence: WAV parsing, duration fitting, BGM generation and narration mixing utilities exist, with audio-focused tests in the repository.
+- Change: made BGM explicitly opt-in by default and added a BGM-only WAV path when requested without narration.
 - Gap: the built-in BGM is a deterministic synthesized bed, not a substitute for a professional/licensed music-generation or music-library service. A generated file having an audio track does not prove perceptual quality.
-- Verification: test source exists; tests/listening were not executed in this review.
+- Verification: source commit is deployed through Vercel; test source exists, but tests/listening were not executed in this review.
 - Remaining: execute audio tests, inspect actual mixed files, test speech audibility/clipping/silence and clarify licensed music options.
 
 ### Round 8 — SNS publishing and automation
 - Reviewed: `src/app/api/social/publish/route.ts`, `src/lib/social/tiktok.ts`, MCP social tools.
 - Positive evidence: per-user authentication, TikTok OAuth token encryption, explicit consent, URL/ownership checks and duplicate-publish reservation logic are present; adapters cover TikTok, Instagram, Facebook, YouTube, X and LinkedIn.
-- Critical gap: the production UI currently exposes a user-triggered publish action; a separate branch `fix/bgm-only-audio-20261012` contains a five-minute operator loop/reconciliation work but is not the main production branch. Do not call scheduled autonomous publishing production-ready until that branch is reviewed, tested, merged and deployed.
-- Verification: current main deployment build is READY; live SNS publishing was not tested.
+- Change: moved the existing operator-loop cron from once daily to every five minutes on main, so recovery/reconciliation can run more promptly.
+- Critical gap: the UI still exposes a user-triggered publish action for new posts. The scheduled operator loop can reconcile queued work, but end-to-end autonomous creative → post → metrics operation is not yet live-verified.
+- Verification: current main deployment build is READY; live SNS publishing and cron execution were not tested.
 - Remaining: inspect and test cron authorization, lease behavior, retry/duplicate handling, account consent, token refresh, platform API approval and provider-confirmed post status.
 
 ### Round 9 — SSRF/security and commerce boundary
@@ -74,4 +76,4 @@ This log distinguishes code review, deployment build evidence, automated tests, 
 - Remaining: run the full CI/test suite, real sandbox-to-production acceptance tests, third-party UX/design review and cost/margin validation.
 
 ## Current decision
-The ten review areas have been inspected, and product positioning, extension metadata/command, version alignment and page metadata were changed. **This is not ten completed improvement-and-test cycles and is not launch-certified.** Highest-priority next work: review and test the non-main scheduled operator loop; execute the repository test suite; test actual video/audio generation and recovery; verify OAuth/SNS APIs; implement Shopify only if required; and obtain an independent product/design review.
+The ten review areas have been inspected, and product positioning, extension metadata/command, version alignment, page metadata, optional BGM handling and cron cadence were changed. **This is not ten completed improvement-and-test cycles and is not launch-certified.** Highest-priority next work: execute the repository test suite; test actual video/audio generation and recovery; verify cron execution and OAuth/SNS APIs; implement Shopify only if required; and obtain an independent product/design review.
