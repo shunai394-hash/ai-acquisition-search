@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { consumeMonthlyUsage, getUserFromBearer, refundMonthlyUsage } from "@/lib/billing";
 import { generateVideo } from "@/lib/video/router";
 import { generateNarration } from "@/lib/video/gemini-tts";
-import { fitWavToDuration, mixNarrationWithBgm } from "@/lib/video/audio";
+import { bgmOnlyWav, fitWavToDuration, mixNarrationWithBgm } from "@/lib/video/audio";
 import { saveAudioToStorage } from "@/lib/video/storage";
 
 export const runtime = "nodejs";
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
     }
 
     // Choose the model once so the stored job and the provider request agree.
-    const selectedModel = model ?? ((audioUrl || narrationText)
+    const selectedModel = model ?? ((audioUrl || narrationText || includeBgm)
       ? process.env.HF_AUDIO_VIDEO_MODEL ?? "alibaba/wan-3.0/reference-to-video"
       : imageUrl
         ? process.env.HF_I2V_MODEL ?? "alibaba/wan-3.0-prime/image-to-video"
@@ -186,6 +186,17 @@ export async function POST(request: Request) {
         ? mixNarrationWithBgm(narrationWav, duration, bgmPrompt)
         : fitWavToDuration(narrationWav, duration);
       const savedAudio = await saveAudioToStorage({ userId: user.id, jobId: job.id, bytes: audioWav });
+      audioUrl = savedAudio.url;
+      audioPath = savedAudio.path;
+      audioBucket = savedAudio.bucket;
+    } else if (includeBgm && !audioUrl) {
+      // BGM-only projects must still produce an audio asset; otherwise the UI's
+      // audio toggle can claim success while the generated video has no soundtrack.
+      const savedAudio = await saveAudioToStorage({
+        userId: user.id,
+        jobId: job.id,
+        bytes: bgmOnlyWav(duration, bgmPrompt),
+      });
       audioUrl = savedAudio.url;
       audioPath = savedAudio.path;
       audioBucket = savedAudio.bucket;
