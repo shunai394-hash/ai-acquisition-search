@@ -45,6 +45,21 @@ export async function POST(request: Request) {
     if (!caption) return NextResponse.json({ error: "投稿本文が必要です。" }, { status: 400 });
     if (!platforms.length) return NextResponse.json({ error: "投稿先を1つ以上選択してください。" }, { status: 400 });
 
+    // Meta, YouTube and X currently use server-wide credentials, not each user's
+    // connected account. Do not silently publish a customer's video to the
+    // operator's account in a multi-user deployment. Shared-account mode is an
+    // explicit deployment choice for single-tenant installations only.
+    const sharedCredentialPlatforms = platforms.filter((platform) =>
+      ["instagram", "facebook", "youtube", "x"].includes(platform),
+    );
+    if (sharedCredentialPlatforms.length > 0 && process.env.SNS_ALLOW_SHARED_PROVIDER_ACCOUNTS !== "true") {
+      return NextResponse.json({
+        error: "選択したSNSは現在サーバー共通認証を使用します。ユーザー別OAuthが実装されるまで投稿を停止しています。単一アカウント運用で明示的に許可する場合のみ SNS_ALLOW_SHARED_PROVIDER_ACCOUNTS=true を設定してください。",
+        code: "SHARED_SOCIAL_ACCOUNT_DISABLED",
+        blockedPlatforms: sharedCredentialPlatforms,
+      }, { status: 403 });
+    }
+
     const supabase = getAdminSupabase();
 
     // Videos generated here live in the video-assets bucket. Never forward the
