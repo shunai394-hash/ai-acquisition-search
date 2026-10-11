@@ -1,7 +1,7 @@
 {
   "name": "ai-acquisition-search",
-  "description": "Evidence-based customer acquisition decision engine for Claude Code: research, campaign testing, performance analysis, and next-action decisions.",
-  "version": "0.5.0",
+  "description": "AI video production director for Claude Code: prompt-first creative briefs, shot planning, connected video and narration engines, optional Shopify/product context, authorized social publishing, and evidence-based performance iteration.",
+  "version": "0.6.0",
   "author": {
     "name": "AI Acquisition Search"
   },
@@ -9,11 +9,15 @@
   "homepage": "https://github.com/shunai394-hash/ai-acquisition-search",
   "license": "MIT",
   "keywords": [
-    "customer-acquisition",
+    "ai-video-production",
+    "video-director",
+    "creative-workflow",
+    "higgsfield",
+    "text-to-video",
+    "image-to-video",
+    "social-publishing",
+    "shopify",
     "marketing",
-    "advertising",
-    "decision-engine",
-    "analytics",
     "mcp"
   ]
 }
