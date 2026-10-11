@@ -57,8 +57,9 @@ This log distinguishes code review, deployment build evidence, automated tests, 
 - Reviewed: `src/app/api/social/publish/route.ts`, `src/lib/social/tiktok.ts`, MCP social tools.
 - Positive evidence: per-user authentication, TikTok OAuth token encryption, explicit consent, URL/ownership checks and duplicate-publish reservation logic are present; adapters cover TikTok, Instagram, Facebook, YouTube, X and LinkedIn.
 - Change: moved the existing operator-loop cron from once daily to every five minutes on main, so recovery/reconciliation can run more promptly.
-- Critical gap: the UI still exposes a user-triggered publish action for new posts. The scheduled operator loop can reconcile queued work, but end-to-end autonomous creative → post → metrics operation is not yet live-verified.
-- Verification: current main deployment build is READY; live SNS publishing and cron execution were not tested.
+- Change: prompt-first videos can now create idempotent SNS publishing drafts without requiring a marketing creative; main also schedules the operator loop every five minutes.
+- Critical gap: new posts still require a user-triggered publish action unless an authorized queued workflow takes over. End-to-end autonomous creative → post → metrics operation is not yet live-verified.
+- Verification: PR #67 CI passed `npm run typecheck`, `npm test`, `npm run backtest:decision`, `npm run build` and `npm run lint` on its reviewed head; current main deployment is READY, but that CI run predates subsequent main-branch changes. Live SNS publishing and cron execution were not tested.
 - Remaining: inspect and test cron authorization, lease behavior, retry/duplicate handling, account consent, token refresh, platform API approval and provider-confirmed post status.
 
 ### Round 9 — SSRF/security and commerce boundary
@@ -76,4 +77,4 @@ This log distinguishes code review, deployment build evidence, automated tests, 
 - Remaining: run the full CI/test suite, real sandbox-to-production acceptance tests, third-party UX/design review and cost/margin validation.
 
 ## Current decision
-The ten review areas have been inspected, and product positioning, extension metadata/command, version alignment, page metadata, optional BGM handling and cron cadence were changed. **This is not ten completed improvement-and-test cycles and is not launch-certified.** Highest-priority next work: execute the repository test suite; test actual video/audio generation and recovery; verify cron execution and OAuth/SNS APIs; implement Shopify only if required; and obtain an independent product/design review.
+The ten review areas have been inspected, and product positioning, extension metadata/command, version alignment, page metadata, optional BGM handling and cron cadence were changed. **This is not ten completed improvement-and-test cycles and is not launch-certified.** Highest-priority next work: rerun full CI against the latest main SHA; test actual video/audio generation and recovery; verify cron execution and OAuth/SNS APIs; implement Shopify only if required; and obtain an independent product/design review.
