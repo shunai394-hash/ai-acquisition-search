@@ -5,6 +5,7 @@ import { uploadYouTubeVideo } from "@/lib/social/youtube";
 import { publishXPost } from "@/lib/social/x";
 import { createLinkedInVideoPost, decryptLinkedInToken } from "@/lib/linkedin";
 import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
+import { blockedSharedCredentialPlatforms } from "@/lib/social/publish-policy";
 import { assertPublicUrl, fetchPublicUrl } from "@/lib/security/public-url";
 import { isOwnedVideoPath, signVideoAsset, SNS_INGEST_URL_TTL_SECONDS, videoAssetPathFromUrl } from "@/lib/video/asset-access";
 import { writeFile, unlink } from "node:fs/promises";
@@ -49,10 +50,11 @@ export async function POST(request: Request) {
     // connected account. Do not silently publish a customer's video to the
     // operator's account in a multi-user deployment. Shared-account mode is an
     // explicit deployment choice for single-tenant installations only.
-    const sharedCredentialPlatforms = platforms.filter((platform) =>
-      ["instagram", "facebook", "youtube", "x"].includes(platform),
+    const sharedCredentialPlatforms = blockedSharedCredentialPlatforms(
+      platforms,
+      process.env.SNS_ALLOW_SHARED_PROVIDER_ACCOUNTS === "true",
     );
-    if (sharedCredentialPlatforms.length > 0 && process.env.SNS_ALLOW_SHARED_PROVIDER_ACCOUNTS !== "true") {
+    if (sharedCredentialPlatforms.length > 0) {
       return NextResponse.json({
         error: "選択したSNSは現在サーバー共通認証を使用します。ユーザー別OAuthが実装されるまで投稿を停止しています。単一アカウント運用で明示的に許可する場合のみ SNS_ALLOW_SHARED_PROVIDER_ACCOUNTS=true を設定してください。",
         code: "SHARED_SOCIAL_ACCOUNT_DISABLED",
