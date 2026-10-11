@@ -349,10 +349,16 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
   const jobs = [...(activeJobs || []), ...(publishJobs || [])];
 
   const settlePublish = async (job: { id: string; user_id: string; provider_response: unknown }) => {
-    await db.from("production_jobs").update({
+    const { data, error } = await db.from("production_jobs").update({
       provider_response: { ...jobMeta(job.provider_response), publish_settled: true, publish_settled_at: new Date().toISOString() },
       updated_at: new Date().toISOString(),
-    }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "completed");
+    }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "completed").select("id").maybeSingle();
+
+    // Do not report the publish retry as settled when the database write failed
+    // or the job stopped matching the expected state. Keeping it unsettled lets
+    // the next operator pass reconcile it instead of silently losing recovery.
+    if (error) throw error;
+    if (!data) throw new Error("SNS投稿の再巡回結果をジョブへ保存できませんでした。");
   };
 
   for (const job of jobs) {
