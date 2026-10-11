@@ -21,16 +21,19 @@ export async function POST(request: Request) {
   try {
     const user = await getUserFromBearer(request);
     if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "SNS投稿リクエストの形式が不正です。" }, { status: 400 });
+    }
     const socialPostId = typeof body.socialPostId === "string" ? body.socialPostId.trim() : "";
     let videoUrl = typeof body.videoUrl === "string" ? body.videoUrl.trim() : "";
     const caption = typeof body.caption === "string" ? body.caption.trim() : "";
     const supportedPlatforms: Platform[] = ["tiktok", "instagram", "facebook", "youtube", "x", "linkedin"];
-    const platforms: Platform[] = Array.isArray(body.platforms)
-      ? Array.from(new Set<Platform>((body.platforms as unknown[]).filter(
-          (v: unknown): v is Platform => typeof v === "string" && supportedPlatforms.includes(v as Platform),
-        )))
-      : [];
+    if (!Array.isArray(body.platforms) || body.platforms.length === 0 ||
+      body.platforms.some((value: unknown) => typeof value !== "string" || !supportedPlatforms.includes(value as Platform))) {
+      return NextResponse.json({ error: "対応しているSNSを1つ以上選択してください。" }, { status: 400 });
+    }
+    const platforms: Platform[] = Array.from(new Set<Platform>(body.platforms as Platform[]));
     if (!socialPostId) return NextResponse.json({ error: "socialPostIdが必要です。" }, { status: 400 });
     if (!videoUrl.startsWith("https://")) return NextResponse.json({ error: "完成動画のHTTPS URLが必要です。" }, { status: 400 });
     const ownVideoPath = videoAssetPathFromUrl(videoUrl);
@@ -44,7 +47,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "この動画を投稿する権限がありません。" }, { status: 403 });
     }
     if (!caption) return NextResponse.json({ error: "投稿本文が必要です。" }, { status: 400 });
-    if (!platforms.length) return NextResponse.json({ error: "投稿先を1つ以上選択してください。" }, { status: 400 });
+    if (caption.length > 2200) return NextResponse.json({ error: "投稿本文は2,200文字以内にしてください。" }, { status: 400 });
+    if (platforms.includes("x") && caption.length > 280) return NextResponse.json({ error: "X投稿本文は280文字以内にしてください。" }, { status: 400 });
 
     // Meta, YouTube and X currently use server-wide credentials, not each user's
     // connected account. Do not silently publish a customer's video to the
