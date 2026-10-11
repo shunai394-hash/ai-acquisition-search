@@ -117,6 +117,7 @@ export default function Home() {
   const videoLock = useRef(false);
   const videoGeneration = useRef(0);
   const publishLock = useRef(false);
+  const standaloneDraftKey = useRef("");
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["tiktok"]);
   const [publishCaption, setPublishCaption] = useState("");
   const [tiktokConsent, setTiktokConsent] = useState(false);
@@ -215,6 +216,8 @@ export default function Home() {
     setLoadingPhase("商品ページを読み取っています");
     setError("");
     setResult(null);
+    setSocialPostId("");
+    setPublishResults([]);
     const phaseTimers = [
       window.setTimeout(() => setLoadingPhase("市場の声と競合シグナルを整理しています"), 900),
       window.setTimeout(() => setLoadingPhase("痛点と機会の因果関係を組み立てています"), 1900),
@@ -418,7 +421,7 @@ export default function Home() {
     setStudioGenerating(true); setStudioError(""); setStudioUrl(""); setStudioStage("prepare"); setStudioStatus("素材を準備中…");
     try {
       const token = await getAccessToken();
-      let currentSocialPostId = socialPostId;
+      let currentSocialPostId = result ? socialPostId : "";
       const autoPublishPlatforms = publishPlatforms.filter((platform) => platform !== "tiktok" || tiktokConsent);
       if (!currentSocialPostId && result) {
         const planResponse = await fetch("/api/operator/plan", {
@@ -430,6 +433,23 @@ export default function Home() {
         if (!planResponse.ok) throw new Error(planBody.error || "SNS自動運用計画の作成に失敗しました。");
         currentSocialPostId = String(planBody.socialPostId || "");
         if (currentSocialPostId) setSocialPostId(currentSocialPostId);
+      } else if (!currentSocialPostId && publishPlatforms.length > 0) {
+        if (!standaloneDraftKey.current) standaloneDraftKey.current = window.crypto.randomUUID();
+        const draftResponse = await fetch("/api/social/draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({
+            draftKey: standaloneDraftKey.current,
+            network: publishPlatforms[0],
+            prompt: studioPrompt.trim(),
+            caption: publishCaption.trim() || studioPrompt.trim().slice(0, 2200),
+          }),
+        });
+        const draftBody = await draftResponse.json().catch(() => ({}));
+        if (!draftResponse.ok) throw new Error(draftBody.error || "SNS投稿用の動画プロジェクトを保存できませんでした。");
+        currentSocialPostId = String(draftBody.socialPostId || "");
+        if (!currentSocialPostId) throw new Error("SNS投稿用の下書きIDを取得できませんでした。");
+        setSocialPostId(currentSocialPostId);
       }
       let imageUrl = "";
       let imagePath = "";
@@ -539,6 +559,7 @@ export default function Home() {
           setStudioStatus(audioUrl && outcome.hasAudioTrack === false
             ? "完成しましたが、生成動画に音声トラックが含まれていません（ナレーション/BGMは反映されていません）。"
             : "完成しました。プレビューで確認できます。");
+          if (!result) standaloneDraftKey.current = "";
           if (currentSocialPostId && autoPublishPlatforms.length) {
             setPublishStatus("完成動画をSNSへ自動投稿中…");
             try {
