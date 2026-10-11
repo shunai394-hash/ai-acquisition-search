@@ -18,10 +18,14 @@ export function validateSocialDraftInput(body: unknown): SocialDraftValidation {
   }
 
   const record = body as Record<string, unknown>;
-  const prompt = typeof record.prompt === "string" ? record.prompt.trim() : "";
-  const caption = typeof record.caption === "string" ? record.caption.trim() : "";
-  const network = typeof record.network === "string" ? record.network.trim() : "";
-  const draftKey = typeof record.draftKey === "string" ? record.draftKey.trim() : "";
+  if (typeof record.prompt !== "string" || typeof record.caption !== "string" || typeof record.network !== "string" || typeof record.draftKey !== "string") {
+    return { ok: false, error: "プロンプト、投稿本文、SNS、下書きIDの形式が不正です。" };
+  }
+
+  const prompt = record.prompt.trim();
+  const caption = record.caption.trim();
+  const network = record.network.trim();
+  const draftKey = record.draftKey.trim();
 
   if (prompt.length < 8 || prompt.length > 10000) {
     return { ok: false, error: "プロンプトは8〜10,000文字で入力してください。" };
