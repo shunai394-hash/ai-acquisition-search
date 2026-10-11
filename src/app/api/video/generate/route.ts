@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     audioPath = body.audioPath ? String(body.audioPath) : undefined;
     audioBucket = body.audioBucket ? String(body.audioBucket) : undefined;
     const narrationText = typeof body.narrationText === "string" ? body.narrationText.trim() : "";
-    const includeBgm = body.includeBgm !== false;
+    const includeBgm = body.includeBgm === true;
     const narrationVoice = typeof body.narrationVoice === "string" ? body.narrationVoice.trim() : undefined;
     const narrationStyle = typeof body.narrationStyle === "string" ? body.narrationStyle.trim() : undefined;
     const bgmPrompt = typeof body.bgmPrompt === "string" ? body.bgmPrompt.trim() : "";
