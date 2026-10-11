@@ -560,7 +560,7 @@ export default function Home() {
             ? "完成しましたが、生成動画に音声トラックが含まれていません（ナレーション/BGMは反映されていません）。"
             : "完成しました。プレビューで確認できます。");
           if (!result) standaloneDraftKey.current = "";
-          if (currentSocialPostId && autoPublishPlatforms.length) {
+          if (currentSocialPostId && autoPublishPlatforms.length && !(audioUrl && outcome.hasAudioTrack === false)) {
             setPublishStatus("完成動画をSNSへ自動投稿中…");
             try {
               const publishToken = await getAccessToken();
@@ -578,6 +578,8 @@ export default function Home() {
               setPublishStatus("");
               setStudioError(publishError instanceof Error ? publishError.message : "SNS自動投稿に失敗しました。");
             }
+          } else if (currentSocialPostId && autoPublishPlatforms.length && audioUrl && outcome.hasAudioTrack === false) {
+            setPublishStatus("自動投稿を停止しました。完成動画に音声トラックがなく、ナレーション/BGMが反映されていないためです。音声を確認してから再生成してください。");
           }
           return;
         }
