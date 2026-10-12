@@ -83,14 +83,20 @@ async function publishCompletedVideo(
   if (existingSnakeError) throw existingSnakeError;
 
   // Keep compatibility with older rows that used camelCase metadata.
-  const existing = existingSnake?.length
-    ? existingSnake
-    : (await db.from("social_posts")
-        .select("id,status,external_post_id")
-        .eq("user_id", userId)
-        .eq("network", nextPost.network)
-        .eq("metadata->>sourceSocialPostId", nextPost.id)
-        .limit(1)).data;
+  let existing = existingSnake;
+  if (!existing?.length) {
+    const { data: existingCamel, error: existingCamelError } = await db.from("social_posts")
+      .select("id,status,external_post_id")
+      .eq("user_id", userId)
+      .eq("network", nextPost.network)
+      .eq("metadata->>sourceSocialPostId", nextPost.id)
+      .limit(1);
+    // A failed idempotency lookup is not equivalent to "no previous post".
+    // Abort before calling the provider so a transient DB failure cannot
+    // create a duplicate external post.
+    if (existingCamelError) throw existingCamelError;
+    existing = existingCamel;
+  }
 
   if (existing?.[0]?.external_post_id) {
     return { ok: true, skipped: true, reason: "already published", postId: existing[0].id };
