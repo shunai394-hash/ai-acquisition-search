@@ -113,8 +113,15 @@ async function publishCompletedVideo(
     ? result.payload.results.filter((item: { ok?: boolean } | null) => item?.ok)
     : [];
 
+  // The publish endpoint can report that the external platform may have accepted
+  // the post while its own persistence failed. Never overwrite that uncertainty
+  // as a clean success here; doing so could make a later retry duplicate a post.
+  if (manualRecoveryRequired) {
+    return { ok: false, status: result.status, result: result.payload, manualRecoveryRequired: true };
+  }
+
   if (published.length > 0) {
-    await db.from("social_posts").update({
+    const { data: settledPost, error: settleError } = await db.from("social_posts").update({
       status: "published",
       metadata: {
         ...(nextPost.metadata || {}),
@@ -122,10 +129,23 @@ async function publishCompletedVideo(
         auto_publish_result: result.payload,
       },
       updated_at: new Date().toISOString(),
-    }).eq("id", nextPost.id).eq("user_id", userId);
+    }).eq("id", nextPost.id).eq("user_id", userId).select("id").maybeSingle();
+
+    // A remote post is an irreversible side effect. If its local settlement
+    // fails, stop automatic retries and surface manual reconciliation instead
+    // of pretending the database and provider are in sync.
+    if (settleError || !settledPost) {
+      return {
+        ok: false,
+        status: result.status,
+        result: result.payload,
+        manualRecoveryRequired: true,
+        error: settleError?.message || "SNS投稿結果をデータベースへ保存できませんでした。",
+      };
+    }
   }
 
-  return { ok: published.length > 0, status: result.status, result: result.payload, manualRecoveryRequired };
+  return { ok: published.length > 0, status: result.status, result: result.payload, manualRecoveryRequired: false };
 }
 
 const LEASE_NAME = "operator-loop";
