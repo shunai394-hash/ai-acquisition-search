@@ -44,3 +44,15 @@ test("an audio track with zero samples is not treated as audible", () => {
   assert.equal(mp4HasAudioTrack(silent), false);
   assert.equal(mp4HasAudioTrack(audible), true);
 });
+
+
+import { audioTrackFromAsset } from "@/lib/video/media-probe";
+
+test("reads audio-track state from the persisted asset metadata shape", () => {
+  assert.equal(audioTrackFromAsset({ metadata: { has_audio_track: true } }), true);
+  assert.equal(audioTrackFromAsset({ metadata: { has_audio_track: false } }), false);
+  assert.equal(audioTrackFromAsset({ has_audio_track: true, metadata: { has_audio_track: false } }), true);
+  assert.equal(audioTrackFromAsset({ metadata: {} }), null);
+  assert.equal(audioTrackFromAsset(null), null);
+  assert.equal(audioTrackFromAsset([]), null);
+});

@@ -83,14 +83,20 @@ async function publishCompletedVideo(
   if (existingSnakeError) throw existingSnakeError;
 
   // Keep compatibility with older rows that used camelCase metadata.
-  const existing = existingSnake?.length
-    ? existingSnake
-    : (await db.from("social_posts")
-        .select("id,status,external_post_id")
-        .eq("user_id", userId)
-        .eq("network", nextPost.network)
-        .eq("metadata->>sourceSocialPostId", nextPost.id)
-        .limit(1)).data;
+  let existing = existingSnake;
+  if (!existing?.length) {
+    const { data: existingCamel, error: existingCamelError } = await db.from("social_posts")
+      .select("id,status,external_post_id")
+      .eq("user_id", userId)
+      .eq("network", nextPost.network)
+      .eq("metadata->>sourceSocialPostId", nextPost.id)
+      .limit(1);
+    // A failed idempotency lookup is not equivalent to "no previous post".
+    // Abort before calling the provider so a transient DB failure cannot
+    // create a duplicate external post.
+    if (existingCamelError) throw existingCamelError;
+    existing = existingCamel;
+  }
 
   if (existing?.[0]?.external_post_id) {
     return { ok: true, skipped: true, reason: "already published", postId: existing[0].id };
@@ -113,8 +119,15 @@ async function publishCompletedVideo(
     ? result.payload.results.filter((item: { ok?: boolean } | null) => item?.ok)
     : [];
 
+  // The publish endpoint can report that the external platform may have accepted
+  // the post while its own persistence failed. Never overwrite that uncertainty
+  // as a clean success here; doing so could make a later retry duplicate a post.
+  if (manualRecoveryRequired) {
+    return { ok: false, status: result.status, result: result.payload, manualRecoveryRequired: true };
+  }
+
   if (published.length > 0) {
-    await db.from("social_posts").update({
+    const { data: settledPost, error: settleError } = await db.from("social_posts").update({
       status: "published",
       metadata: {
         ...(nextPost.metadata || {}),
@@ -122,10 +135,23 @@ async function publishCompletedVideo(
         auto_publish_result: result.payload,
       },
       updated_at: new Date().toISOString(),
-    }).eq("id", nextPost.id).eq("user_id", userId);
+    }).eq("id", nextPost.id).eq("user_id", userId).select("id").maybeSingle();
+
+    // A remote post is an irreversible side effect. If its local settlement
+    // fails, stop automatic retries and surface manual reconciliation instead
+    // of pretending the database and provider are in sync.
+    if (settleError || !settledPost) {
+      return {
+        ok: false,
+        status: result.status,
+        result: result.payload,
+        manualRecoveryRequired: true,
+        error: settleError?.message || "SNS投稿結果をデータベースへ保存できませんでした。",
+      };
+    }
   }
 
-  return { ok: published.length > 0, status: result.status, result: result.payload, manualRecoveryRequired };
+  return { ok: published.length > 0, status: result.status, result: result.payload, manualRecoveryRequired: false };
 }
 
 const LEASE_NAME = "operator-loop";
@@ -349,10 +375,16 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
   const jobs = [...(activeJobs || []), ...(publishJobs || [])];
 
   const settlePublish = async (job: { id: string; user_id: string; provider_response: unknown }) => {
-    await db.from("production_jobs").update({
+    const { data, error } = await db.from("production_jobs").update({
       provider_response: { ...jobMeta(job.provider_response), publish_settled: true, publish_settled_at: new Date().toISOString() },
       updated_at: new Date().toISOString(),
-    }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "completed");
+    }).eq("id", job.id).eq("user_id", job.user_id).eq("status", "completed").select("id").maybeSingle();
+
+    // Do not report the publish retry as settled when the database write failed
+    // or the job stopped matching the expected state. Keeping it unsettled lets
+    // the next operator pass reconcile it instead of silently losing recovery.
+    if (error) throw error;
+    if (!data) throw new Error("SNS投稿の再巡回結果をジョブへ保存できませんでした。");
   };
 
   for (const job of jobs) {
