@@ -1420,3 +1420,19 @@ body {
   overflow: visible;
   padding-bottom: max(110px, env(safe-area-inset-bottom));
 }
+
+
+/* Auto-publishing is the primary home workflow: keep setup and upload above the fold. */
+.auto-publish-home{margin:26px 0 22px;padding:28px;border:1px solid #ffffff20;border-radius:22px;background:linear-gradient(135deg,#111821,#090c11 70%);scroll-margin-top:20px}
+.auto-publish-home-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.auto-publish-home h1{font-size:clamp(30px,4.5vw,52px);line-height:1.08;letter-spacing:-.045em;margin:0}
+.auto-publish-home-head p:not(.eyebrow){max-width:720px;color:#ffffff80;line-height:1.75;font-size:13px}
+.auto-publish-state{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;border:1px solid #ffffff24;border-radius:999px;padding:9px 12px;color:#b9ffcf;font-size:10px;letter-spacing:.1em}
+.auto-publish-state i{width:7px;height:7px;border-radius:50%;background:#8df0ac;display:inline-block}
+.auto-publish-steps{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 0;border-top:1px solid #ffffff12;border-bottom:1px solid #ffffff12}
+.auto-publish-steps span{font-size:12px;color:#ffffffa8}.auto-publish-steps b{color:#ffffff50;margin-right:7px;font-size:10px}.auto-publish-steps i{font-style:normal;color:#ffffff35}
+.auto-publish-setup{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px}
+.auto-publish-setup strong{font-size:14px}.auto-publish-setup p{margin:6px 0 0;color:#ffffff70;font-size:12px}
+.auto-publish-setup a{display:inline-block;padding:12px 15px;border-radius:12px;background:#fff;color:#07090d;text-decoration:none;font-weight:700;font-size:12px;white-space:nowrap}
+.auto-publish-consent{margin-top:16px}.auto-publish-notice{color:#b9ffcf;font-size:12px}
+@media(max-width:700px){.auto-publish-home{padding:20px 16px;margin-top:16px}.auto-publish-home-head{flex-direction:column}.auto-publish-state{align-self:flex-start}.auto-publish-setup{align-items:flex-start;flex-direction:column}.auto-publish-setup a{width:100%;text-align:center}.auto-publish-steps{gap:8px}.auto-publish-steps span{font-size:11px}}
