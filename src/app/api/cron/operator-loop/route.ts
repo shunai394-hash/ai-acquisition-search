@@ -391,15 +391,16 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
       }
       const now = new Date();
       const nextAttempts = attempts + 1;
-      const blocked = nextAttempts >= 5 || outcome.manualRecoveryRequired === true;
+      const manualRecoveryRequired = "manualRecoveryRequired" in outcome && outcome.manualRecoveryRequired === true;
+      const blocked = nextAttempts >= 5 || manualRecoveryRequired;
       await db.from("social_posts").update({
         metadata: {
           ...metadata,
           auto_publish_attempts: nextAttempts,
           auto_publish_last_attempt_at: now.toISOString(),
-          auto_publish_last_error: String(outcome.reason || outcome.error || "publish_not_confirmed").slice(0, 500),
+          auto_publish_last_error: String(("reason" in outcome ? outcome.reason : undefined) || ("error" in outcome ? outcome.error : undefined) || "publish_not_confirmed").slice(0, 500),
           auto_publish_next_attempt_at: blocked ? null : new Date(now.getTime() + Math.min(60, 5 * nextAttempts) * 60 * 1000).toISOString(),
-          ...(blocked ? { auto_publish: false, auto_publish_blocked: true, auto_publish_blocked_reason: outcome.manualRecoveryRequired ? "manual_recovery_required" : "retry_limit", auto_publish_blocked_at: now.toISOString() } : {}),
+          ...(blocked ? { auto_publish: false, auto_publish_blocked: true, auto_publish_blocked_reason: manualRecoveryRequired ? "manual_recovery_required" : "retry_limit", auto_publish_blocked_at: now.toISOString() } : {}),
         },
         updated_at: now.toISOString(),
       }).eq("id", queued.id).eq("user_id", queued.user_id).eq("status", "planned");
