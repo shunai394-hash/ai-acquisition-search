@@ -95,6 +95,11 @@ export default function Home() {
   const [studioGenerating, setStudioGenerating] = useState(false);
   const [studioStatus, setStudioStatus] = useState("");
   const [studioUrl, setStudioUrl] = useState("");
+  const [completedVideos, setCompletedVideos] = useState<Array<{ name: string; storagePath: string; size: number | null; createdAt: string | null; url: string; downloadUrl: string }>>([]);
+  const [libraryFile, setLibraryFile] = useState<File | null>(null);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryUploading, setLibraryUploading] = useState(false);
+  const [libraryMessage, setLibraryMessage] = useState("");
   const [studioError, setStudioError] = useState("");
   const [studioDuration, setStudioDuration] = useState(5);
   const [studioAspect, setStudioAspect] = useState<"9:16" | "16:9" | "1:1">("9:16");
@@ -700,6 +705,49 @@ export default function Home() {
     }
   }
 
+  async function loadCompletedVideos() {
+    setLibraryLoading(true);
+    setLibraryMessage("");
+    try {
+      const token = await getAccessToken();
+      const response = await fetch("/api/video/library", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "完成動画を読み込めませんでした。");
+      setCompletedVideos(Array.isArray(body.videos) ? body.videos : []);
+    } catch (err) {
+      setLibraryMessage(userFacingClientError(err, "完成動画を読み込めませんでした。"));
+    } finally {
+      setLibraryLoading(false);
+    }
+  }
+
+  async function uploadCompletedVideo() {
+    if (!libraryFile || libraryUploading) return;
+    setLibraryUploading(true);
+    setLibraryMessage("");
+    try {
+      const token = await getAccessToken();
+      const form = new FormData();
+      form.set("file", libraryFile);
+      const response = await fetch("/api/video/library", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token },
+        body: form,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "動画を保存できませんでした。");
+      setLibraryFile(null);
+      const input = document.getElementById("completed-video-file") as HTMLInputElement | null;
+      if (input) input.value = "";
+      setLibraryMessage("完成動画フォルダーに保存しました。");
+      await loadCompletedVideos();
+    } catch (err) {
+      setLibraryMessage(userFacingClientError(err, "動画の保存に失敗しました。"));
+    } finally {
+      setLibraryUploading(false);
+    }
+  }
+
   async function saveMetrics() {
     setVerdict(null);
     setError("");
@@ -858,6 +906,45 @@ export default function Home() {
         {videoError && !result && <p className="error" role="alert">{videoError}</p>}
         {videoUrl && !result && <div className="studio-result"><video src={videoUrl} controls playsInline preload="metadata" aria-label="前回復元した動画のプレビュー" /><p><a href={videoUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></p></div>}
         {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline preload="metadata" aria-label="生成した動画のプレビュー" onError={() => { void refreshStudioVideoUrl(); }} /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>同じ条件でもう一度</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>画角と光を変えて再生成</button><a href={studioUrl} target="_blank" rel="noreferrer">新しいタブで開く →</a><a href={downloadUrl(studioUrl)} download>動画を保存 ↓</a></div></div>}
+      </section>
+
+      <section className="panel completed-video-library" aria-labelledby="completed-video-library-title">
+        <div className="studio-result-head">
+          <div>
+            <p className="eyebrow">06 · VIDEO LIBRARY</p>
+            <h2 id="completed-video-library-title">完成動画フォルダー</h2>
+            <p>PCに保存済みのMP4動画をアップロードして保管。ここからプレビューやダウンロードができます。</p>
+          </div>
+          <span className="studio-result-state">{completedVideos.length} FILE{completedVideos.length === 1 ? "" : "S"}</span>
+        </div>
+        <div className="library-upload-row">
+          <label className="library-file-label" htmlFor="completed-video-file">完成したMP4動画を選択</label>
+          <input id="completed-video-file" type="file" accept="video/mp4,.mp4" onChange={(event) => setLibraryFile(event.target.files?.[0] ?? null)} aria-label="保存するMP4動画" />
+          <button type="button" onClick={() => { void uploadCompletedVideo(); }} disabled={!libraryFile || libraryUploading}>
+            {libraryUploading ? "保存中…" : "フォルダーに保存"}
+          </button>
+          <button type="button" className="secondary-button" onClick={() => { void loadCompletedVideos(); }} disabled={libraryLoading}>
+            {libraryLoading ? "読み込み中…" : "保存済みを表示"}
+          </button>
+        </div>
+        <p className="video-status">MP4 / 最大250MB。動画はログイン中のアカウント専用領域に保存されます。</p>
+        {libraryMessage && <p className={libraryMessage.includes("保存しました") ? "video-status" : "error"} role="status" aria-live="polite">{libraryMessage}</p>}
+        {completedVideos.length > 0 && <div className="completed-video-grid">
+          {completedVideos.map((video) => (
+            <article className="completed-video-card" key={video.storagePath}>
+              <video src={video.url} controls playsInline preload="metadata" aria-label={video.name + "のプレビュー"} />
+              <div className="completed-video-card-copy">
+                <strong title={video.name}>{video.name}</strong>
+                <span>{video.size ? (video.size / (1024 * 1024)).toFixed(1) + " MB" : "サイズ不明"}</span>
+              </div>
+              <div className="studio-result-actions">
+                <button type="button" onClick={() => { setVideoUrl(video.url); setVideoError(""); setVideoStatus("完成動画フォルダーから動画を選択しました。"); }}>投稿用動画に設定</button>
+                <a href={video.downloadUrl} download>ダウンロード ↓</a>
+              </div>
+            </article>
+          ))}
+        </div>}
+        {!completedVideos.length && !libraryLoading && <p className="library-empty">まだ動画はありません。MP4を選択してフォルダーに保存してください。</p>}
       </section>
 
       <section className="url-analysis-secondary" aria-labelledby="url-analysis-title">
