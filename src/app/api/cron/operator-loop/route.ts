@@ -93,8 +93,11 @@ async function publishCompletedVideo(
         .eq("metadata->>sourceSocialPostId", nextPost.id)
         .limit(1)).data;
 
-  if (existing?.[0]?.external_post_id) {
+  if (existing?.[0]?.status === "published" && existing[0]?.external_post_id) {
     return { ok: true, skipped: true, reason: "already published", postId: existing[0].id };
+  }
+  if (existing?.[0] && ["pending", "publishing"].includes(existing[0].status)) {
+    return { ok: false, skipped: true, reason: "provider publication is still pending; awaiting reconciliation" };
   }
 
   const result = await internalRequest("POST", "/api/social/publish", userId, {
