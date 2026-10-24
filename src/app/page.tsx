@@ -808,7 +808,7 @@ export default function Home() {
       <header className="topbar">
         <div>
           <strong>AI Acquisition Search</strong>
-          <span>AI VIDEO STUDIO · IMAGE TO VIDEO</span>
+          <span>AUTO PUBLISH · COMPLETED VIDEOS → SNS</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           {result && (
@@ -825,39 +825,59 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="hero" aria-labelledby="hero-title">
-        <div className="hero-grid">
-          <div className="hero-copy">
-            <p className="eyebrow hero-eyebrow"><span className="hero-eyebrow-mark" aria-hidden="true"></span> AI VIDEO DIRECTION / 01</p>
-            <h1 id="hero-title">動画を入れて、<br /><span>SNSへ届ける。</span></h1>
-            <p className="lead">完成したMP4をアップロード。投稿先と本文を確認して、TikTokなどのSNS投稿へ。動画生成よりも、完成動画の保管・投稿準備・投稿状況を中心にした運用画面です。</p>
-            <div className="hero-actions">
-              <a className="hero-primary" href="#completed-video-library">動画をアップロード <span aria-hidden="true">↗</span></a>
-              <a className="hero-text-link" href="#video-studio">動画を新規作成する <span aria-hidden="true">↓</span></a>
-            </div>
-            <div className="hero-proof">
-              <div><b>01 / OPENING</b><strong>冒頭の一瞬</strong><span>0.5秒の見せ方を選び、最初の構図と動きを演出します。</span></div>
-              <div><b>02 / DIRECTION</b><strong>言葉で演出</strong><span>被写体・カメラ・光・空気感を自由なプロンプトで指定。</span></div>
-              <div><b>03 / FINISH</b><strong>自分の設定で生成</strong><span>尺・画角・解像度を調整。完成動画を確認して保存。</span></div>
-            </div>
+      <section className="auto-publish-home" aria-labelledby="auto-publish-home-title">
+        <div className="auto-publish-home-head">
+          <div>
+            <p className="eyebrow">AUTO PUBLISH · SNS OPERATIONS</p>
+            <h1 id="auto-publish-home-title">完成動画を、SNSへ自動投稿。</h1>
+            <p>動画を保存し、投稿キューに追加。TikTok連携と自動投稿への同意が済めば、スケジュール処理がキューを順次実行します。</p>
           </div>
-          <div className="hero-video-visual" aria-label="動画演出のコンセプトビジュアル">
-            <div className="video-visual-top"><span><i /> VIDEO STUDIO</span><span>ART DIRECTION / 01</span></div>
-            <div className="video-visual-frame">
-              <div className="visual-sun" />
-              <div className="visual-horizon" />
-              <div className="visual-subject"><span /></div>
-              <div className="visual-light-streak" />
-              <div className="visual-frame-label"><span>THE OPENING / 00.5 SEC</span><strong>Make them look.</strong><small>FRAMING · MOTION · LIGHT</small></div>
-              <span className="visual-timecode">FIRST FRAME / 00:00.5</span>
-              <span className="visual-first-frame">FIRST 0.5 SEC</span>
-            </div>
-            <div className="video-visual-bottom"><span>01 <b>INTENTION</b></span><i>→</i><span>02 <b>MOTION</b></span><i>→</i><span>03 <b>STORY</b></span></div>
-            <div className="visual-caption"><span>OPENING DIRECTION</span><strong>Contrast · Movement · Curiosity</strong><span className="visual-caption-status">A CREATIVE CHOICE, NOT A GUARANTEE</span></div>
-          </div>
+          <span className="auto-publish-state"><i aria-hidden="true" /> AUTO QUEUE</span>
         </div>
-        <div id="how-it-works" className="hero-loop" aria-label="動画制作の流れ"><span>IDEA</span><i>→</i><span>DIRECT</span><i>→</i><span>GENERATE</span><i>→</i><span>REVIEW</span><i>→</i><span>REFINE</span></div>
-        <p className="hero-note">冒頭演出は生成プロンプトに反映されます。視聴維持率そのものを保証する機能ではありません。</p>
+        <div className="auto-publish-steps" aria-label="自動投稿の手順">
+          <span><b>01</b> MP4を保存</span><i aria-hidden="true">→</i>
+          <span><b>02</b> 投稿キューに追加</span><i aria-hidden="true">→</i>
+          <span><b>03</b> TikTokへ投稿</span>
+        </div>
+        <div className="auto-publish-setup">
+          <div>
+            <strong>TikTokアカウント</strong>
+            <p>投稿先アカウントを接続し、自動投稿を許可してください。</p>
+          </div>
+          <a className="tiktok-connect-link" href="/api/tiktok/connect">TikTokを接続 →</a>
+        </div>
+        <label className="publish-consent auto-publish-consent">
+          <input
+            type="checkbox"
+            checked={tiktokConsent}
+            onChange={async (e) => {
+              if (!e.target.checked) {
+                setTiktokConsent(false);
+                return;
+              }
+              try {
+                const token = await getAccessToken();
+                const consent = await fetch("/api/social/tiktok-consent", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+                  body: JSON.stringify({ consented: true }),
+                });
+                const body = await consent.json().catch(() => ({}));
+                if (!consent.ok) throw new Error(body.error || "TikTok自動投稿への同意を保存できませんでした。");
+                setTiktokConsent(true);
+              } catch (err) {
+                setTiktokConsent(false);
+                setVideoError(err instanceof Error ? err.message : "TikTok自動投稿への同意を保存できませんでした。");
+              }
+            }}
+          />
+          <span>
+            <strong>TikTok自動投稿を許可する</strong>
+            <small>同意後、投稿キューに追加した動画がスケジュール処理の対象になります。公開範囲はTikTok側の権限・アプリ審査設定に従います。</small>
+          </span>
+        </label>
+        {tiktokNotice && <p className="auto-publish-notice" role="status">{tiktokNotice}</p>}
+        {videoError && <p className="error" role="alert">{videoError}</p>}
       </section>
 
       <section id="completed-video-library" className="panel completed-video-library" aria-labelledby="completed-video-library-title">
