@@ -1469,3 +1469,6 @@ img,video{max-width:100%}
   .auto-publish-setup{flex-wrap:wrap;align-items:flex-start}
   .tiktok-connect-link{max-width:100%;white-space:normal}
 }
+
+.tiktok-connect-link{cursor:pointer;font-family:inherit}
+.tiktok-connect-link:disabled{cursor:wait;opacity:.58;transform:none}
