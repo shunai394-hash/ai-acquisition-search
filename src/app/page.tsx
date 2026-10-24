@@ -851,8 +851,8 @@ export default function Home() {
         <div className="auto-publish-home-head">
           <div>
             <p className="eyebrow">AUTO PUBLISH · SNS OPERATIONS</p>
-            <h1 id="auto-publish-home-title">完成動画を、SNSへ自動投稿。</h1>
-            <p>手元にある権利確認済みのMP4を保存し、投稿キューへ。TikTok連携・自動投稿への同意・必要な権限がそろった投稿だけを、スケジュール処理が実行します。</p>
+            <h1 id="auto-publish-home-title">プロンプトから動画制作、SNS投稿まで。</h1>
+            <p>商品画像とプロンプトからAI動画を制作し、確認後にSNSへ。既存のMP4も投稿でき、TikTok連携・同意・必要な権限がそろった投稿だけをスケジュール処理が実行します。</p>
           </div>
           <span className="auto-publish-state"><i aria-hidden="true" /> PUBLISH WORKFLOW</span>
         </div>
