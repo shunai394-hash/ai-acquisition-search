@@ -1490,7 +1490,7 @@ export default function Home() {
                 </label>
               )}
               <div className="video-actions">
-                <button type="button" onClick={() => publishGeneratedVideo(studioUrl || videoUrl)} disabled={publishGenerating || publishPlatforms.filter((platform) => platform !== "tiktok" || tiktokConsent).length === 0}>
+                <button type="button" onClick={() => publishGeneratedVideo(libraryPublishPostId ? videoUrl : (studioUrl || videoUrl))} disabled={publishGenerating || publishPlatforms.filter((platform) => platform !== "tiktok" || tiktokConsent).length === 0}>
                   {publishGenerating ? "投稿中…" : "選択したSNSへ投稿 →"}
                 </button>
                 {publishStatus && <span className="video-status" role="status" aria-live="polite">{publishStatus}</span>}
