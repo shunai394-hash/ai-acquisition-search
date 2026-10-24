@@ -995,7 +995,7 @@ export default function Home() {
         {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline preload="metadata" aria-label="生成した動画のプレビュー" onError={() => { void refreshStudioVideoUrl(); }} /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>同じ条件でもう一度</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>画角と光を変えて再生成</button><a href={studioUrl} target="_blank" rel="noreferrer">新しいタブで開く →</a><a href={downloadUrl(studioUrl)} download>動画を保存 ↓</a></div></div>}
       </section>
 
-      <section className="url-analysis-secondary" aria-labelledby="url-analysis-title">
+      <section hidden className="url-analysis-secondary" aria-labelledby="url-analysis-title">
         <div>
           <p className="eyebrow">OPTIONAL TOOL</p>
           <h2 id="url-analysis-title">商品URLから始めたい場合</h2>
@@ -1011,7 +1011,7 @@ export default function Home() {
                 </section>
 
       {result && (
-        <div className="results">
+        <div className="results" hidden>
           <nav className="journey-index" aria-label="Decision journey">
             <a className="journey-active" href="#research"><b>01</b> RESEARCH</a><i>→</i><a href="#decision-map-title"><b>02</b> TENSION</a><i>→</i><a href="#decision"><b>03</b> DECISION</a><i>→</i><a href="#creative-bridge-title"><b>04</b> CREATIVE</a><i>→</i><a href="#test-loop"><b>05</b> TEST</a><i>→</i><a href="#loop"><b>06</b> LEARN</a>
           </nav>
