@@ -949,7 +949,7 @@ export default function Home() {
                 <span>{video.size ? (video.size / (1024 * 1024)).toFixed(1) + " MB" : "サイズ不明"}</span>
               </div>
               <div className="studio-result-actions">
-                <button type="button" onClick={() => { setVideoUrl(video.url); setVideoError(""); setVideoStatus("完成動画フォルダーから動画を選択しました。"); }}>投稿用動画に設定</button>
+                <button type="button" onClick={() => { setVideoUrl(video.url); setSocialPostId(""); setVideoError(""); setVideoStatus("完成動画フォルダーから動画を選択しました。SNS投稿の準備ができています。"); }}>投稿用動画に設定</button>
                 <a href={video.downloadUrl} download>ダウンロード ↓</a>
               </div>
             </article>
@@ -1405,11 +1405,11 @@ export default function Home() {
             <aside className="loop-gate" aria-label="SNS自動運用への接続">
               <div>
                 <span className="eyebrow">NEXT · AUTOMATION GATE</span>
-                <strong>動画は完成。次はテスト計画を保存して運用ループへ。</strong>
-                <p>保存すると投稿IDが発行され、SNS投稿 → 実績取得 → AI判定 → 次のクリエイティブまで接続できます。</p>
+                <strong>動画単体でもSNSへ投稿できます。</strong>
+                <p>投稿だけなら下のSNS投稿欄を使ってください。テスト計画を保存すると、投稿後の実績取得・AI判定・次のクリエイティブまで運用ループを接続できます。</p>
               </div>
               <button type="button" onClick={() => document.getElementById("test-loop")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
-                テスト計画へ →
+                分析ループを設定 →
               </button>
             </aside>
           )}
