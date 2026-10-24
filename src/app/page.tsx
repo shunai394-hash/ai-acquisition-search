@@ -818,9 +818,9 @@ export default function Home() {
               <a href="#loop">03 <span>Loop</span></a>
             </nav>
           )}
-          <span className="status">ログイン後に生成</span>
+          <span className="status">アカウント接続で開始</span>
           <GoogleSignIn />
-          <a href="#completed-video-library" className="billing-link">動画フォルダー ↓</a>
+          <a href="#completed-video-library" className="billing-link">投稿メディア ↓</a>
           <Link href="/billing" className="billing-link">契約管理</Link>
         </div>
       </header>
@@ -830,7 +830,7 @@ export default function Home() {
           <div>
             <p className="eyebrow">AUTO PUBLISH · SNS OPERATIONS</p>
             <h1 id="auto-publish-home-title">完成動画を、SNSへ自動投稿。</h1>
-            <p>動画を保存し、投稿キューに追加。TikTok連携と自動投稿への同意が済めば、スケジュール処理がキューを順次実行します。</p>
+            <p>手元にある権利確認済みのMP4を保存し、投稿キューへ。TikTok連携・自動投稿への同意・必要な権限がそろった投稿だけを、スケジュール処理が実行します。</p>
           </div>
           <span className="auto-publish-state"><i aria-hidden="true" /> AUTO QUEUE</span>
         </div>
@@ -916,7 +916,7 @@ export default function Home() {
             </article>
           ))}
         </div>}
-        {!completedVideos.length && !libraryLoading && <p className="library-empty">まだ動画はありません。MP4を選択してフォルダーに保存してください。</p>}
+        {!completedVideos.length && !libraryLoading && <p className="library-empty">投稿できるメディアはまだありません。手元にあるMP4を選択して保存し、投稿キューに追加してください。</p>}
       </section>
 
 
