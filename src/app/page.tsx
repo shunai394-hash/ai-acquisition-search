@@ -46,7 +46,7 @@ function subscribeToSearchParams(callback: () => void) {
 
 function getTiktokNotice() {
   const value = new URLSearchParams(window.location.search).get("tiktok");
-  if (value === "connected") return "TikTokアカウントを接続しました。自動投稿を利用できます。";
+  if (value === "connected") return "TikTokアカウントを接続しました。自動投稿には、必要な権限と投稿への同意がそろっていることも必要です。";
   if (value === "error") return "TikTok接続に失敗しました。もう一度接続してください。";
   return "";
 }
@@ -832,7 +832,7 @@ export default function Home() {
             <h1 id="auto-publish-home-title">完成動画を、SNSへ自動投稿。</h1>
             <p>手元にある権利確認済みのMP4を保存し、投稿キューへ。TikTok連携・自動投稿への同意・必要な権限がそろった投稿だけを、スケジュール処理が実行します。</p>
           </div>
-          <span className="auto-publish-state"><i aria-hidden="true" /> AUTO QUEUE</span>
+          <span className="auto-publish-state"><i aria-hidden="true" /> PUBLISH WORKFLOW</span>
         </div>
         <div className="auto-publish-steps" aria-label="自動投稿の手順">
           <span><b>01</b> MP4を保存</span><i aria-hidden="true">→</i>
