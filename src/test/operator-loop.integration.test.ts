@@ -126,7 +126,7 @@ test("cron without the right secret is rejected with a reason (auth is never dis
   assert.equal((await res.json()).reason, "authorization_mismatch");
 });
 
-test("full loop: SNS metrics -> Results -> Teacher PIVOT -> next creative -> video job", async () => {
+test("full loop: SNS metrics -> Results -> Teacher PIVOT -> plan-only next post without video generation", async () => {
   seedPost("p1");
   const res = await operatorLoop(cronRequest());
   const body = await res.json();
@@ -147,13 +147,14 @@ test("full loop: SNS metrics -> Results -> Teacher PIVOT -> next creative -> vid
   const child = db.table("social_posts").find((x) => (x.metadata as Record<string, unknown>)?.source_social_post_id === "p1");
   assert.ok(child, "next post created");
   assert.equal((child!.metadata as Record<string, unknown>).operator_decision_run_id, (run as unknown as { id: string }).id);
-  const job = db.table("production_jobs")[0];
-  assert.equal(job.status, "running");
-  assert.equal(job.request_id, "hf-1");
-  assert.equal(stub.higgsfieldCalls, 1);
+  assert.equal(child!.status, "planned");
+  assert.equal((child!.metadata as Record<string, unknown>).auto_publish, false);
+  assert.equal((child!.metadata as Record<string, unknown>).media_required, true);
+  assert.equal(db.table("production_jobs").length, 0, "SNS-first mode must not create a video job");
+  assert.equal(stub.higgsfieldCalls, 0, "SNS-first mode must not call the video provider");
 });
 
-test("video retry reuses the original reference image", async () => {
+test("SNS-first cron does not retry legacy failed video jobs", async () => {
   db.seed("production_jobs", [{
     id: "job-image-retry",
     user_id: "u1",
@@ -177,14 +178,14 @@ test("video retry reuses the original reference image", async () => {
 
   const body = await (await operatorLoop(cronRequest())).json();
   const jobResult = body.results.find((x: { jobId?: string }) => x.jobId === "job-image-retry");
-  assert.equal(jobResult.status, "running", JSON.stringify(body.results));
-  assert.equal(stub.higgsfieldCalls, 1);
-  assert.equal(stub.higgsfieldBodies[0].image_url, "https://8.8.8.8/product-reference.webp");
-  const retryJob = db.table("production_jobs")[0] as { provider_response: Record<string, unknown> };
+  assert.equal(jobResult, undefined, "failed generation jobs are not picked up in SNS-first mode");
+  assert.equal(stub.higgsfieldCalls, 0);
+  const retryJob = db.table("production_jobs")[0] as { status: string; provider_response: Record<string, unknown> };
+  assert.equal(retryJob.status, "failed");
   assert.equal(retryJob.provider_response.input_image_url, "https://8.8.8.8/product-reference.webp");
 });
 
-test("next creative carries the reference image into the queued video job", async () => {
+test("next creative remains a plan and never queues a video job in SNS-first mode", async () => {
   seedPost("p1");
   const creative = db.table("creatives").find((x) => x.id === "c1");
   creative!.scenario = {
@@ -200,10 +201,12 @@ test("next creative carries the reference image into the queued video job", asyn
   }));
   const body = await res.json();
   assert.equal(res.status, 201, JSON.stringify(body));
-  const job = db.table("production_jobs")[0];
-  assert.equal(job.model, "alibaba/wan-3.0-prime/image-to-video");
-  assert.equal((job.provider_response as Record<string, unknown>).input_image_url, "https://8.8.8.8/product-reference.webp");
-  assert.equal(body.video.imageReference, true);
+  assert.equal(db.table("production_jobs").length, 0, "requesting autoGenerate must not create a video job in SNS-first mode");
+  assert.equal(body.video, null);
+  const nextPost = db.table("social_posts").find((x) => (x.metadata as Record<string, unknown>)?.source_social_post_id === "p1");
+  assert.equal(nextPost?.status, "planned");
+  assert.equal((nextPost?.metadata as Record<string, unknown>).auto_publish, false);
+  assert.equal((nextPost?.metadata as Record<string, unknown>).media_required, true);
 });
 
 test("two concurrent cron runs: one is skipped, nothing is duplicated", async () => {
@@ -214,8 +217,8 @@ test("two concurrent cron runs: one is skipped, nothing is duplicated", async ()
   assert.equal(db.table("post_metrics").length, 1);
   assert.equal(db.table("operator_runs").filter((x) => x.run_type === "ai_performance_verdict").length, 1);
   assert.equal(db.table("social_posts").length, 2);
-  assert.equal(db.table("production_jobs").length, 1);
-  assert.equal(stub.higgsfieldCalls, 1);
+  assert.equal(db.table("production_jobs").length, 0);
+  assert.equal(stub.higgsfieldCalls, 0);
   assert.equal(db.table("operator_leases").length, 0, "lease released");
 });
 
