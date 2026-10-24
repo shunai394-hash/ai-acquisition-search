@@ -1436,3 +1436,36 @@ body {
 .auto-publish-setup a{display:inline-block;padding:12px 15px;border-radius:12px;background:#fff;color:#07090d;text-decoration:none;font-weight:700;font-size:12px;white-space:nowrap}
 .auto-publish-consent{margin-top:16px}.auto-publish-notice{color:#b9ffcf;font-size:12px}
 @media(max-width:700px){.auto-publish-home{padding:20px 16px;margin-top:16px}.auto-publish-home-head{flex-direction:column}.auto-publish-state{align-self:flex-start}.auto-publish-setup{align-items:flex-start;flex-direction:column}.auto-publish-setup a{width:100%;text-align:center}.auto-publish-steps{gap:8px}.auto-publish-steps span{font-size:11px}}
+
+
+/* SNS-operations-first product direction: generation UI is intentionally out of the primary workflow. */
+.video-studio,
+.creative-bridge,
+.video-generator{display:none!important}
+
+/* Interaction polish and accessibility */
+:where(a,button,input,textarea,select,[tabindex]):focus-visible{
+  outline:2px solid #d9f99d;
+  outline-offset:3px;
+}
+button,a,input,textarea,select{ -webkit-tap-highlight-color:transparent; }
+button{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,opacity .18s ease}
+button:not(:disabled):active{transform:translateY(1px)}
+a{transition:color .18s ease,opacity .18s ease}
+input,textarea,select{max-width:100%}
+img,video{max-width:100%}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}
+@media(max-width:700px){
+  .auto-publish-home,.completed-video-library{min-width:0}
+  .auto-publish-steps{flex-wrap:wrap;gap:10px}
+  .auto-publish-steps>i{display:none}
+  .auto-publish-setup{flex-wrap:wrap;align-items:flex-start}
+  .tiktok-connect-link{max-width:100%;white-space:normal}
+}
