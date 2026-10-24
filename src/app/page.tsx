@@ -96,6 +96,7 @@ export default function Home() {
   const [studioStatus, setStudioStatus] = useState("");
   const [studioUrl, setStudioUrl] = useState("");
   const [completedVideos, setCompletedVideos] = useState<Array<{ name: string; storagePath: string; size: number | null; createdAt: string | null; url: string; downloadUrl: string }>>([]);
+  const [libraryPublishPostId, setLibraryPublishPostId] = useState("");
   const [libraryFile, setLibraryFile] = useState<File | null>(null);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryUploading, setLibraryUploading] = useState(false);
@@ -667,10 +668,10 @@ export default function Home() {
       if (current()) { videoLock.current = false; setVideoGenerating(false); }
     }
   }
-  async function publishGeneratedVideo(sourceUrl = videoUrl) {
+  async function publishGeneratedVideo(sourceUrl = videoUrl, sourcePostId = libraryPublishPostId || socialPostId) {
     if (publishLock.current) return;
     if (!sourceUrl) return;
-    if (!socialPostId) {
+    if (!sourcePostId) {
       setVideoError("先に「このテスト計画を保存」して、投稿先を紐づけてください。");
       return;
     }
@@ -690,7 +691,7 @@ export default function Home() {
       const response = await fetch("/api/social/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ socialPostId, videoUrl: sourceUrl, caption, platforms: eligiblePublishPlatforms }),
+        body: JSON.stringify({ socialPostId: sourcePostId, videoUrl: sourceUrl, caption, platforms: eligiblePublishPlatforms }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "SNS投稿に失敗しました。");
@@ -702,6 +703,31 @@ export default function Home() {
     } finally {
       publishLock.current = false;
       setPublishGenerating(false);
+    }
+  }
+
+  async function prepareCompletedVideoForPublishing(video: { name: string; storagePath: string; url: string }) {
+    setLibraryMessage("");
+    setVideoError("");
+    setVideoUrl(video.url);
+    setLibraryPublishPostId("");
+    try {
+      const token = await getAccessToken();
+      const response = await fetch("/api/social/library-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ storagePath: video.storagePath, caption: publishCaption.trim() }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || typeof body.socialPostId !== "string") {
+        throw new Error(body.error || "SNS投稿の準備に失敗しました。");
+      }
+      setLibraryPublishPostId(body.socialPostId);
+      setLibraryMessage("投稿用に設定しました。投稿先と本文を確認して「選択したSNSへ投稿」を押してください。");
+      setPublishStatus("");
+      setPublishResults([]);
+    } catch (err) {
+      setLibraryMessage(userFacingClientError(err, "SNS投稿の準備に失敗しました。"));
     }
   }
 
@@ -938,7 +964,7 @@ export default function Home() {
                 <span>{video.size ? (video.size / (1024 * 1024)).toFixed(1) + " MB" : "サイズ不明"}</span>
               </div>
               <div className="studio-result-actions">
-                <button type="button" onClick={() => { setVideoUrl(video.url); setVideoError(""); setVideoStatus("完成動画フォルダーから動画を選択しました。"); }}>投稿用動画に設定</button>
+                <button type="button" onClick={() => { void prepareCompletedVideoForPublishing(video); }}>SNS投稿の準備</button>
                 <a href={video.downloadUrl} download>ダウンロード ↓</a>
               </div>
             </article>
@@ -1402,7 +1428,7 @@ export default function Home() {
               </button>
             </aside>
           )}
-          {(videoUrl || studioUrl) && socialPostId && (
+          {(videoUrl || studioUrl) && (socialPostId || libraryPublishPostId) && (
             <section className="next publisher-loop" aria-labelledby="publisher-title">
               <p className="eyebrow">PUBLISH · AUTOMATION READY</p>
               <h2 id="publisher-title">完成した動画を、そのままSNSへ。</h2>
