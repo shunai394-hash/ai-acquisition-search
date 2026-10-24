@@ -5,8 +5,26 @@ import { DECISION_RUN_TYPE, isProcessingRun, reservationLeaseExpiry } from "@/li
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+function makePrompt(input: {
+  title: string; originalHook: string; changedAngle?: string; changedHook?: string;
+  nextAction: string; network: string;
+}) {
+  return [
+    "Create the next short-form advertising video for iterative acquisition testing.",
+    "Product/creative: " + input.title,
+    "Original hook: " + input.originalHook,
+    "Network: " + input.network,
+    "Decision: " + input.nextAction,
+    input.changedAngle ? "Changed angle: " + input.changedAngle : "",
+    input.changedHook ? "Changed hook: " + input.changedHook : "",
+    "Use natural UGC-style visuals, 9:16, clear first 3 seconds, no fake claims, no watermark, no platform UI.",
+    "Keep the product recognizable and make the change from the previous creative explicit in the hook or angle.",
+  ].filter(Boolean).join("\n");
+}
+
 export async function POST(request: Request) {
   let userId = "";
+  let jobId = "";
   let nextCreativeId = "";
   let nextPostId = "";
   let operatorRunId = "";
@@ -169,7 +187,7 @@ export async function POST(request: Request) {
       creative_id: nextCreative.id,
       user_id: user.id,
       network: post.network,
-      status: "planned",
+      status: "scheduled",
       caption: post.caption || hook,
       metadata: {
         source_social_post_id: post.id,
@@ -178,9 +196,7 @@ export async function POST(request: Request) {
         operator_decision_run_id: latestVerdict?.id ?? null,
         iteration_angle: angle,
         test_metric: body.testMetric || "CTR / CVR / ROAS",
-        auto_publish: false,
-        media_required: true,
-        plan_only: true,
+        auto_publish: true,
       }
     }).select("id,network,status,caption,metadata").single();
     if (nextPostError || !nextPost) throw new Error(nextPostError?.message || "次の投稿レコード作成に失敗しました。");
@@ -196,8 +212,44 @@ export async function POST(request: Request) {
       ? scenarioRecord.input_image_path
       : undefined;
 
-    // SNS-first mode creates a plan only; it never creates a production_jobs row.
-    const video = null;
+    let video = null;
+    if (body.autoGenerate !== false) {
+      const prompt = makePrompt({
+        title: String(nextCreative.title || creative.title || "広告"),
+        originalHook: String(creative.hook || ""),
+        changedAngle: angle,
+        changedHook: hook,
+        nextAction,
+        network: post.network,
+      });
+
+      const { data: job, error: jobError } = await db.from("production_jobs").insert({
+        user_id: user.id,
+        social_post_id: nextPost.id,
+        creative_id: nextCreative.id,
+        provider: "higgsfield",
+        model: inputImageUrl || inputImagePath ? "alibaba/wan-3.0-prime/image-to-video" : (process.env.HF_VIDEO_MODEL || "alibaba/wan-3.0/text-to-video"),
+        status: "queued",
+        prompt,
+        duration: 5,
+        resolution: "1080p",
+        aspect_ratio: "9:16",
+        generate_audio: false,
+        provider_response: inputImageUrl || inputImagePath
+          ? {
+            ...(inputImageUrl ? { input_image_url: inputImageUrl } : {}),
+            ...(inputImagePath ? { input_image_path: inputImagePath, input_image_bucket: "video-inputs" } : {}),
+          }
+          : null
+      }).select("id").single();
+      if (jobError || !job) throw new Error(jobError?.message || "動画生成ジョブの作成に失敗しました。");
+      jobId = job.id;
+
+      // Higgsfieldはここでは開始しない。
+      // next-creativeはproduction_jobs=queuedまででHTTP処理を終了し、
+      // operator-loopのWorker処理がqueued Jobを取得してHiggsfieldを開始する。
+      video = { jobId, requestId: null, status: "queued", imageReference: Boolean(inputImageUrl || inputImagePath) };
+    }
 
     const { data: run, error: runError } = await db.from("operator_runs").insert({
       product_id: creative.product_id,
@@ -218,6 +270,7 @@ export async function POST(request: Request) {
       const db = getAdminSupabase();
       // 途中生成物を残すと、次回Cronが「既に生成済み」と誤認するため、
       // このリクエストで作った行だけをロールバックする。
+      if (jobId) await db.from("production_jobs").delete().eq("id", jobId).eq("user_id", userId);
       if (operatorRunId) await db.from("operator_runs").delete().eq("id", operatorRunId).eq("user_id", userId);
       if (nextPostId) await db.from("social_posts").delete().eq("id", nextPostId).eq("user_id", userId);
       if (nextCreativeId) await db.from("creatives").delete().eq("id", nextCreativeId).eq("user_id", userId);
