@@ -1,8 +1,8 @@
-# AI Acquisition Search — SNS Auto-Publishing Platform
+# AI Acquisition Search — AI Video Production & SNS Automation Platform
 
-AI Acquisition Search helps creators and businesses publish existing media to connected social accounts, on a controlled schedule, and learn from real post results.
+AI Acquisition Search is an AI-directed video production platform with integrated SNS publishing. Users can start from a prompt and optional product/reference images, generate video through configured providers, then review, schedule and publish authorized media to connected social accounts.
 
-**Primary product: SNS publishing operations.** Video generation is out of scope for the active product direction. Users bring an existing MP4, image, caption, or approved creative asset; the platform manages account authorization, preflight checks, queueing, scheduled publishing, provider-confirmed status, retries/reconciliation, and performance tracking. Never present a mock state as a successful post.
+**Primary workflow: brief → AI direction → video generation → review → authorized SNS publishing → performance learning.** Existing MP4s and images must also be publishable without regeneration. Never present an unconfigured provider or mock state as a successful generation or post.
 
 ## Product priorities
 
@@ -66,8 +66,8 @@ TIKTOK_TOKEN_ENCRYPTION_KEY=...
 
 TikTok publishing requires a registered app with the relevant products/scopes, matching callback URL, user-authorized account, and any required platform review. Unreviewed clients may be limited to private/test visibility.
 
-### Optional media providers
-Existing media is the product input. Any legacy video-generation provider integration is not part of the primary product workflow and must not be presented as the main feature.
+### Video generation and narration
+Configure the video provider and narration/audio credentials required by the active generation adapters. Provider/model availability depends on the connected account and secrets. Existing media upload remains available when generation is unavailable.
 
 ## Quality standard
 
