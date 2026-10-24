@@ -820,6 +820,7 @@ export default function Home() {
           )}
           <span className="status">ログイン後に生成</span>
           <GoogleSignIn />
+          <a href="#completed-video-library" className="billing-link">動画フォルダー ↓</a>
           <Link href="/billing" className="billing-link">契約管理</Link>
         </div>
       </header>
@@ -828,11 +829,11 @@ export default function Home() {
         <div className="hero-grid">
           <div className="hero-copy">
             <p className="eyebrow hero-eyebrow"><span className="hero-eyebrow-mark" aria-hidden="true"></span> AI VIDEO DIRECTION / 01</p>
-            <h1 id="hero-title">最初の0.5秒から、<br /><span>映像を設計する。</span></h1>
-            <p className="lead">写真1枚でも、言葉だけでも。作りたい世界を伝えれば、動き・カメラ・光まで指示できる動画スタジオ。派手な映像も、静かなシネマも、あなたの意図から始まります。</p>
+            <h1 id="hero-title">動画を入れて、<br /><span>SNSへ届ける。</span></h1>
+            <p className="lead">完成したMP4をアップロード。投稿先と本文を確認して、TikTokなどのSNS投稿へ。動画生成よりも、完成動画の保管・投稿準備・投稿状況を中心にした運用画面です。</p>
             <div className="hero-actions">
-              <a className="hero-primary" href="#video-studio">スタジオでつくる <span aria-hidden="true">↗</span></a>
-              <a className="hero-text-link" href="#how-it-works">制作の流れを見る <span aria-hidden="true">↓</span></a>
+              <a className="hero-primary" href="#completed-video-library">動画をアップロード <span aria-hidden="true">↗</span></a>
+              <a className="hero-text-link" href="#video-studio">動画を新規作成する <span aria-hidden="true">↓</span></a>
             </div>
             <div className="hero-proof">
               <div><b>01 / OPENING</b><strong>冒頭の一瞬</strong><span>0.5秒の見せ方を選び、最初の構図と動きを演出します。</span></div>
@@ -858,6 +859,46 @@ export default function Home() {
         <div id="how-it-works" className="hero-loop" aria-label="動画制作の流れ"><span>IDEA</span><i>→</i><span>DIRECT</span><i>→</i><span>GENERATE</span><i>→</i><span>REVIEW</span><i>→</i><span>REFINE</span></div>
         <p className="hero-note">冒頭演出は生成プロンプトに反映されます。視聴維持率そのものを保証する機能ではありません。</p>
       </section>
+
+      <section id="completed-video-library" className="panel completed-video-library" aria-labelledby="completed-video-library-title">
+        <div className="studio-result-head">
+          <div>
+            <p className="eyebrow">06 · VIDEO LIBRARY</p>
+            <h2 id="completed-video-library-title">完成動画フォルダー</h2>
+            <p>PCに保存済みのMP4動画をアップロードして保管。ここからプレビューやダウンロードができます。</p>
+          </div>
+          <span className="studio-result-state">{completedVideos.length} FILE{completedVideos.length === 1 ? "" : "S"}</span>
+        </div>
+        <div className="library-upload-row">
+          <label className="library-file-label" htmlFor="completed-video-file">完成したMP4動画を選択</label>
+          <input id="completed-video-file" type="file" accept="video/mp4,.mp4" onChange={(event) => setLibraryFile(event.target.files?.[0] ?? null)} aria-label="保存するMP4動画" />
+          <button type="button" onClick={() => { void uploadCompletedVideo(); }} disabled={!libraryFile || libraryUploading}>
+            {libraryUploading ? "保存中…" : "フォルダーに保存"}
+          </button>
+          <button type="button" className="secondary-button" onClick={() => { void loadCompletedVideos(); }} disabled={libraryLoading}>
+            {libraryLoading ? "読み込み中…" : "保存済みを表示"}
+          </button>
+        </div>
+        <p className="video-status">MP4 / 最大250MB。動画はログイン中のアカウント専用領域に保存されます。</p>
+        {libraryMessage && <p className={libraryMessage.includes("保存しました") ? "video-status" : "error"} role="status" aria-live="polite">{libraryMessage}</p>}
+        {completedVideos.length > 0 && <div className="completed-video-grid">
+          {completedVideos.map((video) => (
+            <article className="completed-video-card" key={video.storagePath}>
+              <video src={video.url} controls playsInline preload="metadata" aria-label={video.name + "のプレビュー"} />
+              <div className="completed-video-card-copy">
+                <strong title={video.name}>{video.name}</strong>
+                <span>{video.size ? (video.size / (1024 * 1024)).toFixed(1) + " MB" : "サイズ不明"}</span>
+              </div>
+              <div className="studio-result-actions">
+                <button type="button" onClick={() => { void prepareCompletedVideoForPublishing(video); }}>SNS投稿の準備</button>
+                <a href={video.downloadUrl} download>ダウンロード ↓</a>
+              </div>
+            </article>
+          ))}
+        </div>}
+        {!completedVideos.length && !libraryLoading && <p className="library-empty">まだ動画はありません。MP4を選択してフォルダーに保存してください。</p>}
+      </section>
+
 
       <section id="video-studio" className="video-studio" aria-labelledby="video-studio-title">
         <div className="studio-kicker-row"><span className="studio-live-dot" aria-hidden="true"></span><span>動画スタジオ</span><span className="studio-divider">/</span><span>画像と文章</span></div>
@@ -932,45 +973,6 @@ export default function Home() {
         {videoError && !result && <p className="error" role="alert">{videoError}</p>}
         {videoUrl && !result && <div className="studio-result"><video src={videoUrl} controls playsInline preload="metadata" aria-label="前回復元した動画のプレビュー" /><p><a href={videoUrl} target="_blank" rel="noreferrer">完成動画を開く →</a></p></div>}
         {studioUrl && <div className="studio-result"><div className="studio-result-head"><div><span className="eyebrow">05 · OUTPUT</span><strong>生成結果</strong></div><span className="studio-result-state">READY</span></div><video src={studioUrl} controls playsInline preload="metadata" aria-label="生成した動画のプレビュー" onError={() => { void refreshStudioVideoUrl(); }} /><div className="studio-result-actions"><button type="button" onClick={() => { void generateStudioVideo(); }} disabled={studioGenerating}>同じ条件でもう一度</button><button type="button" onClick={() => { void generateStudioVideo("Try a materially different camera movement, pacing, composition, and lighting while keeping the same product and message."); }} disabled={studioGenerating}>画角と光を変えて再生成</button><a href={studioUrl} target="_blank" rel="noreferrer">新しいタブで開く →</a><a href={downloadUrl(studioUrl)} download>動画を保存 ↓</a></div></div>}
-      </section>
-
-      <section className="panel completed-video-library" aria-labelledby="completed-video-library-title">
-        <div className="studio-result-head">
-          <div>
-            <p className="eyebrow">06 · VIDEO LIBRARY</p>
-            <h2 id="completed-video-library-title">完成動画フォルダー</h2>
-            <p>PCに保存済みのMP4動画をアップロードして保管。ここからプレビューやダウンロードができます。</p>
-          </div>
-          <span className="studio-result-state">{completedVideos.length} FILE{completedVideos.length === 1 ? "" : "S"}</span>
-        </div>
-        <div className="library-upload-row">
-          <label className="library-file-label" htmlFor="completed-video-file">完成したMP4動画を選択</label>
-          <input id="completed-video-file" type="file" accept="video/mp4,.mp4" onChange={(event) => setLibraryFile(event.target.files?.[0] ?? null)} aria-label="保存するMP4動画" />
-          <button type="button" onClick={() => { void uploadCompletedVideo(); }} disabled={!libraryFile || libraryUploading}>
-            {libraryUploading ? "保存中…" : "フォルダーに保存"}
-          </button>
-          <button type="button" className="secondary-button" onClick={() => { void loadCompletedVideos(); }} disabled={libraryLoading}>
-            {libraryLoading ? "読み込み中…" : "保存済みを表示"}
-          </button>
-        </div>
-        <p className="video-status">MP4 / 最大250MB。動画はログイン中のアカウント専用領域に保存されます。</p>
-        {libraryMessage && <p className={libraryMessage.includes("保存しました") ? "video-status" : "error"} role="status" aria-live="polite">{libraryMessage}</p>}
-        {completedVideos.length > 0 && <div className="completed-video-grid">
-          {completedVideos.map((video) => (
-            <article className="completed-video-card" key={video.storagePath}>
-              <video src={video.url} controls playsInline preload="metadata" aria-label={video.name + "のプレビュー"} />
-              <div className="completed-video-card-copy">
-                <strong title={video.name}>{video.name}</strong>
-                <span>{video.size ? (video.size / (1024 * 1024)).toFixed(1) + " MB" : "サイズ不明"}</span>
-              </div>
-              <div className="studio-result-actions">
-                <button type="button" onClick={() => { void prepareCompletedVideoForPublishing(video); }}>SNS投稿の準備</button>
-                <a href={video.downloadUrl} download>ダウンロード ↓</a>
-              </div>
-            </article>
-          ))}
-        </div>}
-        {!completedVideos.length && !libraryLoading && <p className="library-empty">まだ動画はありません。MP4を選択してフォルダーに保存してください。</p>}
       </section>
 
       <section className="url-analysis-secondary" aria-labelledby="url-analysis-title">
