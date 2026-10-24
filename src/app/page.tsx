@@ -670,10 +670,6 @@ export default function Home() {
   async function publishGeneratedVideo(sourceUrl = videoUrl) {
     if (publishLock.current) return;
     if (!sourceUrl) return;
-    if (!socialPostId) {
-      setVideoError("先に「このテスト計画を保存」して、投稿先を紐づけてください。");
-      return;
-    }
     const eligiblePublishPlatforms = publishPlatforms.filter((platform) => platform !== "tiktok" || tiktokConsent);
     if (!eligiblePublishPlatforms.length) {
       setVideoError("投稿先を1つ以上選択してください。TikTokは公開前の明示的な同意が必要です。");
@@ -686,11 +682,26 @@ export default function Home() {
     setPublishResults([]);
     try {
       const token = await getAccessToken();
-      const caption = publishCaption.trim() || result?.analysis?.nextPosts?.[selectedScenario]?.hook || result?.analysis?.decision?.valueProposition || "AI Acquisition Search creative";
+      const caption = publishCaption.trim() || result?.analysis?.nextPosts?.[selectedScenario]?.hook || result?.analysis?.decision?.valueProposition || "完成動画を公開します。";
+      let publishSourceId = socialPostId;
+      if (!publishSourceId) {
+        setPublishStatus("投稿用の動画・本文を準備中…");
+        const prepareResponse = await fetch("/api/social/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ videoUrl: sourceUrl, caption, platforms: eligiblePublishPlatforms }),
+        });
+        const prepareBody = await prepareResponse.json().catch(() => ({}));
+        if (!prepareResponse.ok || typeof prepareBody.socialPostId !== "string") {
+          throw new Error(prepareBody.error || "SNS投稿の準備に失敗しました。");
+        }
+        publishSourceId = prepareBody.socialPostId;
+        setSocialPostId(publishSourceId);
+      }
       const response = await fetch("/api/social/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ socialPostId, videoUrl: sourceUrl, caption, platforms: eligiblePublishPlatforms }),
+        body: JSON.stringify({ socialPostId: publishSourceId, videoUrl: sourceUrl, caption, platforms: eligiblePublishPlatforms }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "SNS投稿に失敗しました。");
@@ -1402,7 +1413,7 @@ export default function Home() {
               </button>
             </aside>
           )}
-          {(videoUrl || studioUrl) && socialPostId && (
+          {(videoUrl || studioUrl) && (
             <section className="next publisher-loop" aria-labelledby="publisher-title">
               <p className="eyebrow">PUBLISH · AUTOMATION READY</p>
               <h2 id="publisher-title">完成した動画を、そのままSNSへ。</h2>
