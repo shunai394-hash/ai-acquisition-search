@@ -7,6 +7,7 @@ import BillingButton from "@/components/BillingButton";
 import Link from "next/link";
 import type { AcquisitionAnalyzeResult, EcPulseResearchBundle, EcPulseResearchRun } from "@/lib/acquisition/types";
 import { ANALYSIS_VIDEO_JOB_STORAGE_KEY, forgetJob, parseStoredJobId, rememberJob, STUDIO_JOB_STORAGE_KEY, userFacingClientError } from "@/lib/video/studio-session";
+import { audioTrackFromAsset } from "@/lib/video/media-probe";
 
 function List({ items }: { items: string[] }) {
   return (
@@ -351,7 +352,7 @@ export default function Home() {
         if (poll.status === 401 || poll.status === 404) throw Object.assign(new Error(data.error || "動画ジョブを確認できません。"), { fatal: true });
         if (!poll.ok) throw new Error(data.error || "動画生成状態の取得に失敗しました。");
         consecutiveErrors = 0;
-        if (data.job?.status === "completed" && data.asset?.video_url) return { status: "completed" as const, videoUrl: String(data.asset.video_url), hasAudioTrack: typeof data.asset.has_audio_track === "boolean" ? data.asset.has_audio_track as boolean : null };
+        if (data.job?.status === "completed" && data.asset?.video_url) { return { status: "completed" as const, videoUrl: String(data.asset.video_url), hasAudioTrack: audioTrackFromAsset(data.asset) }; }
         if (data.job?.status === "failed") return { status: "failed" as const, error: String(data.job?.error || "動画生成に失敗しました。") };
         onProgress(Math.round((Date.now() - started) / 1000), String(data.job?.provider_status || ""));
       } catch (error) {
@@ -566,7 +567,7 @@ export default function Home() {
             ? "完成しましたが、生成動画に音声トラックが含まれていません（ナレーション/BGMは反映されていません）。"
             : "完成しました。プレビューで確認できます。");
           if (!result) standaloneDraftKey.current = "";
-          if (currentSocialPostId && autoPublishPlatforms.length) {
+          if (currentSocialPostId && autoPublishPlatforms.length && !(audioUrl && outcome.hasAudioTrack === false)) {
             setPublishStatus("完成動画をSNSへ自動投稿中…");
             try {
               const publishToken = await getAccessToken();
@@ -584,6 +585,8 @@ export default function Home() {
               setPublishStatus("");
               setStudioError(publishError instanceof Error ? publishError.message : "SNS自動投稿に失敗しました。");
             }
+          } else if (currentSocialPostId && autoPublishPlatforms.length && audioUrl && outcome.hasAudioTrack === false) {
+            setPublishStatus("自動投稿を停止しました。完成動画に音声トラックがなく、ナレーション/BGMが反映されていないためです。音声を確認してから再生成してください。");
           }
           return;
         }

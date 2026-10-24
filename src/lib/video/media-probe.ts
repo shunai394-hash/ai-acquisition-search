@@ -114,3 +114,15 @@ export function mp4HasAudioTrack(bytes: Uint8Array): boolean | null {
   if (sawAudioSamples && audioSamples === 0) return false;
   return true;
 }
+
+
+/** Read the persisted audio-track flag from the video-job API asset shape. */
+export function audioTrackFromAsset(asset: unknown): boolean | null {
+  if (!asset || typeof asset !== "object" || Array.isArray(asset)) return null;
+  const record = asset as Record<string, unknown>;
+  if (typeof record.has_audio_track === "boolean") return record.has_audio_track;
+  const metadata = record.metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const nested = (metadata as Record<string, unknown>).has_audio_track;
+  return typeof nested === "boolean" ? nested : null;
+}
