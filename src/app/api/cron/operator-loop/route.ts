@@ -206,7 +206,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
         continue;
       }
 
-      // STOP: never generate. WAIT (insufficient data): re-evaluate on a later run.
+      // STOP: never create a next plan. WAIT (insufficient data): re-evaluate later. For continue/pivot, create a plan only; this SNS-first product no longer auto-generates videos.
       const verdict = decision.payload?.verdict;
       if (verdict === "stop" || verdict === "wait" || decision.payload?.generateCreative === false) {
         results.push({
@@ -227,7 +227,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
         changedAngle: decision.payload?.changedAngle,
         changedHook: decision.payload?.changedHook,
         testMetric: decision.payload?.testMetric,
-        autoGenerate: true,
+        autoGenerate: false,
       });
 
       results.push({
