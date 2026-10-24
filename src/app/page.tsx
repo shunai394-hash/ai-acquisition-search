@@ -820,6 +820,7 @@ export default function Home() {
           )}
           <span className="status">ログイン後に生成</span>
           <GoogleSignIn />
+          <a href="#completed-video-library" className="billing-link">動画フォルダー ↓</a>
           <Link href="/billing" className="billing-link">契約管理</Link>
         </div>
       </header>
