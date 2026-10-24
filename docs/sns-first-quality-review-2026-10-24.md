@@ -22,15 +22,15 @@ Review standard: award-caliber craft inspired by Awwwards, The Webby Awards and 
 
 ## Release gates — not yet passed
 
-- [ ] GitHub Actions checks (typecheck, lint, tests, build) complete successfully on the latest PR commit.
+- [x] GitHub Actions checks (typecheck, lint, tests, build) passed on commit `3d98b69d5d661723ac39459fcc0315cf99be03c2` (181 tests: 181 total, 0 failed). A documentation-only follow-up may trigger a fresh CI run.
 - [ ] Preview browser review at mobile, tablet and desktop sizes.
 - [ ] Keyboard-only and reduced-motion walkthrough.
 - [ ] TikTok OAuth completes with a real authorized account and the state cookie validates.
 - [ ] Immediate publishing test returns a provider-confirmed status and real post ID/URL.
 - [ ] Scheduled publishing test runs at the requested local time and reconciles provider state without duplicate posts.
 - [ ] Queue failures, expired/revoked tokens, ambiguous timeouts and retry behavior verified.
-- [ ] Confirm no new video-generation job is created by the scheduled operator loop.
+- [x] CI integration tests confirm the scheduled operator loop does not create or retry video-generation jobs.
 
 ## Current conclusion
 
-Ten implementation iterations have been applied to the branch, but **the quality cycle is not complete**. The latest GitHub check was still running at the time of this note, and no live TikTok post or scheduled-post result has been verified. Do not merge or claim production readiness until the applicable release gates pass. A deployment/build alone does not prove OAuth or posting works.
+Ten implementation iterations have been applied to the branch, but **the quality cycle is not complete**. GitHub Actions typecheck, tests, decision backtest, build and lint passed on commit `3d98b69d5d661723ac39459fcc0315cf99be03c2`. A Vercel preview for that commit reached `READY`. The preview could not be inspected through the available public-page viewer, and no live TikTok OAuth or post/scheduled-post result has been verified. Do not claim end-to-end posting readiness until those release gates pass. A deployment/build alone does not prove OAuth or posting works.
