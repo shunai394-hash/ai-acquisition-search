@@ -227,7 +227,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
         changedAngle: decision.payload?.changedAngle,
         changedHook: decision.payload?.changedHook,
         testMetric: decision.payload?.testMetric,
-        autoGenerate: false,
+        autoGenerate: true,
       });
 
       results.push({
@@ -433,7 +433,7 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
   const jobColumns = "id,user_id,social_post_id,status,request_id,prompt,duration,resolution,aspect_ratio,model,generate_audio,provider_response,error,created_at,started_at";
   const { data: activeJobs, error: activeJobsError } = await db.from("production_jobs")
     .select(jobColumns)
-    .eq("status", "running")
+    .in("status", ["queued", "running"])
     .is("provider_response->>terminal", null)
     .is("provider_response->>manual_recovery_required", null)
     .order("created_at", { ascending: true })
