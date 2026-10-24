@@ -10,8 +10,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "AI Acquisition Search | AI動画制作スタジオ",
-  description: "文章や画像から、広告・SNSショート・MV・ブランド映像・商品動画などを制作。AIディレクターが企画と演出を整理し、接続済みの生成エンジンで映像制作を支援します。",
+  title: "AI Acquisition Search | SNS自動投稿オペレーション",
+  description: "既存の動画・画像を、接続済みSNSへ安全に予約投稿。投稿キュー、アカウント連携、公開状態、実績の確認をひとつに。",
   applicationName: "AI Acquisition Search",
   category: "business",
   icons: {
@@ -23,14 +23,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ja_JP",
-    title: "AI Acquisition Search | 写真とプロンプトから動画をつくる",
-    description: "文章や画像から、広告・SNSショート・MV・ブランド映像・商品動画などを制作。作りたい映像を自分の言葉で指示できます。",
+    title: "AI Acquisition Search | SNSへの投稿を自動化",
+    description: "手元のメディアをSNSへ予約投稿し、投稿状況と実際の成果を一元管理。",
     siteName: "AI Acquisition Search",
   },
   twitter: {
     card: "summary",
     title: "AI Acquisition Search | 写真とプロンプトから動画をつくる",
-    description: "画像と自由なプロンプトから動画を生成。作りたい映像を自分の言葉で指示できます。",
+    description: "既存メディアのSNS予約投稿・投稿状況・実績管理をひとつに。",
   },
 };
 
