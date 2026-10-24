@@ -434,7 +434,6 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
   const { data: activeJobs, error: activeJobsError } = await db.from("production_jobs")
     .select(jobColumns)
     .eq("status", "running")
-    .not("request_id", "is", null)
     .is("provider_response->>terminal", null)
     .is("provider_response->>manual_recovery_required", null)
     .order("created_at", { ascending: true })
