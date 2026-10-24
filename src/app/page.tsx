@@ -127,6 +127,7 @@ export default function Home() {
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["tiktok"]);
   const [publishCaption, setPublishCaption] = useState("");
   const [tiktokConsent, setTiktokConsent] = useState(false);
+  const [tiktokConnecting, setTiktokConnecting] = useState(false);
   const [publishGenerating, setPublishGenerating] = useState(false);
   const [publishStatus, setPublishStatus] = useState("");
   const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; pending?: boolean; url?: string; error?: string }>>([]);
@@ -211,6 +212,27 @@ export default function Home() {
     const { data } = await supabase.auth.getSession();
     if (!data.session) throw new Error("先にGoogleでログインしてください。");
     return data.session.access_token;
+  }
+
+  async function connectTikTokAccount() {
+    if (tiktokConnecting) return;
+    setTiktokConnecting(true);
+    setVideoError("");
+    try {
+      const token = await getAccessToken();
+      const response = await fetch("/api/tiktok/connect?format=json", {
+        headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+        cache: "no-store",
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || typeof body.url !== "string") {
+        throw new Error(body.error || "TikTok接続を開始できませんでした。");
+      }
+      window.location.assign(body.url);
+    } catch (error) {
+      setVideoError(error instanceof Error ? error.message : "TikTok接続を開始できませんでした。");
+      setTiktokConnecting(false);
+    }
   }
 
   async function analyze(e?: FormEvent) {
@@ -844,7 +866,7 @@ export default function Home() {
             <strong>TikTokアカウント</strong>
             <p>投稿先アカウントを接続し、自動投稿を許可してください。</p>
           </div>
-          <a className="tiktok-connect-link" href="/api/tiktok/connect">TikTokを接続 →</a>
+          <button type="button" className="tiktok-connect-link" onClick={() => { void connectTikTokAccount(); }} disabled={tiktokConnecting}>{tiktokConnecting ? "接続先を準備中…" : "TikTokを接続 →"}</button>
         </div>
         <label className="publish-consent auto-publish-consent">
           <input
@@ -1475,7 +1497,7 @@ export default function Home() {
               />
               {publishPlatforms.includes("tiktok") && (
                 <div className="tiktok-connect-box">
-                  <a href="/api/tiktok/connect" className="tiktok-connect-link">TikTokアカウントを接続 →</a>
+                  <button type="button" className="tiktok-connect-link" onClick={() => { void connectTikTokAccount(); }} disabled={tiktokConnecting}>{tiktokConnecting ? "接続先を準備中…" : "TikTokアカウントを接続 →"}</button>
                   <span>ユーザーごとのTikTok OAuthで安全に投稿します。</span>
                 </div>
               )}
