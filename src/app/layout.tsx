@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "AI Acquisition Search | 写真とプロンプトから動画をつくる",
+    title: "AI Acquisition Search | SNS自動投稿オペレーション",
     description: "既存メディアのSNS予約投稿・投稿状況・実績管理をひとつに。",
   },
 };
