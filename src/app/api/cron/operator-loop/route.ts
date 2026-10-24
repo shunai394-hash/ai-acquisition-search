@@ -428,12 +428,12 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
   }
 
   // Higgsfieldの未完了ジョブを回収し、完成したらそのままSNSへ投稿する。
-  // In SNS-first mode, only poll already-started video jobs so they can finish and publish.
-  // Never start or retry queued/failed generation jobs. Completed jobs may still be published.
+  // Poll running jobs, start queued jobs, and apply bounded retry/refund policy to failed jobs.
+  // Provider-start ambiguity remains a manual-recovery case; terminal jobs are excluded below.
   const jobColumns = "id,user_id,social_post_id,status,request_id,prompt,duration,resolution,aspect_ratio,model,generate_audio,provider_response,error,created_at,started_at";
   const { data: activeJobs, error: activeJobsError } = await db.from("production_jobs")
     .select(jobColumns)
-    .in("status", ["queued", "running"])
+    .in("status", ["queued", "running", "failed"])
     .is("provider_response->>terminal", null)
     .is("provider_response->>manual_recovery_required", null)
     .order("created_at", { ascending: true })
