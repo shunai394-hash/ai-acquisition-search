@@ -723,7 +723,7 @@ export default function Home() {
         throw new Error(body.error || "SNS投稿の準備に失敗しました。");
       }
       setLibraryPublishPostId(body.socialPostId);
-      setLibraryMessage("投稿用に設定しました。投稿先と本文を確認して「選択したSNSへ投稿」を押してください。");
+      setLibraryMessage("自動投稿キューに追加しました。TikTokの公開同意とアカウント接続が完了すると、定期処理が自動投稿します。");
       setPublishStatus("");
       setPublishResults([]);
     } catch (err) {
@@ -890,7 +890,7 @@ export default function Home() {
                 <span>{video.size ? (video.size / (1024 * 1024)).toFixed(1) + " MB" : "サイズ不明"}</span>
               </div>
               <div className="studio-result-actions">
-                <button type="button" onClick={() => { void prepareCompletedVideoForPublishing(video); }}>SNS投稿の準備</button>
+                <button type="button" onClick={() => { void prepareCompletedVideoForPublishing(video); }}>自動投稿キューに追加</button>
                 <a href={video.downloadUrl} download>ダウンロード ↓</a>
               </div>
             </article>
