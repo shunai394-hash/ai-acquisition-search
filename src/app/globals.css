@@ -1400,3 +1400,23 @@ a:hover{opacity:.86}
 .library-empty{padding:24px 16px;border:1px dashed #343b4a;border-radius:12px;text-align:center}
 @media(max-width:850px){.completed-video-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.completed-video-grid{grid-template-columns:1fr}.completed-video-card video{max-height:480px}.library-upload-row{align-items:stretch;flex-direction:column}.library-upload-row input[type=file]{min-width:0;width:100%}.library-upload-row button{width:100%}}
+
+
+/* Prevent the authenticated home workspace from becoming vertically trapped.
+   Keep the document as the scroll container after Supabase OAuth returns. */
+html,
+body {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto !important;
+  overscroll-behavior-y: auto;
+}
+body {
+  position: relative;
+}
+#main-content.shell {
+  height: auto;
+  min-height: 100svh;
+  overflow: visible;
+  padding-bottom: max(110px, env(safe-area-inset-bottom));
+}
