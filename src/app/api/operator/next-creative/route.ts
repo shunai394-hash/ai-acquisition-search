@@ -187,7 +187,7 @@ export async function POST(request: Request) {
       creative_id: nextCreative.id,
       user_id: user.id,
       network: post.network,
-      status: "scheduled",
+      status: body.autoGenerate === false ? "planned" : "scheduled",
       caption: post.caption || hook,
       metadata: {
         source_social_post_id: post.id,
@@ -196,7 +196,8 @@ export async function POST(request: Request) {
         operator_decision_run_id: latestVerdict?.id ?? null,
         iteration_angle: angle,
         test_metric: body.testMetric || "CTR / CVR / ROAS",
-        auto_publish: true,
+        auto_publish: body.autoGenerate !== false,
+        ...(body.autoGenerate === false ? { media_required: true, plan_only: true } : {}),
       }
     }).select("id,network,status,caption,metadata").single();
     if (nextPostError || !nextPost) throw new Error(nextPostError?.message || "次の投稿レコード作成に失敗しました。");
