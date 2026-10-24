@@ -6,6 +6,7 @@ import { acquireLease, releaseLease } from "@/lib/ops/lease";
 import { jobMeta, providerDefinitelyNotStarted, refundJobUsage } from "@/lib/video/job-recovery";
 import { cronSecret, unauthorizedCron, verifyCronRequest } from "@/lib/security/cron-auth";
 import { operatorEvaluationDelayHours } from "@/lib/ops/config";
+import { signVideoAsset, SNS_INGEST_URL_TTL_SECONDS } from "@/lib/video/asset-access";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -92,8 +93,11 @@ async function publishCompletedVideo(
         .eq("metadata->>sourceSocialPostId", nextPost.id)
         .limit(1)).data;
 
-  if (existing?.[0]?.external_post_id) {
+  if (existing?.[0]?.status === "published" && existing[0]?.external_post_id) {
     return { ok: true, skipped: true, reason: "already published", postId: existing[0].id };
+  }
+  if (existing?.[0] && ["pending", "publishing"].includes(existing[0].status)) {
+    return { ok: false, skipped: true, reason: "provider publication is still pending; awaiting reconciliation" };
   }
 
   const result = await internalRequest("POST", "/api/social/publish", userId, {
@@ -321,6 +325,105 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
       // Transient status API errors stay pending; retrying the publish itself
       // could duplicate a post that TikTok has already accepted.
       results.push({ postId: pending.id, step: "tiktok-pending", status: "error", error: message });
+    }
+  }
+
+  // Explicitly queued completed-library videos publish automatically once TikTok consent and account connection exist.
+  // The operator-loop lease serializes workers; retry metadata adds backoff and a finite retry budget.
+  const { data: queuedLibraryVideos, error: queuedLibraryVideosError } = await db.from("social_posts")
+    .select("id,user_id,caption,metadata,created_at")
+    .eq("status", "planned")
+    .eq("network", "tiktok")
+    .eq("metadata->>source_type", "completed_video")
+    .eq("metadata->>auto_publish", "true")
+    .order("created_at", { ascending: true })
+    .limit(20);
+  if (queuedLibraryVideosError) {
+    results.push({ step: "completed-video-auto-publish-queue", status: "error", error: queuedLibraryVideosError.message });
+  }
+
+  for (const queued of queuedLibraryVideos || []) {
+    if (!budgetRemaining()) { timeBudgetExceeded = true; break; }
+    if (!queued.user_id) continue;
+    const metadata = queued.metadata && typeof queued.metadata === "object"
+      ? queued.metadata as Record<string, unknown>
+      : {};
+    const nextAttemptAt = typeof metadata.auto_publish_next_attempt_at === "string"
+      ? new Date(metadata.auto_publish_next_attempt_at).getTime()
+      : 0;
+    if (nextAttemptAt && nextAttemptAt > Date.now()) continue;
+    const attempts = Number(metadata.auto_publish_attempts || 0);
+    if (attempts >= 5) {
+      await db.from("social_posts").update({
+        metadata: { ...metadata, auto_publish: false, auto_publish_blocked: true, auto_publish_blocked_reason: "retry_limit", auto_publish_blocked_at: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }).eq("id", queued.id).eq("user_id", queued.user_id).eq("status", "planned");
+      results.push({ postId: queued.id, step: "completed-video-auto-publish-queue", status: "blocked", reason: "retry_limit" });
+      continue;
+    }
+
+    try {
+      const { data: consent, error: consentError } = await db.from("tiktok_publish_consents")
+        .select("user_id").eq("user_id", queued.user_id).maybeSingle();
+      if (consentError) throw consentError;
+      if (!consent) {
+        results.push({ postId: queued.id, step: "completed-video-auto-publish-queue", status: "waiting", reason: "tiktok_consent_required" });
+        continue;
+      }
+      const { data: account, error: accountError } = await db.from("tiktok_accounts")
+        .select("user_id").eq("user_id", queued.user_id).maybeSingle();
+      if (accountError) throw accountError;
+      if (!account) {
+        results.push({ postId: queued.id, step: "completed-video-auto-publish-queue", status: "waiting", reason: "tiktok_account_not_connected" });
+        continue;
+      }
+      const storagePath = typeof metadata.video_storage_path === "string" ? metadata.video_storage_path : "";
+      if (!storagePath.startsWith(queued.user_id + "/library/") || !storagePath.toLowerCase().endsWith(".mp4")) {
+        await db.from("social_posts").update({
+          metadata: { ...metadata, auto_publish: false, auto_publish_blocked: true, auto_publish_blocked_reason: "invalid_video_storage_path", auto_publish_blocked_at: new Date().toISOString() },
+          updated_at: new Date().toISOString(),
+        }).eq("id", queued.id).eq("user_id", queued.user_id).eq("status", "planned");
+        results.push({ postId: queued.id, step: "completed-video-auto-publish-queue", status: "blocked", reason: "invalid_video_storage_path" });
+        continue;
+      }
+      const videoUrl = await signVideoAsset(db, storagePath, { ttlSeconds: SNS_INGEST_URL_TTL_SECONDS });
+      const outcome = await publishCompletedVideo(db, queued.user_id, queued.id, videoUrl);
+      if (outcome.ok) {
+        results.push({ postId: queued.id, step: "completed-video-auto-publish-queue", status: "published", outcome });
+        continue;
+      }
+      const now = new Date();
+      const nextAttempts = attempts + 1;
+      const manualRecoveryRequired = "manualRecoveryRequired" in outcome && outcome.manualRecoveryRequired === true;
+      const blocked = nextAttempts >= 5 || manualRecoveryRequired;
+      await db.from("social_posts").update({
+        metadata: {
+          ...metadata,
+          auto_publish_attempts: nextAttempts,
+          auto_publish_last_attempt_at: now.toISOString(),
+          auto_publish_last_error: String(("reason" in outcome ? outcome.reason : undefined) || ("error" in outcome ? outcome.error : undefined) || "publish_not_confirmed").slice(0, 500),
+          auto_publish_next_attempt_at: blocked ? null : new Date(now.getTime() + Math.min(60, 5 * nextAttempts) * 60 * 1000).toISOString(),
+          ...(blocked ? { auto_publish: false, auto_publish_blocked: true, auto_publish_blocked_reason: manualRecoveryRequired ? "manual_recovery_required" : "retry_limit", auto_publish_blocked_at: now.toISOString() } : {}),
+        },
+        updated_at: now.toISOString(),
+      }).eq("id", queued.id).eq("user_id", queued.user_id).eq("status", "planned");
+      results.push({ postId: queued.id, step: "completed-video-auto-publish-queue", status: blocked ? "blocked" : "retry_scheduled", attempts: nextAttempts, outcome });
+    } catch (error) {
+      const now = new Date();
+      const nextAttempts = attempts + 1;
+      const blocked = nextAttempts >= 5;
+      await db.from("social_posts").update({
+        metadata: {
+          ...metadata,
+          auto_publish_attempts: nextAttempts,
+          auto_publish_last_attempt_at: now.toISOString(),
+          auto_publish_last_error: (error instanceof Error ? error.message : String(error)).slice(0, 500),
+          auto_publish_next_attempt_at: blocked ? null : new Date(now.getTime() + Math.min(60, 5 * nextAttempts) * 60 * 1000).toISOString(),
+          ...(blocked ? { auto_publish: false, auto_publish_blocked: true, auto_publish_blocked_reason: "retry_limit", auto_publish_blocked_at: now.toISOString() } : {}),
+        },
+        updated_at: now.toISOString(),
+      }).eq("id", queued.id).eq("user_id", queued.user_id).eq("status", "planned");
+      results.push({ postId: queued.id, step: "completed-video-auto-publish-queue", status: blocked ? "blocked" : "retry_scheduled", attempts: nextAttempts, error: error instanceof Error ? error.message : String(error) });
     }
   }
 

@@ -21,12 +21,32 @@ export async function POST(request: Request) {
 
     const draftKey = "completed_video:" + storagePath;
     const { data: existing, error: lookupError } = await db.from("social_posts")
-      .select("id")
+      .select("id,metadata,status")
       .eq("user_id", user.id)
       .filter("metadata->>draft_key", "eq", draftKey)
       .maybeSingle();
     if (lookupError) throw lookupError;
-    if (existing) return NextResponse.json({ ok: true, socialPostId: existing.id, reused: true });
+    if (existing) {
+      if (existing.status === "published") {
+        return NextResponse.json({ ok: true, socialPostId: existing.id, reused: true, queued: false, status: "published" });
+      }
+      const existingMetadata = existing.metadata && typeof existing.metadata === "object"
+        ? existing.metadata as Record<string, unknown>
+        : {};
+      const { error: queueError } = await db.from("social_posts").update({
+        metadata: {
+          ...existingMetadata,
+          auto_publish: true,
+          auto_publish_queued_at: new Date().toISOString(),
+          auto_publish_attempts: 0,
+          auto_publish_next_attempt_at: null,
+          auto_publish_blocked: false,
+        },
+        updated_at: new Date().toISOString(),
+      }).eq("id", existing.id).eq("user_id", user.id).eq("status", "planned");
+      if (queueError) throw queueError;
+      return NextResponse.json({ ok: true, socialPostId: existing.id, reused: true, queued: true, status: "planned" });
+    }
 
     const { data, error } = await db.from("social_posts").insert({
       creative_id: null,
@@ -38,6 +58,9 @@ export async function POST(request: Request) {
         source_type: "completed_video",
         draft_key: draftKey,
         video_storage_path: storagePath,
+        auto_publish: true,
+        auto_publish_queued_at: new Date().toISOString(),
+        auto_publish_attempts: 0,
       },
     }).select("id").single();
 
@@ -49,7 +72,7 @@ export async function POST(request: Request) {
       }
       throw error;
     }
-    return NextResponse.json({ ok: true, socialPostId: data.id, reused: false }, { status: 201 });
+    return NextResponse.json({ ok: true, socialPostId: data.id, reused: false, queued: true, status: "planned" }, { status: 201 });
   } catch (error) {
     console.error("completed video SNS draft creation failed", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "SNS投稿の準備に失敗しました。" }, { status: 500 });
