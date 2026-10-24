@@ -1,23 +1,23 @@
-# SNS Auto-Publishing Platform — Product Contract
+# AI Video Production & SNS Automation Platform — Product Contract
 
 ## Product promise
-AI Acquisition Search is a social publishing operations platform. Its primary job is to take user-provided, rights-cleared media and publish it to authorized social accounts reliably, on schedule, with transparent status and measurable learning. **New video generation is out of scope for the active product direction.** Do not make video generation the primary entry point, navigation item, or success metric.
+AI Acquisition Search is an AI-directed video production platform integrated with reliable SNS publishing. The primary workflow turns a prompt and optional reference/product images into a creative brief, shot plan, generated video with requested sound where supported, a reviewable deliverable, and an authorized social post. Users can also publish existing media without regenerating it.
 
 ## Primary user journey
-1. Connect a social account through its official OAuth flow.
-2. Select an existing media asset (MP4/image) and enter or review platform-specific copy.
-3. Run a preflight: authorization, scopes, media type/size/duration, caption, visibility, rights/disclosure and platform constraints.
-4. Preview the exact destination, media, caption and visibility.
-5. Choose publish-now or a date/time with an explicit timezone; enqueue a durable job.
-6. Process the queue through an authenticated scheduled worker; persist state transitions and attempt metadata.
-7. Confirm publication from the provider response; save provider ID, URL, timestamp and visibility.
-8. On timeout or ambiguous response, reconcile remote state before any retry to avoid duplicate posts.
-9. Display actionable failure reasons, safe retry/cancel controls and a complete activity history.
-10. Collect only permitted real analytics, show metric provenance/time windows, and use results to recommend the next test.
+1. Accept a natural-language brief and optional product/reference images or an existing media file.
+2. Build an AI-directed treatment, hook, shot plan, motion and sound plan.
+3. Generate through a configured provider; persist job IDs, status, errors and usage.
+4. Validate playable output, requested audio, duration and aspect ratio; allow preview/revision.
+5. Prepare platform-specific caption, media and disclosure; preflight rights, scopes and limits.
+6. Connect a social account through official OAuth and obtain explicit posting consent.
+7. Publish now or schedule with a visible timezone; persist durable queue states.
+8. Confirm publication from the provider response and save ID/URL/timestamp/visibility.
+9. Reconcile ambiguous timeouts before retrying; prevent duplicate posts.
+10. Use real permitted analytics to recommend the next creative test.
 
 ## Product information architecture
-- **Home / Operations:** queue status, connected account readiness, next scheduled posts, recent outcomes and the main “Add post” action.
-- **Create post:** existing media selection/upload, caption, per-platform variants, preview, schedule and preflight.
+- **AI Video Studio:** prompt/image input, creative direction, generation status, audio options, preview and export.
+- **Publish / Operations:** queue status, connected-account readiness, next scheduled posts, existing-media intake, captions, preview, schedule and preflight.
 - **Queue / Calendar:** scheduled, processing, published, failed and manual-action-required states; timezone visible; edit/cancel behavior explicit.
 - **Accounts:** per-platform connection state, scopes, consent, expiry/reconnect and disconnect.
 - **Analytics:** only provider-returned measurements, timestamped and attributed to the correct post/account.
@@ -48,7 +48,7 @@ Use explicit states such as `draft`, `scheduled`, `queued`, `publishing`, `publi
 ## Ten-pass review protocol
 Each pass must record the inspected evidence, defect, concrete change, validation result and remaining blocker. Do not count a plan, visual mock, or code-only change without checks as a completed pass.
 
-1. Product scope and navigation: remove video-generation-first entry points; foreground posting operations.
+1. Product scope and navigation: make AI-directed video production and authorized SNS publishing one coherent workflow.
 2. Visual hierarchy: improve information density, typography, spacing, color and focus on the main action.
 3. Responsive UX: check mobile/tablet/desktop, overflow, touch targets and long content.
 4. Accessibility: semantic structure, keyboard flow, focus visibility, contrast and reduced motion.
