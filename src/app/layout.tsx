@@ -10,8 +10,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "AI Acquisition Search | SNS自動投稿オペレーション",
-  description: "既存の動画・画像を、接続済みSNSへ安全に予約投稿。投稿キュー、アカウント連携、公開状態、実績の確認をひとつに。",
+  title: "AI Acquisition Search | AI動画制作・SNS自動投稿",
+  description: "商品画像とプロンプトからAI動画を制作。ナレーション・BGMを整え、確認後にTikTokなどのSNSへ予約・自動投稿できる動画制作プラットフォーム。",
   applicationName: "AI Acquisition Search",
   category: "business",
   icons: {
@@ -23,14 +23,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ja_JP",
-    title: "AI Acquisition Search | SNSへの投稿を自動化",
-    description: "手元のメディアをSNSへ予約投稿し、投稿状況と実際の成果を一元管理。",
+    title: "AI Acquisition Search | AI動画制作からSNS投稿まで",
+    description: "商品画像とプロンプトから動画を制作し、確認後に接続済みSNSへ投稿。生成・公開・実績を一元管理。",
     siteName: "AI Acquisition Search",
   },
   twitter: {
     card: "summary",
-    title: "AI Acquisition Search | SNS自動投稿オペレーション",
-    description: "既存メディアのSNS予約投稿・投稿状況・実績管理をひとつに。",
+    title: "AI Acquisition Search | AI動画制作・SNS自動投稿",
+    description: "AI動画制作からSNS予約投稿、公開状況と実績管理までをひとつに。",
   },
 };
 
