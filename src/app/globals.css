@@ -1438,10 +1438,7 @@ body {
 @media(max-width:700px){.auto-publish-home{padding:20px 16px;margin-top:16px}.auto-publish-home-head{flex-direction:column}.auto-publish-state{align-self:flex-start}.auto-publish-setup{align-items:flex-start;flex-direction:column}.auto-publish-setup a{width:100%;text-align:center}.auto-publish-steps{gap:8px}.auto-publish-steps span{font-size:11px}}
 
 
-/* SNS-operations-first product direction: generation UI is intentionally out of the primary workflow. */
-.video-studio,
-.creative-bridge,
-.video-generator{display:none!important}
+/* Keep the video studio visible: generation is the first step before SNS publishing. */
 
 /* Interaction polish and accessibility */
 :where(a,button,input,textarea,select,[tabindex]):focus-visible{
