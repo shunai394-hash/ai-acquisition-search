@@ -28,7 +28,6 @@ function getSupabaseBrowserClient(): SupabaseClient | null {
 
 export default function GoogleSignIn() {
   const [user, setUser] = useState<User | null>(null);
-  const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -39,25 +38,23 @@ export default function GoogleSignIn() {
     if (!supabase) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setError("ログイン設定が未完了です。管理者にお問い合わせください。");
-      setReady(true);
       return;
     }
 
+    // Never block rendering the login button on a network request. A slow or
+    // stalled getUser() call must not make the sign-in control disappear.
     void supabase.auth
       .getUser()
       .then(({ data, error: authError }) => {
         if (!active) return;
         if (authError) {
-          setError("ログイン状態を確認できませんでした。再読み込みしてください。");
+          setError("ログイン状態を確認できませんでした。Googleログインはそのまま試せます。");
           return;
         }
         setUser(data.user ?? null);
       })
       .catch(() => {
-        if (active) setError("ログイン状態を確認できませんでした。通信環境を確認してください。");
-      })
-      .finally(() => {
-        if (active) setReady(true);
+        if (active) setError("ログイン状態を確認できませんでした。通信環境を確認してください。Googleログインはそのまま試せます。");
       });
 
     const {
@@ -95,7 +92,9 @@ export default function GoogleSignIn() {
         },
       });
 
-      if (authError) setError(`Googleログイン失敗: ${authError.message}。SupabaseのGoogle ProviderとURL許可設定を確認してください。`);
+      if (authError) {
+        setError(`Googleログイン失敗: ${authError.message}。SupabaseのGoogle ProviderとURL許可設定を確認してください。`);
+      }
     } catch {
       setError("Googleログインを開始できませんでした。Supabase URL・公開キー・Google Provider設定を確認してください。");
     } finally {
@@ -122,10 +121,6 @@ export default function GoogleSignIn() {
     } finally {
       setBusy(false);
     }
-  }
-
-  if (!ready) {
-    return <p role="status" aria-live="polite">ログイン状態を確認しています…</p>;
   }
 
   return (
