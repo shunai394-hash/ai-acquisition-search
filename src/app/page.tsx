@@ -214,6 +214,49 @@ export default function Home() {
     return data.session.access_token;
   }
 
+  async function publishFinishedVideo(input: { jobId: string; videoUrl: string; socialPostId: string; platforms: string[]; caption: string }) {
+    const token = await getAccessToken();
+    const results: Array<{ platform: string; ok: boolean; pending?: boolean; url?: string; error?: string }> = [];
+    let platforms = input.platforms;
+    if (platforms.includes("tiktok") && input.jobId) {
+      const queued = await fetch("/api/ops/from-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ productionJobId: input.jobId, caption: input.caption }),
+      });
+      const queuedBody = await queued.json().catch(() => ({}));
+      if (queued.ok) {
+        const status = String(queuedBody.job?.status || "");
+        results.push({
+          platform: "tiktok",
+          ok: status === "published",
+          pending: status === "pending" || status === "queued" || status === "processing",
+          url: queuedBody.job?.post_url || undefined,
+          error: queuedBody.job?.last_error || undefined,
+        });
+        platforms = platforms.filter((platform) => platform !== "tiktok");
+      } else if (queued.status !== 503) {
+        results.push({ platform: "tiktok", ok: false, error: queuedBody.error || "TikTok投稿キューへの登録に失敗しました。" });
+        platforms = platforms.filter((platform) => platform !== "tiktok");
+      }
+    }
+    let published = results.filter((item) => item.ok).length;
+    let failed = results.filter((item) => !item.ok && !item.pending).length;
+    if (platforms.length) {
+      const publishResponse = await fetch("/api/social/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ socialPostId: input.socialPostId, videoUrl: input.videoUrl, caption: input.caption, platforms }),
+      });
+      const publishBody = await publishResponse.json().catch(() => ({}));
+      if (!publishResponse.ok) throw new Error(publishBody.error || "SNS自動投稿に失敗しました。");
+      if (Array.isArray(publishBody.results)) results.push(...publishBody.results);
+      published += Number(publishBody.published || 0);
+      failed += Number(publishBody.failed || 0);
+    }
+    return { results, published, failed };
+  }
+
   async function connectTikTokAccount() {
     if (tiktokConnecting) return;
     setTiktokConnecting(true);
@@ -591,17 +634,16 @@ export default function Home() {
           if (currentSocialPostId && autoPublishPlatforms.length) {
             setPublishStatus("完成動画をSNSへ自動投稿中…");
             try {
-              const publishToken = await getAccessToken();
               const caption = publishCaption.trim() || result?.analysis?.nextPosts?.[selectedScenario]?.hook || result?.analysis?.decision?.valueProposition || "AI Acquisition Search creative";
-              const publishResponse = await fetch("/api/social/publish", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: "Bearer " + publishToken },
-                body: JSON.stringify({ socialPostId: currentSocialPostId, videoUrl: data.asset.video_url, caption, platforms: autoPublishPlatforms }),
+              const published = await publishFinishedVideo({
+                jobId,
+                videoUrl: data.asset.video_url,
+                socialPostId: currentSocialPostId,
+                platforms: autoPublishPlatforms,
+                caption,
               });
-              const publishBody = await publishResponse.json().catch(() => ({}));
-              if (!publishResponse.ok) throw new Error(publishBody.error || "SNS自動投稿に失敗しました。");
-              setPublishResults(Array.isArray(publishBody.results) ? publishBody.results : []);
-              setPublishStatus(publishBody.failed ? `自動投稿：${publishBody.published || 0}件成功 / ${publishBody.failed}件失敗` : `自動投稿：${publishBody.published || 0}件`);
+              setPublishResults(published.results);
+              setPublishStatus(published.failed ? `自動投稿：${published.published}件成功 / ${published.failed}件失敗` : `自動投稿：${published.published}件`);
             } catch (publishError) {
               setPublishStatus("");
               setStudioError(publishError instanceof Error ? publishError.message : "SNS自動投稿に失敗しました。");
@@ -660,17 +702,16 @@ export default function Home() {
           if (socialPostId && eligiblePublishPlatforms.length) {
             setPublishStatus("完成動画をSNSへ自動投稿中…");
             try {
-              const publishToken = await getAccessToken();
               const caption = publishCaption.trim() || result?.analysis?.nextPosts?.[selectedScenario]?.hook || result?.analysis?.decision?.valueProposition || "AI Acquisition Search creative";
-              const publishResponse = await fetch("/api/social/publish", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: "Bearer " + publishToken },
-                body: JSON.stringify({ socialPostId, videoUrl: data.asset.video_url, caption, platforms: eligiblePublishPlatforms }),
+              const published = await publishFinishedVideo({
+                jobId,
+                videoUrl: data.asset.video_url,
+                socialPostId,
+                platforms: eligiblePublishPlatforms,
+                caption,
               });
-              const publishBody = await publishResponse.json().catch(() => ({}));
-              if (!publishResponse.ok) throw new Error(publishBody.error || "SNS自動投稿に失敗しました。");
-              setPublishResults(Array.isArray(publishBody.results) ? publishBody.results : []);
-              setPublishStatus(publishBody.failed ? `自動投稿：${publishBody.published || 0}件成功 / ${publishBody.failed}件失敗` : `自動投稿：${publishBody.published || 0}件`);
+              setPublishResults(published.results);
+              setPublishStatus(published.failed ? `自動投稿：${published.published}件成功 / ${published.failed}件失敗` : `自動投稿：${published.published}件`);
             } catch (publishError) {
               setPublishStatus("");
               setVideoError(publishError instanceof Error ? publishError.message : "SNS自動投稿に失敗しました。");
@@ -843,6 +884,7 @@ export default function Home() {
           <span className="status">アカウント接続で開始</span>
           <GoogleSignIn />
           <a href="#completed-video-library" className="billing-link">投稿メディア ↓</a>
+          <Link href="/ops" className="billing-link">投稿運用</Link>
           <Link href="/billing" className="billing-link">契約管理</Link>
         </div>
       </header>

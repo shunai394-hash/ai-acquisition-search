@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getUserFromBearer } from "@/lib/billing";
-import { createTikTokState, tiktokAuthUrl } from "@/lib/social/tiktok";
+import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
+import { createTikTokState, decryptTikTokToken, tiktokAuthUrl } from "@/lib/social/tiktok";
 
 export const runtime = "nodejs";
 
@@ -24,6 +24,14 @@ export async function GET(request: Request) {
   const response = new URL(request.url).searchParams.get("format") === "json"
     ? NextResponse.json({ url: authorizationUrl })
     : NextResponse.redirect(authorizationUrl);
+  const next = new URL(request.url).searchParams.get("next");
+  response.cookies.set("tiktok_oauth_next", next === "/ops" ? "/ops" : "/", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 600,
+  });
   response.cookies.set("tiktok_oauth_state", state, {
     httpOnly: true,
     secure: true,
@@ -32,4 +40,32 @@ export async function GET(request: Request) {
     maxAge: 600,
   });
   return response;
+}
+
+export async function DELETE(request: Request) {
+  const user = await getUserFromBearer(request);
+  if (!user) return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
+  const db = getAdminSupabase();
+  const account = await db.from("tiktok_accounts").select("access_token_encrypted").eq("user_id", user.id).maybeSingle();
+  if (account.error) return NextResponse.json({ error: "TikTok接続の確認に失敗しました。" }, { status: 500 });
+  if (account.data?.access_token_encrypted) {
+    try {
+      const token = decryptTikTokToken(account.data.access_token_encrypted);
+      await fetch("https://open.tiktokapis.com/v2/oauth/revoke/", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "Cache-Control": "no-cache" },
+        body: new URLSearchParams({
+          client_key: process.env.TIKTOK_CLIENT_KEY || "",
+          client_secret: process.env.TIKTOK_CLIENT_SECRET || "",
+          token,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch {
+      console.error("tiktok revoke failed");
+    }
+  }
+  const deleted = await db.from("tiktok_accounts").delete().eq("user_id", user.id);
+  if (deleted.error) return NextResponse.json({ error: "TikTok接続の解除に失敗しました。" }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }

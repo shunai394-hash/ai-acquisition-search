@@ -21,14 +21,17 @@ const cmp = (a: unknown, b: unknown) => (String(a) < String(b) ? -1 : String(a) 
 
 function parseOr(expr: string): Filter {
   const parts = expr.split(",").map((part) => {
-    const m = /^(.+?)\.(is|eq|lt)\.(.*)$/.exec(part);
+    const m = /^(.+?)\.(is|eq|lt|lte|gt|gte)\.(.*)$/.exec(part);
     if (!m) throw new Error(`unsupported or(): ${part}`);
     const [, col, op, value] = m;
     return (row: Row) => {
       const v = get(row, col);
       if (op === "is") return value === "null" ? v == null : v != null;
       if (op === "eq") return v != null && String(v) === value;
-      return v != null && cmp(v, value) < 0;
+      if (op === "lt") return v != null && cmp(v, value) < 0;
+      if (op === "lte") return v != null && cmp(v, value) <= 0;
+      if (op === "gt") return v != null && cmp(v, value) > 0;
+      return v != null && cmp(v, value) >= 0;
     };
   });
   return (row) => parts.some((p) => p(row));

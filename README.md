@@ -66,6 +66,8 @@ TIKTOK_TOKEN_ENCRYPTION_KEY=...
 
 TikTok publishing requires a registered app with the relevant products/scopes, matching callback URL, user-authorized account, and any required platform review. Unreviewed clients may be limited to private/test visibility.
 
+Durable TikTok scheduling, retries, and the operations console live at `/ops`. Setup and the limits that still require TikTok review are in `docs/sns-autopost.md`.
+
 ### Video generation and narration
 Configure the video provider and narration/audio credentials required by the active generation adapters. Provider/model availability depends on the connected account and secrets. Existing media upload remains available when generation is unavailable.
 

@@ -1,0 +1,18 @@
+.ops-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.ops-tabs button,.ops-form button,.ops-row button{border:0;border-radius:999px;padding:8px 12px;background:#fff;color:#07090d;font-weight:700;cursor:pointer}
+.ops-tabs button[aria-selected="true"]{outline:2px solid #9b8cff}
+.ops-tabs button:disabled,.ops-form button:disabled{opacity:.45;cursor:not-allowed}
+.ops-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.ops-stat{padding:14px;border:1px solid #ffffff14;border-radius:14px;background:#0003}
+.ops-stat b{display:block;color:#ffffff55;font-size:11px}
+.ops-stat strong{display:block;margin-top:6px;font-size:22px}
+.ops-form,.ops-list{display:grid;gap:10px;margin-top:14px}
+.ops-form input,.ops-form textarea,.ops-form select{width:100%;border:1px solid #ffffff1c;background:#ffffff0a;border-radius:12px;color:#fff;padding:10px}
+.ops-form label{display:grid;gap:6px;color:#ffffff88;font-size:12px}
+.ops-row{display:grid;gap:6px;padding:12px;border:1px solid #ffffff12;border-radius:12px;background:#0003}
+.ops-row small{color:#ffffff66}
+.ops-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.ops-calendar button{min-height:64px;text-align:left;border:1px solid #ffffff12;border-radius:10px;background:#0003;color:#fff;padding:8px;cursor:pointer}
+.ops-calendar .muted{color:#ffffff44}
+.ops-warning{padding:12px;border:1px solid #ffb45c55;border-radius:12px;color:#ffd7a8;background:#ffb45c14}
+@media(max-width:700px){.ops-grid,.ops-calendar{grid-template-columns:1fr 1fr}}

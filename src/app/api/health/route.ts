@@ -87,6 +87,7 @@ export async function GET(request: Request) {
       stripeProPrice: Boolean(process.env.STRIPE_PRO_PRICE_ID),
       tiktokOAuth: Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET && process.env.TIKTOK_REDIRECT_URI && process.env.TIKTOK_TOKEN_ENCRYPTION_KEY),
       tiktokPrivacyLevel: process.env.TIKTOK_PRIVACY_LEVEL || "SELF_ONLY",
+      publishQueueSchedule: "*/5 * * * *",
     },
   }, { status: ok ? 200 : 503 });
 }

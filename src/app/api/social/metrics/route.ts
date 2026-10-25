@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase, getUserFromBearer } from "@/lib/billing";
 import { decryptLinkedInToken, getLinkedInMemberPostAnalytics } from "@/lib/linkedin";
-import { getTikTokVideoMetrics, resolveTikTokVideoId } from "@/lib/social/tiktok";
+import { getTikTokAccessToken, getTikTokVideoMetrics, resolveTikTokVideoId } from "@/lib/social/tiktok";
 import { getInstagramReelMetrics, getFacebookReelMetrics } from "@/lib/social/meta";
 import { getYouTubeVideoStatus } from "@/lib/social/youtube";
 import { getXPostMetrics } from "@/lib/social/x";
@@ -175,8 +175,17 @@ export async function POST(request: Request) {
       );
       normalized = linkedinMetric(raw);
     } else if (post.network === "tiktok") {
-      const resolved = await resolveTikTokVideoId(post.external_post_id);
-      raw = await getTikTokVideoMetrics(resolved.videoId);
+      const accessToken = await getTikTokAccessToken(user.id);
+      const resolved = await resolveTikTokVideoId(post.external_post_id, accessToken);
+      if (!resolved.videoId) {
+        return NextResponse.json({
+          ok: false,
+          metricsStatus: "unavailable",
+          error: "TikTokは投稿を受け付けていますが、再生数を取得できる公開動画IDがまだありません。非公開投稿や審査前の数値は推測しません。",
+          publishStatus: resolved.status ?? null,
+        }, { status: 409 });
+      }
+      raw = await getTikTokVideoMetrics(resolved.videoId, accessToken);
       normalized = tiktokMetric(raw);
     } else if (post.network === "instagram") {
       raw = await getInstagramReelMetrics(post.external_post_id);
