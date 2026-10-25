@@ -95,9 +95,9 @@ export default function GoogleSignIn() {
         },
       });
 
-      if (authError) setError("Googleログインを開始できませんでした。設定を確認して再試行してください。");
+      if (authError) setError(`Googleログイン失敗: ${authError.message}。SupabaseのGoogle ProviderとURL許可設定を確認してください。`);
     } catch {
-      setError("Googleログインを開始できませんでした。通信環境を確認してください。");
+      setError("Googleログインを開始できませんでした。Supabase URL・公開キー・Google Provider設定を確認してください。");
     } finally {
       setBusy(false);
     }
