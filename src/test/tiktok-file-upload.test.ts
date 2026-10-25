@@ -67,6 +67,8 @@ test("TikTok falls back to bounded FILE_UPLOAD when PULL_FROM_URL ownership is u
     assert.equal(fileInit.source_info.video_size, 6);
     assert.equal(fileInit.source_info.chunk_size, 6);
     assert.equal(fileInit.source_info.total_chunk_count, 1);
+    assert.equal(fileInit.post_info.brand_content_toggle, false);
+    assert.equal(fileInit.post_info.privacy_level, "SELF_ONLY");
 
     const upload = calls.find((call) => call.method === "PUT");
     assert.ok(upload);

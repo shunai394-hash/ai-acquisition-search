@@ -35,8 +35,8 @@ export function getTikTokRedirectUri() {
   return oauthRequired("TIKTOK_REDIRECT_URI");
 }
 
-export function createTikTokState(userId: string) {
-  const payload = Buffer.from(JSON.stringify({ userId, nonce: crypto.randomBytes(24).toString("base64url"), issuedAt: Date.now() })).toString("base64url");
+export function createTikTokState(userId: string, issuedAt = Date.now()) {
+  const payload = Buffer.from(JSON.stringify({ userId, nonce: crypto.randomBytes(24).toString("base64url"), issuedAt })).toString("base64url");
   const signature = crypto.createHmac("sha256", encryptionKey()).update(payload).digest("base64url");
   return payload + "." + signature;
 }
@@ -332,6 +332,8 @@ export async function publishTikTokVideo(input: TikTokPublishInput) {
     disable_duet: input.disableDuet ?? false,
     disable_stitch: input.disableStitch ?? false,
     is_aigc: input.isAigc ?? true,
+    // TikTok Direct Post marks this field required. false means the post is not a paid partnership.
+    brand_content_toggle: false,
     brand_organic_toggle: input.brandOrganicToggle ?? false,
     ...(input.videoCoverTimestampMs == null ? {} : { video_cover_timestamp_ms: input.videoCoverTimestampMs }),
   };
@@ -367,6 +369,53 @@ export async function publishTikTokVideo(input: TikTokPublishInput) {
     privacyLevel: privacy,
     creatorUsername: creator.creator_username,
   };
+}
+
+export async function publishTikTokPhoto(input: {
+  accessToken: string;
+  imageUrl: string;
+  description: string;
+  privacyLevel?: TikTokPublishInput["privacyLevel"];
+}) {
+  if (!input.imageUrl.startsWith("https://")) throw new Error("TikTok画像投稿にはHTTPSの画像URLが必要です。");
+  const creator = await queryTikTokCreator(input.accessToken);
+  const options = Array.isArray(creator.privacy_level_options) ? creator.privacy_level_options : [];
+  const privacy = input.privacyLevel || configuredTikTokPrivacyLevel();
+  if (!options.includes(privacy)) throw new Error(`指定されたprivacyLevelはこのTikTokアカウントでは使用できません: ${privacy}`);
+
+  const response = await fetch(`${TIKTOK_API_BASE}/post/publish/content/init/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${input.accessToken}`, "Content-Type": "application/json; charset=UTF-8" },
+    body: JSON.stringify({
+      media_type: "PHOTO",
+      post_mode: "DIRECT_POST",
+      post_info: {
+        title: input.description.trim().slice(0, 90),
+        description: input.description.slice(0, 4000),
+        privacy_level: privacy,
+        disable_comment: false,
+        auto_add_music: true,
+        brand_content_toggle: false,
+        brand_organic_toggle: false,
+      },
+      source_info: {
+        source: "PULL_FROM_URL",
+        photo_cover_index: 0,
+        photo_images: [input.imageUrl],
+      },
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (payload?.error?.code === "url_ownership_unverified") {
+    throw new Error("TikTok画像投稿はPULL_FROM_URLのみで、配信ドメインの所有確認が必要です。未確認のURLでは画像を投稿できません。動画はFILE_UPLOADで投稿できます。");
+  }
+  if (!response.ok || payload?.error?.code !== "ok") {
+    throw new Error(payload?.error?.message || `TikTok photo publish failed: ${response.status}`);
+  }
+  const publishId = payload?.data?.publish_id;
+  if (typeof publishId !== "string" || !publishId) throw new Error("TikTokからpublish_idが返りませんでした。");
+  return { publishId, privacyLevel: privacy };
 }
 
 export async function getTikTokPublishStatus(publishId: string, accessToken = getAccessToken()) {
