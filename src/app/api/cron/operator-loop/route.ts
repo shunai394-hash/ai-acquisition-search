@@ -206,9 +206,9 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
         continue;
       }
 
-      // STOP: never create a next plan. WAIT (insufficient data): re-evaluate later. For continue/pivot, create a plan only; this SNS-first product no longer auto-generates videos.
+      // STOP/WAIT are hard safety gates. For continue/pivot, keep the full product workflow: create the next creative, queue video generation, then publish only after media and account permissions are valid.
       const verdict = decision.payload?.verdict;
-      if (verdict === "stop" || verdict === "wait" || decision.payload?.generateCreative === false) {
+      if (verdict === "stop" || verdict === "wait") {
         results.push({
           postId: post.id,
           network: post.network,
