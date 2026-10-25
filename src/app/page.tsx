@@ -46,7 +46,7 @@ function subscribeToSearchParams(callback: () => void) {
 
 function getTiktokNotice() {
   const value = new URLSearchParams(window.location.search).get("tiktok");
-  if (value === "connected") return "TikTokアカウントを接続しました。自動投稿を利用できます。";
+  if (value === "connected") return "TikTokアカウントを接続しました。自動投稿には、必要な権限と投稿への同意がそろっていることも必要です。";
   if (value === "error") return "TikTok接続に失敗しました。もう一度接続してください。";
   return "";
 }
@@ -127,6 +127,7 @@ export default function Home() {
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["tiktok"]);
   const [publishCaption, setPublishCaption] = useState("");
   const [tiktokConsent, setTiktokConsent] = useState(false);
+  const [tiktokConnecting, setTiktokConnecting] = useState(false);
   const [publishGenerating, setPublishGenerating] = useState(false);
   const [publishStatus, setPublishStatus] = useState("");
   const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; pending?: boolean; url?: string; error?: string }>>([]);
@@ -211,6 +212,27 @@ export default function Home() {
     const { data } = await supabase.auth.getSession();
     if (!data.session) throw new Error("先にGoogleでログインしてください。");
     return data.session.access_token;
+  }
+
+  async function connectTikTokAccount() {
+    if (tiktokConnecting) return;
+    setTiktokConnecting(true);
+    setVideoError("");
+    try {
+      const token = await getAccessToken();
+      const response = await fetch("/api/tiktok/connect?format=json", {
+        headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+        cache: "no-store",
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || typeof body.url !== "string") {
+        throw new Error(body.error || "TikTok接続を開始できませんでした。");
+      }
+      window.location.assign(body.url);
+    } catch (error) {
+      setVideoError(error instanceof Error ? error.message : "TikTok接続を開始できませんでした。");
+      setTiktokConnecting(false);
+    }
   }
 
   async function analyze(e?: FormEvent) {
@@ -818,9 +840,9 @@ export default function Home() {
               <a href="#loop">03 <span>Loop</span></a>
             </nav>
           )}
-          <span className="status">ログイン後に生成</span>
+          <span className="status">アカウント接続で開始</span>
           <GoogleSignIn />
-          <a href="#completed-video-library" className="billing-link">動画フォルダー ↓</a>
+          <a href="#completed-video-library" className="billing-link">投稿メディア ↓</a>
           <Link href="/billing" className="billing-link">契約管理</Link>
         </div>
       </header>
@@ -829,10 +851,10 @@ export default function Home() {
         <div className="auto-publish-home-head">
           <div>
             <p className="eyebrow">AUTO PUBLISH · SNS OPERATIONS</p>
-            <h1 id="auto-publish-home-title">完成動画を、SNSへ自動投稿。</h1>
-            <p>動画を保存し、投稿キューに追加。TikTok連携と自動投稿への同意が済めば、スケジュール処理がキューを順次実行します。</p>
+            <h1 id="auto-publish-home-title">プロンプトから動画制作、SNS投稿まで。</h1>
+            <p>商品画像とプロンプトからAI動画を制作し、確認後にSNSへ。既存のMP4も投稿でき、TikTok連携・同意・必要な権限がそろった投稿だけをスケジュール処理が実行します。</p>
           </div>
-          <span className="auto-publish-state"><i aria-hidden="true" /> AUTO QUEUE</span>
+          <span className="auto-publish-state"><i aria-hidden="true" /> PUBLISH WORKFLOW</span>
         </div>
         <div className="auto-publish-steps" aria-label="自動投稿の手順">
           <span><b>01</b> MP4を保存</span><i aria-hidden="true">→</i>
@@ -844,7 +866,7 @@ export default function Home() {
             <strong>TikTokアカウント</strong>
             <p>投稿先アカウントを接続し、自動投稿を許可してください。</p>
           </div>
-          <a className="tiktok-connect-link" href="/api/tiktok/connect">TikTokを接続 →</a>
+          <button type="button" className="tiktok-connect-link" onClick={() => { void connectTikTokAccount(); }} disabled={tiktokConnecting}>{tiktokConnecting ? "接続先を準備中…" : "TikTokを接続 →"}</button>
         </div>
         <label className="publish-consent auto-publish-consent">
           <input
@@ -916,7 +938,7 @@ export default function Home() {
             </article>
           ))}
         </div>}
-        {!completedVideos.length && !libraryLoading && <p className="library-empty">まだ動画はありません。MP4を選択してフォルダーに保存してください。</p>}
+        {!completedVideos.length && !libraryLoading && <p className="library-empty">投稿できるメディアはまだありません。手元にあるMP4を選択して保存し、投稿キューに追加してください。</p>}
       </section>
 
 
@@ -1475,7 +1497,7 @@ export default function Home() {
               />
               {publishPlatforms.includes("tiktok") && (
                 <div className="tiktok-connect-box">
-                  <a href="/api/tiktok/connect" className="tiktok-connect-link">TikTokアカウントを接続 →</a>
+                  <button type="button" className="tiktok-connect-link" onClick={() => { void connectTikTokAccount(); }} disabled={tiktokConnecting}>{tiktokConnecting ? "接続先を準備中…" : "TikTokアカウントを接続 →"}</button>
                   <span>ユーザーごとのTikTok OAuthで安全に投稿します。</span>
                 </div>
               )}

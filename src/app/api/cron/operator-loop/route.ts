@@ -206,9 +206,9 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
         continue;
       }
 
-      // STOP: never generate. WAIT (insufficient data): re-evaluate on a later run.
+      // STOP/WAIT are hard safety gates. For continue/pivot, keep the full product workflow: create the next creative, queue video generation, then publish only after media and account permissions are valid.
       const verdict = decision.payload?.verdict;
-      if (verdict === "stop" || verdict === "wait" || decision.payload?.generateCreative === false) {
+      if (verdict === "stop" || verdict === "wait") {
         results.push({
           postId: post.id,
           network: post.network,
@@ -428,13 +428,12 @@ async function runOperatorLoop(db: ReturnType<typeof getAdminSupabase>, leaseMod
   }
 
   // Higgsfieldの未完了ジョブを回収し、完成したらそのままSNSへ投稿する。
-  // Only fetch jobs that still need work. Terminal/manual-recovery rows and
-  // completed jobs whose publish already settled are excluded; otherwise the
-  // oldest 30 rows would occupy every slot forever and starve new jobs.
+  // Poll running jobs, start queued jobs, and apply bounded retry/refund policy to failed jobs.
+  // Provider-start ambiguity remains a manual-recovery case; terminal jobs are excluded below.
   const jobColumns = "id,user_id,social_post_id,status,request_id,prompt,duration,resolution,aspect_ratio,model,generate_audio,provider_response,error,created_at,started_at";
   const { data: activeJobs, error: activeJobsError } = await db.from("production_jobs")
     .select(jobColumns)
-    .in("status", ["queued","running","failed"])
+    .in("status", ["queued", "running", "failed"])
     .is("provider_response->>terminal", null)
     .is("provider_response->>manual_recovery_required", null)
     .order("created_at", { ascending: true })

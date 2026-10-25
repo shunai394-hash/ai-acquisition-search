@@ -1,46 +1,66 @@
-# AI Video Production Platform — Product Contract
+# AI Video Production & SNS Automation Platform — Product Contract
 
 ## Product promise
-AI Acquisition Search is an AI-directed video production platform for the web app and Claude Code extension. It should deliver the workflow a world-class video studio provides—briefing, creative direction, pre-production, generation, edit planning, sound, delivery, publishing and learning—through connected specialist engines. It is not merely a product-URL analyzer and it must not claim to replace human craft where the connected tools cannot yet deliver it.
+AI Acquisition Search is an AI-directed video production platform integrated with reliable SNS publishing. The primary workflow turns a prompt and optional reference/product images into a creative brief, shot plan, generated video with requested sound where supported, a reviewable deliverable, and an authorized social post. Users can also publish existing media without regenerating it.
 
-## User entry points
-- **Prompt-first:** the user describes the video they want in natural language.
-- **Assets:** optional product photos, reference images, footage, audio, brand assets and a public URL/Shopify product link.
-- **Video types:** ads/commerce, social shorts, music videos, brand films, explainers, product demos, event recaps and cinematic concepts. The director selects an appropriate format rather than forcing every brief into an ad.
-- **Production controls:** goal, audience, channel, aspect ratio, duration, resolution, visual references, voice, narration, music, captions, budget/quality preference and rights/brand constraints.
-- **Output:** a production brief and shot plan before generation; generated assets; status/provenance; final playable/downloadable output where the configured engines support it; channel-specific publish payloads.
+## Primary user journey
+1. Accept a natural-language brief and optional product/reference images or an existing media file.
+2. Build an AI-directed treatment, hook, shot plan, motion and sound plan.
+3. Generate through a configured provider; persist job IDs, status, errors and usage.
+4. Validate playable output, requested audio, duration and aspect ratio; allow preview/revision.
+5. Prepare platform-specific caption, media and disclosure; preflight rights, scopes and limits.
+6. Connect a social account through official OAuth and obtain explicit posting consent.
+7. Publish now or schedule with a visible timezone; persist durable queue states.
+8. Confirm publication from the provider response and save ID/URL/timestamp/visibility.
+9. Reconcile ambiguous timeouts before retrying; prevent duplicate posts.
+10. Use real permitted analytics to recommend the next creative test.
 
-## Director pipeline
-1. Validate brief and asset rights; ask only for missing information that materially blocks production.
-2. Turn the brief into a creative treatment, audience promise, hook/opening, scene-by-scene shot list, camera/motion, pacing, on-screen text and sound plan.
-3. Choose a suitable connected generation provider/model using capability, quality, aspect ratio, duration, latency and configured cost limits. Never pretend a provider is configured when it is not.
-4. Generate video/image/audio assets and track provider job IDs, state, retries, and errors.
-5. Assemble the final deliverable with narration, BGM/SFX, captions and edit decisions only where the implementation can actually perform them. Validate duration, dimensions, audio track and playable bytes.
-6. Let the user preview and revise; persist jobs so reloads can recover them.
-7. Prepare or publish platform-specific outputs only with user authorization and valid OAuth scopes. Record external IDs/URLs and distinguish queued, processing, published, failed and manual-action-required states.
-8. Collect permitted analytics, compare results against the stated hypothesis, and propose the next test. Do not promise virality or fabricate performance.
+## Product information architecture
+- **AI Video Studio:** prompt/image input, creative direction, generation status, audio options, preview and export.
+- **Publish / Operations:** queue status, connected-account readiness, next scheduled posts, existing-media intake, captions, preview, schedule and preflight.
+- **Queue / Calendar:** scheduled, processing, published, failed and manual-action-required states; timezone visible; edit/cancel behavior explicit.
+- **Accounts:** per-platform connection state, scopes, consent, expiry/reconnect and disconnect.
+- **Analytics:** only provider-returned measurements, timestamped and attributed to the correct post/account.
+- **Activity / Settings:** audit history, retries, deletion, permissions and operational configuration.
 
-## Shopify and commerce
-Treat Shopify as an optional commerce source, not a required entry point. A future/connected Shopify integration should use OAuth and least-privilege scopes, let the merchant choose products, and import only approved product fields and media. Do not ask users to paste Admin API secrets, scrape authenticated stores, or publish product claims that are not supported by supplied/catalog evidence. Product URL and Shopify are optional inputs; prompt-only and image-only briefs remain first-class.
+## Publishing state machine
+Use explicit states such as `draft`, `scheduled`, `queued`, `publishing`, `published`, `failed`, `reconciling`, `cancelled`, and `manual_action_required`. A queue entry is not a published post. A provider HTTP success is not sufficient unless the provider response confirms the resulting state. Persist idempotency keys or equivalent deduplication keys where supported.
 
-## SNS automation guardrails
-- A creative can be prepared without posting.
-- Auto-publish requires a connected account, platform permission, explicit per-account consent and a user-configured scope/budget/schedule.
-- Use platform APIs and respect rate limits, disclosure/AI-content rules, music and image rights, and platform review status.
-- Never guarantee that a video will go viral. Optimize testable leading indicators (retention, completion, shares, saves, CTR and conversions) using actual returned data.
-- Do not silently retry a non-idempotent publish after an ambiguous timeout; first reconcile the provider status to avoid duplicate posts.
+## Authorization and safety
+- Require account OAuth, valid scopes and explicit per-account consent before public auto-publishing.
+- Respect platform policies, API limits, visibility restrictions, AI-content disclosure, music/image rights and user schedule settings.
+- Never ask users to paste platform secrets into chat or browser-visible forms.
+- Keep tokens server-side, encrypted where appropriate, and handle expiry/revocation clearly.
+- Enforce ownership and RLS on media, queue records, tokens and analytics.
+- Validate file MIME type, actual bytes, size, duration and dimensions; do not trust filename extensions alone.
+- Never blindly retry a non-idempotent post after a timeout; reconcile remote state first.
+- Never invent external IDs, URLs, analytics, conversions, revenue or a successful publish state.
 
-## Quality gates
-- **Brief:** clear objective, audience, format, promise, CTA and evidence/assumptions.
-- **Creative:** intentional opening, coherent visual language, shot variety, pacing, readable text, continuity and no unsupported claims.
-- **Media:** generated files are non-empty and playable; duration/aspect ratio are checked; audio track is present when requested; narration/music are mixed at intelligible levels when mixing is supported.
-- **Delivery:** preview, download, job recovery, meaningful errors, accessible controls, responsive UI, reduced-motion support and clear cost/usage state.
-- **Publishing:** per-platform preflight, consent/scope check, duplicate protection, provider-confirmed status and recovery path.
-- **Trust/security:** ownership checks, private asset storage, signed URL expiry, SSRF defenses, secret isolation, RLS, retention/deletion policy and audit trail.
-- **Learning:** distinguish measured facts from estimates; no made-up views, sales, ROI or virality.
+## UX and design quality gates
+- Distinctive, coherent visual system with clear hierarchy and polished responsive behavior.
+- First screen immediately communicates the next action and current operational readiness.
+- Accessible keyboard navigation, visible focus, semantic labels, sufficient contrast and reduced-motion support.
+- Helpful empty/loading/success/error states; errors explain a recovery action.
+- Mobile queue management and upload controls remain usable without horizontal overflow.
+- Status labels reflect persisted backend/provider states, not optimistic UI assumptions.
+- Avoid decorative dashboards full of invented counts or simulated success.
+
+## Ten-pass review protocol
+Each pass must record the inspected evidence, defect, concrete change, validation result and remaining blocker. Do not count a plan, visual mock, or code-only change without checks as a completed pass.
+
+1. Product scope and navigation: make AI-directed video production and authorized SNS publishing one coherent workflow.
+2. Visual hierarchy: improve information density, typography, spacing, color and focus on the main action.
+3. Responsive UX: check mobile/tablet/desktop, overflow, touch targets and long content.
+4. Accessibility: semantic structure, keyboard flow, focus visibility, contrast and reduced motion.
+5. Media intake: validate file content, type, size, preview and safe upload failure recovery.
+6. Queue/scheduling: durable states, timezone clarity, cancellation and no duplicate queue jobs.
+7. OAuth and consent: per-account readiness, expired/revoked tokens, scope mismatch and disconnect.
+8. Publish reliability: provider-confirmed outcomes, timeout reconciliation, retry safety and activity log.
+9. Analytics/trust: only real metrics, source/time provenance, empty states and no fabricated performance.
+10. Release verification: typecheck, lint, tests, production build, deployment status, then a live provider test when credentials and permissions permit.
+
+## Live integration limitation
+A repository adapter or successful deployment does not prove live public posting. Completion requires a real authorized test post, returned provider ID/URL, confirmed visibility, and a separate scheduled-post test. If platform review or credentials block that test, report the exact blocker and do not claim end-to-end completion.
 
 ## Revenue goal
-Business target: ¥160,000,000 in revenue. This is a target, not a forecast or current result. Build a measurable plan with paid conversion, ARPA, churn, generation/provider cost, gross margin, CAC, retention and expansion revenue. Do not claim the target is achieved without billing/finance evidence.
-
-## Ten-pass improvement protocol
-Each pass must record: (1) scope, (2) evidence inspected, (3) defect/risk, (4) code or test change, (5) test result, (6) remaining blocker. A pass is complete only after evidence is captured. A review checklist or plan alone does not count as a completed pass.
+Target revenue: ¥160,000,000. This is an objective, not a forecast or achieved result. Measure paid conversion, ARPA, churn, provider costs, gross margin, CAC, retention and expansion revenue.
